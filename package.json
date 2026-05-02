@@ -1,0 +1,19 @@
+{
+  "name": "switchyard",
+  "version": "0.0.0",
+  "private": true,
+  "workspaces": ["shared", "server", "client"],
+  "scripts": {
+    "dev:server": "bun --cwd server run dev",
+    "dev:client": "bun --cwd client run dev",
+    "build": "bun --cwd client run build && bun --cwd server run build",
+    "openapi:gen": "bun --cwd server run openapi:gen",
+    "db:generate": "bun --cwd server run db:generate",
+    "db:migrate": "bun --cwd server run db:migrate",
+    "typecheck": "tsc -b shared server client"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  },
+  "packageManager": "bun@1.1.34"
+}

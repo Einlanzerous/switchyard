@@ -1,0 +1,95 @@
+-- Custom SQL applied after the schema migration.
+-- These enforce cross-row invariants that Drizzle's CHECK constraints cannot express.
+-- The migrate.ts runner applies this file once after the generated drizzle migrations.
+
+-- ─── Epic hierarchy guard ────────────────────────────────────────────────────
+-- Rules:
+--   - epics cannot have a parent (no epic-of-epic for now)
+--   - non-epic tickets may have a parent only if that parent is type='epic' and not soft-deleted
+CREATE OR REPLACE FUNCTION enforce_ticket_hierarchy() RETURNS trigger AS $$
+DECLARE
+  parent_type ticket_type;
+  parent_deleted timestamptz;
+BEGIN
+  IF NEW.parent_id IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  IF NEW.type = 'epic' THEN
+    RAISE EXCEPTION 'epics cannot have a parent (parent_id must be NULL when type=epic)';
+  END IF;
+
+  SELECT type, deleted_at INTO parent_type, parent_deleted
+    FROM tickets WHERE id = NEW.parent_id;
+
+  IF parent_type IS NULL THEN
+    RAISE EXCEPTION 'parent ticket % does not exist', NEW.parent_id;
+  END IF;
+
+  IF parent_type <> 'epic' THEN
+    RAISE EXCEPTION 'parent ticket must be type=epic, got %', parent_type;
+  END IF;
+
+  IF parent_deleted IS NOT NULL THEN
+    RAISE EXCEPTION 'parent ticket is soft-deleted';
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS tickets_hierarchy_check ON tickets;
+CREATE TRIGGER tickets_hierarchy_check
+  BEFORE INSERT OR UPDATE OF parent_id, type ON tickets
+  FOR EACH ROW EXECUTE FUNCTION enforce_ticket_hierarchy();
+
+-- ─── Resolution required only when status category = closed ─────────────────
+-- This is a cross-table check (tickets.resolution depends on statuses.category),
+-- so it lives as a trigger rather than a CHECK constraint.
+CREATE OR REPLACE FUNCTION enforce_resolution_on_close() RETURNS trigger AS $$
+DECLARE
+  status_cat status_category;
+BEGIN
+  SELECT category INTO status_cat FROM statuses WHERE id = NEW.status_id;
+
+  IF status_cat IS NULL THEN
+    RAISE EXCEPTION 'status_id % does not exist', NEW.status_id;
+  END IF;
+
+  IF status_cat = 'closed' AND NEW.resolution IS NULL THEN
+    RAISE EXCEPTION 'resolution is required when transitioning to a closed status';
+  END IF;
+
+  IF status_cat <> 'closed' AND NEW.resolution IS NOT NULL THEN
+    RAISE EXCEPTION 'resolution must be NULL when status category is %', status_cat;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS tickets_resolution_check ON tickets;
+CREATE TRIGGER tickets_resolution_check
+  BEFORE INSERT OR UPDATE OF status_id, resolution ON tickets
+  FOR EACH ROW EXECUTE FUNCTION enforce_resolution_on_close();
+
+-- ─── updated_at auto-bump ───────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION bump_updated_at() RETURNS trigger AS $$
+BEGIN
+  NEW.updated_at := now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DO $$
+DECLARE
+  t text;
+BEGIN
+  FOR t IN
+    SELECT table_name FROM information_schema.columns
+    WHERE column_name = 'updated_at' AND table_schema = current_schema()
+  LOOP
+    EXECUTE format('DROP TRIGGER IF EXISTS bump_updated_at ON %I', t);
+    EXECUTE format('CREATE TRIGGER bump_updated_at BEFORE UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION bump_updated_at()', t);
+  END LOOP;
+END $$;

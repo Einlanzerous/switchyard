@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+client/dist/
+server/dist/
+shared/dist/
+*.tsbuildinfo
+
+# Caches
+.turbo/
+.cache/
+.vite/
+.bun/
+
+# Tests
+coverage/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Local environment (.env.example IS committed; .env and variants are not)
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+
+# Local-dev attachment storage (production uses the /data/uploads docker volume)
+uploads/
+
+# NOT ignored — listed here as a reminder that these ARE committed:
+#   bun.lock / bun.lockb       (lockfile, for reproducible installs)
+#   server/drizzle/migrations/ (migration history is the schema's source of truth)
+#   openapi.yaml               (generated, but committed for diffing across PRs)
