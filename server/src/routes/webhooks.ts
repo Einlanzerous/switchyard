@@ -4,8 +4,9 @@ import {
   CreateWebhookSubscription, UpdateWebhookSubscription,
   WebhookDelivery, Uuid, paginated, Pagination,
 } from "@switchyard/shared";
-import { requireAuth, requireScope } from "../auth.js";
-import { errorResponses, okJson, createdJson, noContent, stub, z } from "./_helpers.js";
+import { requireAuth } from "../auth.js";
+import { idempotency } from "../lib/idempotency.js";
+import { errorResponses, okJson, createdJson, noContent, stub, scope, z, checkScope } from "./_helpers.js";
 
 const tag = "Webhooks";
 
@@ -59,11 +60,12 @@ const redeliver = createRoute({
 
 export function mount(app: OpenAPIHono) {
   app.use("/v1/webhooks/*", requireAuth);
+  app.use("/v1/webhooks/*", idempotency);
   app.openapi(list, stub);
-  app.openapi(create, requireScope("webhooks:manage"), stub);
+  app.openapi(create, (async (c: any) => { checkScope(c, "webhooks:manage"); return stub(c); }));
   app.openapi(get, stub);
-  app.openapi(update, requireScope("webhooks:manage"), stub);
-  app.openapi(remove, requireScope("webhooks:manage"), stub);
+  app.openapi(update, (async (c: any) => { checkScope(c, "webhooks:manage"); return stub(c); }));
+  app.openapi(remove, (async (c: any) => { checkScope(c, "webhooks:manage"); return stub(c); }));
   app.openapi(deliveries, stub);
-  app.openapi(redeliver, requireScope("webhooks:manage"), stub);
+  app.openapi(redeliver, (async (c: any) => { checkScope(c, "webhooks:manage"); return stub(c); }));
 }

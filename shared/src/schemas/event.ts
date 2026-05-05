@@ -17,6 +17,9 @@ export const EventType = z.enum([
   "comment.deleted",
   "attachment.added",
   "attachment.removed",
+  "project.created",
+  "project.updated",
+  "project.deleted",
 ]);
 export type EventType = z.infer<typeof EventType>;
 

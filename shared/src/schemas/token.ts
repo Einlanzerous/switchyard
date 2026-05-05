@@ -7,6 +7,7 @@ export const ApiTokenScope = z.enum([
   "comments:write",
   "attachments:write",
   "webhooks:manage",
+  "projects:manage",
   "users:manage",
   "admin",
 ]);

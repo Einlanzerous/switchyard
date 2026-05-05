@@ -6,6 +6,8 @@ import { env } from "./env.js";
 import { assertDatabaseReachable, pingDatabase, shutdownDatabase } from "./db.js";
 import { installErrorHandler } from "./errors.js";
 import { mountRoutes } from "./routes/index.js";
+import { startDispatcher, stopDispatcher } from "./lib/webhooks/dispatcher.js";
+import { cleanupExpiredIdempotencyKeys } from "./lib/idempotency.js";
 
 await assertDatabaseReachable();
 
@@ -49,9 +51,18 @@ const server = Bun.serve({
   fetch: app.fetch,
 });
 
+// Background workers.
+startDispatcher();
+const idempotencyCleanup = setInterval(
+  () => void cleanupExpiredIdempotencyKeys().catch((e) => console.warn("[idempotency cleanup]", e)),
+  60 * 60 * 1000
+);
+
 const shutdown = async (signal: string) => {
   console.log(`[switchyard] received ${signal}, shutting down`);
   server.stop();
+  clearInterval(idempotencyCleanup);
+  await stopDispatcher(5_000);
   await shutdownDatabase();
   process.exit(0);
 };

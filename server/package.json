@@ -10,7 +10,12 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "bun src/lib/migrate.ts",
     "db:studio": "drizzle-kit studio",
-    "openapi:gen": "bun src/lib/openapi-gen.ts"
+    "db:test:setup": "bun scripts/db-test-setup.ts",
+    "dev:seed-sample": "bun scripts/dev-seed-sample.ts",
+    "openapi:gen": "bun src/lib/openapi-gen.ts",
+    "test": "bun test",
+    "test:unit": "bun test test/lib/pagination.test.ts test/lib/hmac.test.ts",
+    "test:integration": "bun test test/lib/seed.test.ts"
   },
   "dependencies": {
     "@hono/zod-openapi": "^0.18.3",

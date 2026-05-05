@@ -6,6 +6,7 @@ WORKDIR /app
 
 # Copy only manifests first — restores lockfile-aware caching.
 COPY package.json bun.lock* ./
+COPY tsconfig.base.json ./
 COPY shared/package.json ./shared/
 COPY server/package.json ./server/
 COPY client/package.json ./client/
@@ -18,7 +19,7 @@ FROM deps AS client-builder
 WORKDIR /app
 COPY shared ./shared
 COPY client ./client
-RUN bun --cwd client run build
+RUN bun run --cwd client build
 
 # ─── runtime ───────────────────────────────────────────────────────────────
 FROM oven/bun:1.1-alpine AS runtime

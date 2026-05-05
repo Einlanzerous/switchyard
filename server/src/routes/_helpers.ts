@@ -1,6 +1,8 @@
 import { z } from "@hono/zod-openapi";
 import { ErrorEnvelope } from "@switchyard/shared";
-import { notImplemented } from "../errors.js";
+import type { ApiTokenScope } from "@switchyard/shared";
+import { notImplemented, unauthorized, forbidden } from "../errors.js";
+import { requireScope as _requireScope } from "../auth.js";
 
 // All non-2xx responses use the same envelope. Centralized so route definitions
 // don't have to repeat the response shape.
@@ -32,9 +34,27 @@ export const stub: any = () => {
   throw notImplemented();
 };
 
+// Loosely-typed wrapper around requireScope. @hono/zod-openapi's `app.openapi`
+// types every subsequent argument as a Handler with a TypedResponse return,
+// which a generic MiddlewareHandler doesn't satisfy. Casting to `any` here
+// keeps route definitions readable without poisoning the whole auth module.
+export const scope = (...scopes: ApiTokenScope[]): any => _requireScope(...scopes);
+
 // Common header schemas.
 export const idempotencyHeader = z.object({
   "idempotency-key": z.string().min(1).max(128).optional(),
 });
 
 export { z };
+
+/**
+ * Throwing version of scope check for use inside handlers.
+ */
+export function checkScope(c: any, ...scopes: ApiTokenScope[]) {
+  const auth = c.get("auth");
+  if (!auth) throw unauthorized();
+  const granted = auth.token.scopes as ApiTokenScope[];
+  if (granted.includes("admin")) return;
+  const ok = scopes.every((s) => granted.includes(s));
+  if (!ok) throw forbidden(`requires scope(s): ${scopes.join(", ")}`);
+}

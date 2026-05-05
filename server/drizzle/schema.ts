@@ -108,11 +108,15 @@ export const userProjects = pgTable(
   })
 );
 
+// Per-project ticket counter. Increment-then-return:
+//   UPDATE project_counters SET last_used_number = last_used_number + 1
+//     WHERE project_id = $1 RETURNING last_used_number
+// The returned value is the new ticket's number.
 export const projectCounters = pgTable("project_counters", {
   project_id: uuid("project_id")
     .primaryKey()
     .references(() => projects.id, { onDelete: "cascade" }),
-  next_number: integer("next_number").notNull().default(1),
+  last_used_number: integer("last_used_number").notNull().default(0),
 });
 
 // ─── statuses + transitions ─────────────────────────────────────────────────

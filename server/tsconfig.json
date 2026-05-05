@@ -3,7 +3,7 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": ".",
-    "types": ["bun-types"],
+    "types": ["bun"],
     "noEmit": true
   },
   "include": ["src/**/*.ts", "drizzle/**/*.ts", "drizzle.config.ts"],

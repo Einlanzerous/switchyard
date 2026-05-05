@@ -59,7 +59,11 @@ export const CreateTicket = z.object({
 });
 export type CreateTicket = z.infer<typeof CreateTicket>;
 
-export const UpdateTicket = CreateTicket.omit({ project_key: true, type: true })
+// status_id is intentionally omitted: status changes are routed exclusively
+// through POST /v1/tickets/{idOrKey}/transition, which enforces the
+// transitions table and the epic-close guard. Use that endpoint for any
+// status mutation; PATCH covers everything else.
+export const UpdateTicket = CreateTicket.omit({ project_key: true, type: true, status_id: true })
   .partial()
   .extend({
     label_ids: z.array(Uuid).optional(), // replaces full set when provided

@@ -1,15 +1,32 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import {
+  and, asc, desc, eq, gt, gte, ilike, inArray, isNull, lt, lte, ne, or, sql, type SQL,
+} from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
+import {
   Ticket, TicketSummary, CreateTicket, UpdateTicket, TransitionTicket,
   TicketListFilters, Event, paginated, Pagination,
+  type TicketSummary as ApiTicketSummary,
+  type EventType,
 } from "@switchyard/shared";
+import { db } from "../db.js";
+import * as schema from "../../drizzle/schema.js";
 import { requireAuth } from "../auth.js";
-import { errorResponses, okJson, createdJson, noContent, stub, z, idempotencyHeader } from "./_helpers.js";
+import { idempotency } from "../lib/idempotency.js";
+import { errorResponses, okJson, createdJson, noContent, checkScope, z, idempotencyHeader } from "./_helpers.js";
+import { mapEvent, mapTicketSummary, mapStatusRef, mapUserRef } from "../lib/mappers.js";
+import { resolveTicket, getProjectByKey, getStatusById, getUserById } from "../lib/lookups.js";
+import { buildPage, cursorOrderBy, cursorWhere, decodeCursor } from "../lib/pagination.js";
+import { writeEvent } from "../lib/events.js";
+import { loadTicketDetail, loadTicketSummary, allocateTicketNumber } from "../lib/tickets.js";
+import { badRequest, notFound, unprocessable } from "../errors.js";
 
 const tag = "Tickets";
-
-// Path param accepts either a UUID or a project-prefixed key (e.g. SWY-47).
 const idOrKey = z.string().min(1);
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const STATUS_CATEGORIES = new Set(["backlog", "planning", "in_progress", "blocked", "closed"]);
+const TICKET_TYPES = new Set(["spike", "task", "bug", "epic"]);
 
 const list = createRoute({
   method: "get", path: "/v1/tickets", tags: [tag], summary: "List tickets",
@@ -75,12 +92,588 @@ const children = createRoute({
 
 export function mount(app: OpenAPIHono) {
   app.use("/v1/tickets/*", requireAuth);
-  app.openapi(list, stub);
-  app.openapi(create, stub);
-  app.openapi(get, stub);
-  app.openapi(update, stub);
-  app.openapi(remove, stub);
-  app.openapi(transition, stub);
-  app.openapi(events, stub);
-  app.openapi(children, stub);
+  app.use("/v1/tickets/*", idempotency);
+
+  // ─── list ────────────────────────────────────────────────────────────────
+  app.openapi(list, (async (c: any) => {
+    const q = c.req.valid("query");
+    const limit = q.limit;
+
+    const conds: SQL[] = [];
+    if (!q.include_deleted) conds.push(isNull(schema.tickets.deleted_at));
+
+    if (q.project) {
+      const keys = q.project.split(",").map((k: string) => k.trim()).filter(Boolean);
+      if (keys.length > 0) {
+        const projects = await db.select({ id: schema.projects.id }).from(schema.projects)
+          .where(inArray(schema.projects.key, keys));
+        if (projects.length === 0) {
+          return c.json({ items: [], page: { next_cursor: null, has_more: false } }, 200);
+        }
+        conds.push(inArray(schema.tickets.project_id, projects.map((p) => p.id)));
+      }
+    }
+
+    if (q.status) {
+      const values = q.status.split(",").map((s: string) => s.trim()).filter(Boolean);
+      const ids: string[] = [];
+      const categories: string[] = [];
+      for (const v of values) {
+        if (UUID_RE.test(v)) ids.push(v);
+        else if (STATUS_CATEGORIES.has(v)) categories.push(v);
+        else throw badRequest(`unknown status value: ${v}`);
+      }
+      const statusConds: SQL[] = [];
+      if (ids.length > 0) statusConds.push(inArray(schema.tickets.status_id, ids));
+      if (categories.length > 0) {
+        statusConds.push(
+          sql`EXISTS (SELECT 1 FROM statuses s WHERE s.id = ${schema.tickets.status_id} AND s.category = ANY(${sql.raw(`ARRAY[${categories.map((cat: string) => `'${cat}'`).join(",")}]::status_category[]`)}))`
+        );
+      }
+      if (statusConds.length === 1) conds.push(statusConds[0]!);
+      else if (statusConds.length > 1) conds.push(or(...statusConds)!);
+    }
+
+    if (q.type) {
+      const types = q.type.split(",").map((t: string) => t.trim()).filter(Boolean);
+      for (const t of types) {
+        if (!TICKET_TYPES.has(t)) throw badRequest(`unknown type: ${t}`);
+      }
+      conds.push(inArray(schema.tickets.type, types as any));
+    }
+
+    if (q.label) {
+      const labelIds = q.label.split(",").map((s: string) => s.trim()).filter(Boolean);
+      if (labelIds.length > 0) {
+        conds.push(
+          sql`EXISTS (SELECT 1 FROM ticket_labels tl WHERE tl.ticket_id = ${schema.tickets.id} AND tl.label_id = ANY(${sql.raw(`ARRAY[${labelIds.map((id: string) => `'${id}'`).join(",")}]::uuid[]`)}))`
+        );
+      }
+    }
+
+    if (q.assignee) {
+      if (q.assignee === "unassigned") conds.push(isNull(schema.tickets.assignee_id));
+      else conds.push(eq(schema.tickets.assignee_id, q.assignee));
+    }
+
+    if (q.reporter) conds.push(eq(schema.tickets.reporter_id, q.reporter));
+    if (q.parent_id) conds.push(eq(schema.tickets.parent_id, q.parent_id));
+
+    if (q.text) {
+      const pattern = `%${q.text}%`;
+      conds.push(or(
+        ilike(schema.tickets.title, pattern),
+        ilike(schema.tickets.description, pattern),
+      )!);
+    }
+
+    if (q.updated_after) conds.push(gt(schema.tickets.updated_at, q.updated_after));
+    if (q.updated_before) conds.push(lt(schema.tickets.updated_at, q.updated_before));
+
+    if (q.cursor) {
+      const cur = decodeCursor(q.cursor);
+      if (!cur) throw badRequest("invalid cursor");
+      conds.push(cursorWhere(schema.tickets.updated_at, schema.tickets.id, cur));
+    }
+
+    const assignee = alias(schema.users, "assignee");
+    const reporter = alias(schema.users, "reporter");
+
+    const rows = await db.select({
+      t: schema.tickets,
+      project: schema.projects,
+      status: schema.statuses,
+      assignee,
+      reporter,
+    })
+      .from(schema.tickets)
+      .innerJoin(schema.projects, eq(schema.tickets.project_id, schema.projects.id))
+      .innerJoin(schema.statuses, eq(schema.tickets.status_id, schema.statuses.id))
+      .leftJoin(assignee, eq(schema.tickets.assignee_id, assignee.id))
+      .innerJoin(reporter, eq(schema.tickets.reporter_id, reporter.id))
+      .where(conds.length > 0 ? and(...conds) : undefined)
+      .orderBy(...cursorOrderBy(schema.tickets.updated_at, schema.tickets.id))
+      .limit(limit + 1);
+
+    const ticketIds = rows.map((r) => r.t.id);
+    const labelsByTicket = await fetchLabelsByTicket(ticketIds);
+
+    const summaries: ApiTicketSummary[] = rows.map((r) =>
+      mapTicketSummary(r.t, {
+        project: r.project,
+        status: r.status,
+        assignee: r.assignee,
+        reporter: r.reporter,
+        labels: labelsByTicket.get(r.t.id) ?? [],
+        number: r.t.number,
+      })
+    );
+
+    return c.json(buildPage(summaries, limit), 200);
+  }) as any);
+
+  // ─── detail ──────────────────────────────────────────────────────────────
+  app.openapi(get, (async (c: any) => {
+    const { idOrKey: param } = c.req.valid("param");
+    const ticket = await resolveTicket(param);
+    return c.json(await loadTicketDetail(ticket), 200);
+  }) as any);
+
+  // ─── create ──────────────────────────────────────────────────────────────
+  app.openapi(create, (async (c: any) => {
+    checkScope(c, "tickets:write");
+    const body = c.req.valid("json");
+    const auth = c.get("auth");
+
+    const project = await getProjectByKey(body.project_key, { includeArchived: false });
+
+    // Validate parent (epic in same project, not deleted). Trigger backstops.
+    if (body.parent_id) {
+      const [parent] = await db.select().from(schema.tickets)
+        .where(and(eq(schema.tickets.id, body.parent_id), isNull(schema.tickets.deleted_at)))
+        .limit(1);
+      if (!parent) throw badRequest("parent ticket not found");
+      if (parent.project_id !== project.id) throw badRequest("parent must be in the same project");
+      if (parent.type !== "epic") throw badRequest("parent must be an epic");
+      if (body.type === "epic") throw badRequest("epics cannot have a parent");
+    }
+
+    if (body.assignee_id) await getUserById(body.assignee_id);
+
+    // Resolve target status: explicit, else project default.
+    let statusId = body.status_id;
+    if (!statusId) {
+      const [def] = await db.select({ id: schema.statuses.id })
+        .from(schema.statuses)
+        .where(and(eq(schema.statuses.project_id, project.id), eq(schema.statuses.is_default, true)))
+        .limit(1);
+      if (!def) throw badRequest("project has no default status");
+      statusId = def.id;
+    } else {
+      const status = await getStatusById(statusId);
+      if (status.project_id !== project.id) throw badRequest("status does not belong to this project");
+    }
+
+    if (body.label_ids && body.label_ids.length > 0) {
+      const labels = await db.select({ id: schema.labels.id }).from(schema.labels)
+        .where(and(eq(schema.labels.project_id, project.id), inArray(schema.labels.id, body.label_ids)));
+      if (labels.length !== body.label_ids.length) {
+        throw badRequest("one or more labels do not belong to this project");
+      }
+    }
+
+    const inserted = await db.transaction(async (tx) => {
+      const number = await allocateTicketNumber(tx, project.id);
+
+      const [t] = await tx.insert(schema.tickets).values({
+        project_id: project.id,
+        number,
+        type: body.type,
+        title: body.title,
+        description: body.description ?? "",
+        status_id: statusId!,
+        priority: body.priority ?? null,
+        parent_id: body.parent_id ?? null,
+        assignee_id: body.assignee_id ?? null,
+        reporter_id: auth.user.id,
+        due_date: body.due_date ?? null,
+        metadata: (body.metadata ?? {}) as any,
+      }).returning();
+
+      if (!t) throw new Error("ticket insert returned nothing");
+
+      if (body.label_ids && body.label_ids.length > 0) {
+        await tx.insert(schema.ticketLabels).values(
+          body.label_ids.map((label_id: string) => ({ ticket_id: t.id, label_id }))
+        );
+      }
+
+      return t;
+    });
+
+    // Build summary OUTSIDE the txn for the event — read-after-write of the freshly-committed row.
+    const summary = await loadTicketSummary(inserted);
+    await db.transaction(async (tx) => {
+      await writeEvent(tx as any, {
+        event_type: "ticket.created",
+        actor: mapUserRef(auth.user),
+        ticket: summary,
+        project_id: project.id,
+      });
+    });
+
+    return c.json(await loadTicketDetail(inserted), 201);
+  }) as any);
+
+  // ─── update ──────────────────────────────────────────────────────────────
+  app.openapi(update, (async (c: any) => {
+    checkScope(c, "tickets:write");
+    const { idOrKey: param } = c.req.valid("param");
+    const body = c.req.valid("json");
+    const auth = c.get("auth");
+    const existing = await resolveTicket(param);
+    const project = await db.select().from(schema.projects).where(eq(schema.projects.id, existing.project_id)).limit(1).then((r) => r[0]);
+    if (!project) throw badRequest("orphan ticket: project missing");
+
+    // Validate parent if changed.
+    if (body.parent_id !== undefined && body.parent_id !== null) {
+      if (body.parent_id === existing.id) throw badRequest("ticket cannot be its own parent");
+      const [parent] = await db.select().from(schema.tickets)
+        .where(and(eq(schema.tickets.id, body.parent_id), isNull(schema.tickets.deleted_at)))
+        .limit(1);
+      if (!parent) throw badRequest("parent ticket not found");
+      if (parent.project_id !== existing.project_id) throw badRequest("parent must be in the same project");
+      if (parent.type !== "epic") throw badRequest("parent must be an epic");
+      if (existing.type === "epic") throw badRequest("epics cannot have a parent");
+    }
+
+    if (body.assignee_id !== undefined && body.assignee_id !== null) {
+      await getUserById(body.assignee_id);
+    }
+
+    if (body.label_ids !== undefined && body.label_ids.length > 0) {
+      const labels = await db.select({ id: schema.labels.id }).from(schema.labels)
+        .where(and(eq(schema.labels.project_id, existing.project_id), inArray(schema.labels.id, body.label_ids)));
+      if (labels.length !== body.label_ids.length) {
+        throw badRequest("one or more labels do not belong to this project");
+      }
+    }
+
+    const sets: Partial<typeof schema.tickets.$inferInsert> = {};
+    if (body.title !== undefined) sets.title = body.title;
+    if (body.description !== undefined) sets.description = body.description ?? "";
+    if (body.priority !== undefined) sets.priority = body.priority ?? null;
+    if (body.parent_id !== undefined) sets.parent_id = body.parent_id ?? null;
+    if (body.assignee_id !== undefined) sets.assignee_id = body.assignee_id ?? null;
+    if (body.due_date !== undefined) sets.due_date = body.due_date ?? null;
+    if (body.metadata !== undefined) sets.metadata = body.metadata as any;
+
+    const noFieldChanges = Object.keys(sets).length === 0;
+    const noLabelChange = body.label_ids === undefined;
+    if (noFieldChanges && noLabelChange) {
+      return c.json(await loadTicketDetail(existing), 200);
+    }
+
+    const updated = await db.transaction(async (tx) => {
+      let row = existing;
+      if (!noFieldChanges) {
+        const [u] = await tx.update(schema.tickets)
+          .set(sets)
+          .where(eq(schema.tickets.id, existing.id))
+          .returning();
+        if (!u) throw new Error("update returned nothing");
+        row = u;
+      }
+
+      if (!noLabelChange) {
+        await tx.delete(schema.ticketLabels).where(eq(schema.ticketLabels.ticket_id, existing.id));
+        if (body.label_ids!.length > 0) {
+          await tx.insert(schema.ticketLabels).values(
+            body.label_ids!.map((label_id: string) => ({ ticket_id: existing.id, label_id }))
+          );
+        }
+      }
+
+      return row;
+    });
+
+    // Emit ticket.updated with field diff (skip "labels" — too noisy as a string diff).
+    const summary = await loadTicketSummary(updated);
+    const fields = Object.keys(sets).map((field) => ({
+      field,
+      from: (existing as any)[field] ?? null,
+      to: (sets as any)[field] ?? null,
+    }));
+    if (!noLabelChange) fields.push({ field: "labels", from: null, to: null });
+
+    await db.transaction(async (tx) => {
+      await writeEvent(tx as any, {
+        event_type: "ticket.updated",
+        actor: mapUserRef(auth.user),
+        ticket: summary,
+        project_id: existing.project_id,
+        changes: fields.length > 0 ? { fields } : undefined,
+      });
+      if (body.assignee_id !== undefined && body.assignee_id !== existing.assignee_id) {
+        await writeEvent(tx as any, {
+          event_type: "ticket.assigned",
+          actor: mapUserRef(auth.user),
+          ticket: summary,
+          project_id: existing.project_id,
+        });
+      }
+    });
+
+    return c.json(await loadTicketDetail(updated), 200);
+  }) as any);
+
+  // ─── delete (soft) ───────────────────────────────────────────────────────
+  app.openapi(remove, (async (c: any) => {
+    checkScope(c, "tickets:write");
+    const { idOrKey: param } = c.req.valid("param");
+    const auth = c.get("auth");
+    const existing = await resolveTicket(param);
+
+    const summary = await loadTicketSummary(existing);
+
+    await db.transaction(async (tx) => {
+      await tx.update(schema.tickets)
+        .set({ deleted_at: new Date().toISOString() })
+        .where(eq(schema.tickets.id, existing.id));
+
+      await writeEvent(tx as any, {
+        event_type: "ticket.deleted",
+        actor: mapUserRef(auth.user),
+        ticket: summary,
+        project_id: existing.project_id,
+      });
+    });
+
+    return c.body(null, 204);
+  }) as any);
+
+  // ─── transition ──────────────────────────────────────────────────────────
+  app.openapi(transition, (async (c: any) => {
+    checkScope(c, "tickets:write");
+    const { idOrKey: param } = c.req.valid("param");
+    const body = c.req.valid("json");
+    const auth = c.get("auth");
+    const existing = await resolveTicket(param);
+
+    const fromStatus = await getStatusById(existing.status_id);
+    const toStatus = await getStatusById(body.status_id);
+    if (toStatus.project_id !== existing.project_id) {
+      throw badRequest("target status does not belong to this project");
+    }
+
+    // Resolution rules: required iff target is closed; rejected otherwise.
+    if (toStatus.category === "closed" && !body.resolution) {
+      throw unprocessable("resolution is required when transitioning to a closed status");
+    }
+    if (toStatus.category !== "closed" && body.resolution) {
+      throw unprocessable("resolution must be omitted when target is not closed");
+    }
+
+    // Transitions table: zero rows = wildcard, any rows = whitelist.
+    const allTransitions = await db.select().from(schema.statusTransitions)
+      .where(eq(schema.statusTransitions.project_id, existing.project_id));
+    if (allTransitions.length > 0) {
+      const allowed = allTransitions.some((t) =>
+        t.to_status_id === toStatus.id &&
+        (t.from_status_id === null || t.from_status_id === fromStatus.id)
+      );
+      if (!allowed) {
+        throw unprocessable(
+          `transition from ${fromStatus.display_name} to ${toStatus.display_name} is not allowed`,
+          { from: fromStatus.display_name, to: toStatus.display_name }
+        );
+      }
+    }
+
+    // Epic-close guard.
+    if (existing.type === "epic" && toStatus.category === "closed") {
+      const openChildren = await db.select({
+        id: schema.tickets.id,
+        number: schema.tickets.number,
+        title: schema.tickets.title,
+      })
+        .from(schema.tickets)
+        .innerJoin(schema.statuses, eq(schema.tickets.status_id, schema.statuses.id))
+        .where(and(
+          eq(schema.tickets.parent_id, existing.id),
+          isNull(schema.tickets.deleted_at),
+          ne(schema.statuses.category, "closed"),
+        ));
+
+      if (openChildren.length > 0) {
+        throw unprocessable(
+          `cannot close epic: ${openChildren.length} child ticket${openChildren.length === 1 ? "" : "s"} not yet closed`,
+          { open_children: openChildren }
+        );
+      }
+    }
+
+    // Apply.
+    const updated = await db.transaction(async (tx) => {
+      const [u] = await tx.update(schema.tickets)
+        .set({
+          status_id: toStatus.id,
+          resolution: body.resolution ?? null,
+        })
+        .where(eq(schema.tickets.id, existing.id))
+        .returning();
+      if (!u) throw new Error("update returned nothing");
+
+      if (body.comment) {
+        await tx.insert(schema.comments).values({
+          ticket_id: existing.id,
+          author_id: auth.user.id,
+          body: body.comment,
+        });
+      }
+
+      return u;
+    });
+
+    const summary = await loadTicketSummary(updated);
+
+    // Emit the cluster of events. Order: status_changed (always),
+    // closed (if closed), released (if resolution=released).
+    await db.transaction(async (tx) => {
+      await writeEvent(tx as any, {
+        event_type: "ticket.status_changed",
+        actor: mapUserRef(auth.user),
+        ticket: summary,
+        project_id: existing.project_id,
+        changes: {
+          status: {
+            from: mapStatusRef(fromStatus),
+            to: mapStatusRef(toStatus),
+            resolution: body.resolution ?? null,
+          },
+        },
+      });
+
+      const extraEvents: EventType[] = [];
+      if (toStatus.category === "closed") extraEvents.push("ticket.closed");
+      if (body.resolution === "released") extraEvents.push("ticket.released");
+
+      for (const evt of extraEvents) {
+        await writeEvent(tx as any, {
+          event_type: evt,
+          actor: mapUserRef(auth.user),
+          ticket: summary,
+          project_id: existing.project_id,
+          changes: {
+            status: {
+              from: mapStatusRef(fromStatus),
+              to: mapStatusRef(toStatus),
+              resolution: body.resolution ?? null,
+            },
+          },
+        });
+      }
+
+      if (body.comment) {
+        await writeEvent(tx as any, {
+          event_type: "comment.created",
+          actor: mapUserRef(auth.user),
+          ticket: summary,
+          project_id: existing.project_id,
+          extras: { comment_body: body.comment },
+        });
+      }
+    });
+
+    return c.json(await loadTicketDetail(updated), 200);
+  }) as any);
+
+  // ─── audit history ───────────────────────────────────────────────────────
+  app.openapi(events, (async (c: any) => {
+    const { idOrKey: param } = c.req.valid("param");
+    const q = c.req.valid("query");
+    const limit = q.limit;
+    const ticket = await resolveTicket(param, { includeDeleted: true });
+
+    const conds: SQL[] = [eq(schema.events.ticket_id, ticket.id)];
+    if (q.cursor) {
+      const cur = decodeCursor(q.cursor);
+      if (!cur) throw badRequest("invalid cursor");
+      conds.push(or(
+        lt(schema.events.created_at, cur.u),
+        and(eq(schema.events.created_at, cur.u), lt(schema.events.id, cur.i))!,
+      )!);
+    }
+
+    const rows = await db.select().from(schema.events)
+      .where(and(...conds))
+      .orderBy(desc(schema.events.created_at), desc(schema.events.id))
+      .limit(limit + 1);
+
+    const has_more = rows.length > limit;
+    const slice = has_more ? rows.slice(0, limit) : rows;
+    const items = slice.map(mapEvent);
+    const last = has_more ? slice[slice.length - 1] : null;
+    const next_cursor = last
+      ? Buffer.from(JSON.stringify({ u: last.created_at, i: last.id }), "utf8").toString("base64url")
+      : null;
+
+    return c.json({ items, page: { next_cursor, has_more } }, 200);
+  }) as any);
+
+  // ─── children of an epic ────────────────────────────────────────────────
+  app.openapi(children, (async (c: any) => {
+    const { idOrKey: param } = c.req.valid("param");
+    const q = c.req.valid("query");
+    const limit = q.limit;
+    const parent = await resolveTicket(param);
+
+    const conds: SQL[] = [
+      eq(schema.tickets.parent_id, parent.id),
+      isNull(schema.tickets.deleted_at),
+    ];
+    if (q.cursor) {
+      const cur = decodeCursor(q.cursor);
+      if (!cur) throw badRequest("invalid cursor");
+      conds.push(cursorWhere(schema.tickets.updated_at, schema.tickets.id, cur));
+    }
+
+    const assignee = alias(schema.users, "assignee");
+    const reporter = alias(schema.users, "reporter");
+
+    const rows = await db.select({
+      t: schema.tickets,
+      project: schema.projects,
+      status: schema.statuses,
+      assignee,
+      reporter,
+    })
+      .from(schema.tickets)
+      .innerJoin(schema.projects, eq(schema.tickets.project_id, schema.projects.id))
+      .innerJoin(schema.statuses, eq(schema.tickets.status_id, schema.statuses.id))
+      .leftJoin(assignee, eq(schema.tickets.assignee_id, assignee.id))
+      .innerJoin(reporter, eq(schema.tickets.reporter_id, reporter.id))
+      .where(and(...conds))
+      .orderBy(...cursorOrderBy(schema.tickets.updated_at, schema.tickets.id))
+      .limit(limit + 1);
+
+    const ticketIds = rows.map((r) => r.t.id);
+    const labelsByTicket = await fetchLabelsByTicket(ticketIds);
+
+    const summaries = rows.map((r) =>
+      mapTicketSummary(r.t, {
+        project: r.project,
+        status: r.status,
+        assignee: r.assignee,
+        reporter: r.reporter,
+        labels: labelsByTicket.get(r.t.id) ?? [],
+        number: r.t.number,
+      })
+    );
+
+    return c.json(buildPage(summaries, limit), 200);
+  }) as any);
+
+  void gte; void lte; void notFound;
+}
+
+// ─── helpers ────────────────────────────────────────────────────────────────
+
+async function fetchLabelsByTicket(ticketIds: string[]): Promise<Map<string, (typeof schema.labels.$inferSelect)[]>> {
+  if (ticketIds.length === 0) return new Map();
+  const rows = await db.select({
+    ticket_id: schema.ticketLabels.ticket_id,
+    label: schema.labels,
+  })
+    .from(schema.ticketLabels)
+    .innerJoin(schema.labels, eq(schema.ticketLabels.label_id, schema.labels.id))
+    .where(inArray(schema.ticketLabels.ticket_id, ticketIds));
+
+  const out = new Map<string, (typeof schema.labels.$inferSelect)[]>();
+  for (const r of rows) {
+    const list = out.get(r.ticket_id) ?? [];
+    list.push(r.label);
+    out.set(r.ticket_id, list);
+  }
+  return out;
 }

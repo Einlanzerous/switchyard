@@ -1,6 +1,12 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
+import { and, asc, eq } from "drizzle-orm";
 import { Label, CreateLabel, UpdateLabel, ProjectKey, Uuid } from "@switchyard/shared";
-import { errorResponses, okJson, createdJson, noContent, stub, z } from "./_helpers.js";
+import { db } from "../db.js";
+import * as schema from "../../drizzle/schema.js";
+import { errorResponses, okJson, createdJson, noContent, scope, z, checkScope } from "./_helpers.js";
+import { mapLabel } from "../lib/mappers.js";
+import { getProjectByKey } from "../lib/lookups.js";
+import { conflict, notFound } from "../errors.js";
 
 const tag = "Labels";
 
@@ -35,8 +41,71 @@ const remove = createRoute({
 });
 
 export function mount(app: OpenAPIHono) {
-  app.openapi(list, stub);
-  app.openapi(create, stub);
-  app.openapi(update, stub);
-  app.openapi(remove, stub);
+  app.openapi(list, (async (c: any) => {
+    const { key } = c.req.valid("param");
+    const p = await getProjectByKey(key, { includeArchived: true });
+    const rows = await db.select().from(schema.labels)
+      .where(eq(schema.labels.project_id, p.id))
+      .orderBy(asc(schema.labels.name));
+    return c.json({ items: rows.map(mapLabel) }, 200);
+  }) as any);
+
+  app.openapi(create, (async (c: any) => {
+    checkScope(c, "projects:manage");
+    const { key } = c.req.valid("param");
+    const body = c.req.valid("json");
+    const project = await getProjectByKey(key, { includeArchived: true });
+    try {
+      const [inserted] = await db.insert(schema.labels).values({
+        project_id: project.id,
+        name: body.name,
+        color: body.color,
+      }).returning();
+      if (!inserted) throw new Error("insert returned nothing");
+      return c.json(mapLabel(inserted), 201);
+    } catch (err: any) {
+      if (err?.code === "23505") throw conflict(`label "${body.name}" already exists in this project`);
+      throw err;
+    }
+  }) as any);
+
+  app.openapi(update, (async (c: any) => {
+    checkScope(c, "projects:manage");
+    const { key, id } = c.req.valid("param");
+    const body = c.req.valid("json");
+    const project = await getProjectByKey(key, { includeArchived: true });
+
+    const [existing] = await db.select().from(schema.labels)
+      .where(and(eq(schema.labels.id, id), eq(schema.labels.project_id, project.id)))
+      .limit(1);
+    if (!existing) throw notFound("label");
+
+    const sets: Partial<typeof schema.labels.$inferInsert> = {};
+    if (body.name !== undefined) sets.name = body.name;
+    if (body.color !== undefined) sets.color = body.color;
+    if (Object.keys(sets).length === 0) return c.json(mapLabel(existing), 200);
+
+    try {
+      const [updated] = await db.update(schema.labels)
+        .set(sets)
+        .where(eq(schema.labels.id, id))
+        .returning();
+      if (!updated) throw notFound("label");
+      return c.json(mapLabel(updated), 200);
+    } catch (err: any) {
+      if (err?.code === "23505") throw conflict("label name already in use");
+      throw err;
+    }
+  }) as any);
+
+  app.openapi(remove, (async (c: any) => {
+    checkScope(c, "projects:manage");
+    const { key, id } = c.req.valid("param");
+    const project = await getProjectByKey(key, { includeArchived: true });
+    const result = await db.delete(schema.labels)
+      .where(and(eq(schema.labels.id, id), eq(schema.labels.project_id, project.id)))
+      .returning({ id: schema.labels.id });
+    if (result.length === 0) throw notFound("label");
+    return c.body(null, 204);
+  }) as any);
 }

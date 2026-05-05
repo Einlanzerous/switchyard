@@ -1,10 +1,19 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
+import { and, desc, eq, isNull, type SQL } from "drizzle-orm";
 import {
   User, CreateUser, UpdateUser, Uuid,
   ApiToken, CreateApiToken, ApiTokenWithSecret, paginated, Pagination,
 } from "@switchyard/shared";
-import { requireAuth, requireScope } from "../auth.js";
-import { errorResponses, okJson, createdJson, noContent, stub, z } from "./_helpers.js";
+import { db } from "../db.js";
+import * as schema from "../../drizzle/schema.js";
+import { requireAuth } from "../auth.js";
+import { idempotency } from "../lib/idempotency.js";
+import { errorResponses, okJson, createdJson, noContent, stub, scope, z, checkScope } from "./_helpers.js";
+import { mapUser, mapApiToken } from "../lib/mappers.js";
+import { getUserById } from "../lib/lookups.js";
+import { buildPage, cursorOrderBy, cursorWhere, decodeCursor } from "../lib/pagination.js";
+import { generateApiToken } from "../lib/id.js";
+import { badRequest, conflict, notFound } from "../errors.js";
 
 const tag = "Users";
 
@@ -70,13 +79,132 @@ const revokeToken = createRoute({
 
 export function mount(app: OpenAPIHono) {
   app.use("/v1/users/*", requireAuth);
-  app.openapi(list, stub);
-  app.openapi(me, stub);
-  app.openapi(create, requireScope("users:manage"), stub);
-  app.openapi(get, stub);
-  app.openapi(update, requireScope("users:manage"), stub);
-  app.openapi(remove, requireScope("users:manage"), stub);
-  app.openapi(listTokens, stub);
-  app.openapi(createToken, requireScope("users:manage"), stub);
-  app.openapi(revokeToken, requireScope("users:manage"), stub);
+  app.use("/v1/users/*", idempotency);
+
+  app.openapi(list, (async (c: any) => {
+    const q = c.req.valid("query");
+    const limit = q.limit;
+    const conds: SQL[] = [isNull(schema.users.deleted_at)];
+    if (q.cursor) {
+      const cur = decodeCursor(q.cursor);
+      if (!cur) throw badRequest("invalid cursor");
+      conds.push(cursorWhere(schema.users.updated_at, schema.users.id, cur));
+    }
+    const rows = await db.select().from(schema.users)
+      .where(and(...conds))
+      .orderBy(...cursorOrderBy(schema.users.updated_at, schema.users.id))
+      .limit(limit + 1);
+    return c.json(buildPage(rows.map(mapUser), limit), 200);
+  }) as any);
+
+  app.openapi(me, (async (c: any) => {
+    const auth = c.get("auth");
+    return c.json(mapUser(auth.user), 200);
+  }) as any);
+
+  app.openapi(get, (async (c: any) => {
+    const { id } = c.req.valid("param");
+    const u = await getUserById(id);
+    return c.json(mapUser(u), 200);
+  }) as any);
+
+  app.openapi(create, (async (c: any) => {
+    checkScope(c, "users:manage");
+    const body = c.req.valid("json");
+    try {
+      const [created] = await db.insert(schema.users).values({
+        name: body.name,
+        type: body.type,
+        icon: body.icon ?? null,
+      }).returning();
+      if (!created) throw new Error("insert returned nothing");
+      return c.json(mapUser(created), 201);
+    } catch (err: any) {
+      if (err?.code === "23505") throw conflict(`user "${body.name}" already exists`);
+      throw err;
+    }
+  }) as any);
+
+  app.openapi(update, (async (c: any) => {
+    checkScope(c, "users:manage");
+    const { id } = c.req.valid("param");
+    const body = c.req.valid("json");
+    await getUserById(id);
+
+    const sets: Partial<typeof schema.users.$inferInsert> = {};
+    if (body.name !== undefined) sets.name = body.name;
+    if (body.type !== undefined) sets.type = body.type;
+    if (body.icon !== undefined) sets.icon = body.icon ?? null;
+
+    if (Object.keys(sets).length === 0) {
+      const u = await getUserById(id);
+      return c.json(mapUser(u), 200);
+    }
+
+    try {
+      const [updated] = await db.update(schema.users)
+        .set(sets)
+        .where(eq(schema.users.id, id))
+        .returning();
+      if (!updated) throw notFound("user");
+      return c.json(mapUser(updated), 200);
+    } catch (err: any) {
+      if (err?.code === "23505") throw conflict("name already in use");
+      throw err;
+    }
+  }) as any);
+
+  app.openapi(remove, (async (c: any) => {
+    checkScope(c, "users:manage");
+    const { id } = c.req.valid("param");
+    await getUserById(id);
+    await db.update(schema.users)
+      .set({ deleted_at: new Date().toISOString() })
+      .where(eq(schema.users.id, id));
+    return c.body(null, 204);
+  }) as any);
+
+  app.openapi(listTokens, (async (c: any) => {
+    const { id } = c.req.valid("param");
+    await getUserById(id);
+    const rows = await db.select().from(schema.apiTokens)
+      .where(eq(schema.apiTokens.user_id, id))
+      .orderBy(desc(schema.apiTokens.created_at));
+    return c.json({ items: rows.map(mapApiToken) }, 200);
+  }) as any);
+
+  app.openapi(createToken, (async (c: any) => {
+    checkScope(c, "users:manage");
+    const { id } = c.req.valid("param");
+    const body = c.req.valid("json");
+    await getUserById(id);
+
+    const { token, hash, prefix } = generateApiToken();
+    const [created] = await db.insert(schema.apiTokens).values({
+      user_id: id,
+      name: body.name,
+      hashed_token: hash,
+      token_prefix: prefix,
+      scopes: body.scopes,
+    }).returning();
+    if (!created) throw new Error("insert returned nothing");
+
+    return c.json({ ...mapApiToken(created), token }, 201);
+  }) as any);
+
+  app.openapi(revokeToken, (async (c: any) => {
+    checkScope(c, "users:manage");
+    const { id, tokenId } = c.req.valid("param");
+    const [updated] = await db.update(schema.apiTokens)
+      .set({ revoked_at: new Date().toISOString() })
+      .where(and(
+        eq(schema.apiTokens.id, tokenId),
+        eq(schema.apiTokens.user_id, id),
+      ))
+      .returning();
+    if (!updated) throw notFound("token");
+    return c.body(null, 204);
+  }) as any);
+
+  void stub;
 }

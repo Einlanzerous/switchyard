@@ -1,0 +1,128 @@
+// Idempotent seed: canonical users + bootstrap token.
+// Called from migrate.ts after schema migrations and triggers are applied.
+//
+// Bootstrap rules (locked decision):
+//   - If env.BOOTSTRAP_TOKEN is set, register that exact value as an admin
+//     token attached to `magos` (idempotent — re-running is a no-op).
+//   - Else, if `api_tokens` is empty, auto-generate one admin token, print
+//     it once to stdout, and write it to ${UPLOAD_DIR}/.bootstrap-token
+//     (one-shot file the user reads then deletes).
+//   - Once any tokens exist and BOOTSTRAP_TOKEN is unset, the bootstrap path
+//     is silent. No re-prompts.
+import { eq, and } from "drizzle-orm";
+import { mkdir, writeFile } from "node:fs/promises";
+import { resolve, dirname } from "node:path";
+import { db, schema } from "../db.js";
+import { env } from "../env.js";
+import { generateApiToken, hashToken } from "./id.js";
+
+type CanonicalUser = {
+  name: string;
+  type: "human" | "agent";
+  icon?: string;
+};
+
+const CANONICAL_USERS: CanonicalUser[] = [
+  { name: "magos", type: "human" },
+  { name: "claude", type: "agent" },
+  { name: "n8n-cogitation", type: "agent" },
+  { name: "n8n-vox-dictate", type: "agent" },
+  { name: "servo-signal", type: "agent" },
+  { name: "autosavant-bot", type: "agent" },
+];
+
+export async function seed(): Promise<void> {
+  const userIdsByName = await ensureUsers();
+  await ensureBootstrapToken(userIdsByName.get("magos")!);
+}
+
+async function ensureUsers(): Promise<Map<string, string>> {
+  const result = new Map<string, string>();
+
+  for (const u of CANONICAL_USERS) {
+    const [existing] = await db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(eq(schema.users.name, u.name))
+      .limit(1);
+
+    if (existing) {
+      result.set(u.name, existing.id);
+      continue;
+    }
+
+    const [created] = await db
+      .insert(schema.users)
+      .values({ name: u.name, type: u.type, icon: u.icon ?? null })
+      .returning({ id: schema.users.id });
+
+    if (!created) throw new Error(`failed to insert user ${u.name}`);
+    result.set(u.name, created.id);
+    console.log(`[seed] created user: ${u.name} (${u.type})`);
+  }
+
+  return result;
+}
+
+async function ensureBootstrapToken(magosId: string): Promise<void> {
+  // Path A: explicit BOOTSTRAP_TOKEN env — register it (idempotent on hash).
+  if (env.BOOTSTRAP_TOKEN) {
+    const hash = hashToken(env.BOOTSTRAP_TOKEN);
+    const [existing] = await db
+      .select({ id: schema.apiTokens.id })
+      .from(schema.apiTokens)
+      .where(eq(schema.apiTokens.hashed_token, hash))
+      .limit(1);
+
+    if (existing) return;
+
+    const prefix = env.BOOTSTRAP_TOKEN.slice(0, 10);
+    await db.insert(schema.apiTokens).values({
+      user_id: magosId,
+      name: "bootstrap",
+      hashed_token: hash,
+      token_prefix: prefix,
+      scopes: ["admin"],
+    });
+    console.log(`[seed] registered BOOTSTRAP_TOKEN (prefix=${prefix})`);
+    return;
+  }
+
+  // Path B: auto-generate only when api_tokens is empty.
+  const [{ count }] = (await db.execute<{ count: number }>(
+    // count is bigint in pg; we just need >0 vs 0
+    // drizzle typing for execute is weak — explicit cast
+    // (the surrounding env-empty check is the only thing we care about)
+    /* sql */ `SELECT count(*)::int AS count FROM api_tokens` as unknown as any
+  )) as unknown as [{ count: number }];
+
+  if (count > 0) return;
+
+  const { token, hash, prefix } = generateApiToken();
+
+  await db.insert(schema.apiTokens).values({
+    user_id: magosId,
+    name: "bootstrap",
+    hashed_token: hash,
+    token_prefix: prefix,
+    scopes: ["admin"],
+  });
+
+  // Write to one-shot file inside the upload dir (already mounted as a volume).
+  try {
+    const path = resolve(env.UPLOAD_DIR, ".bootstrap-token");
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, token + "\n", { mode: 0o600 });
+    console.log(`[seed] bootstrap token written to ${path}`);
+  } catch (err) {
+    console.warn("[seed] could not write .bootstrap-token file:", err);
+  }
+
+  // Also surface to stdout with a banner so it's hard to miss in `docker logs`.
+  const banner = "═".repeat(72);
+  console.log(banner);
+  console.log("  switchyard bootstrap token (shown ONCE — copy it now)");
+  console.log(`  ${token}`);
+  console.log("  Use it to mint real per-user tokens, then revoke this one.");
+  console.log(banner);
+}
