@@ -111,23 +111,96 @@ Out of scope (deferred to later phases):
 - Charts / dashboards (Phase 3)
 - Native automation rules (Phase 4)
 
-## Phase 2 — Frontend skeleton
+## Phase 2 — Frontend
 
-Goal: the user can do everything via the UI that they'd otherwise do via curl.
+Goal: the user can do everything via the UI that they'd otherwise do via curl. Linear-density + ClickUp/Monday color richness; skeleton loaders; drawer ticket detail with deep-linkable URLs.
 
-- Generated TS client from `openapi.yaml` (`openapi-typescript` + `openapi-fetch`), wired into TanStack Query Vue.
-- **Login** — single token field, stored in `localStorage` for now (SSO/OAuth not in scope here).
-- **Tickets list** with filter chips (project, status category, type, label, assignee, text search) — mirrors the `GET /v1/tickets` filter API.
-- **Ticket detail** with tabs (description / comments / files / activity), markdown rendering, comment composer with file drop, audio preview placeholder.
-- **Kanban board** — columns by status category; drag → `POST /v1/tickets/{id}/transition`.
-- **Project switcher** + the cross-project boards UI (the "17 projects" use case).
-- **Settings** — manage statuses, labels, transitions, webhooks, tokens, users.
-- Dark mode (already wired in Tailwind config).
-- Command palette (cmd-K) — minimum: jump to ticket by key, quick-create ticket.
+### Locked decisions for Phase 2
 
-Out of scope:
-- Charts (Phase 3)
-- Real-time updates via SSE/websocket (Phase 3 candidate; until then, TanStack Query refetch + manual refresh)
+- **Markdown:** `markdown-it` with GFM tables / task lists. Code highlighting deferred (raw `<pre>` is fine for v1).
+- **Drag-and-drop:** `pragmatic-drag-and-drop` (Atlassian's; framework-agnostic + keyboard-accessible). The Linear lib.
+- **Dates:** `date-fns` (`formatDistanceToNow` for relative, `format` for absolute).
+- **Toasts:** `Sonner` via shadcn-vue.
+- **Forms:** `vee-validate` + `@vee-validate/zod` so Zod schemas from `@switchyard/shared` drive client-side validation too.
+- **Routing:** explicit `router.ts` (project too small for file-based routing to earn its complexity).
+- **Filter UI:** chips for small enums (status category, type, priority); combobox for wide ones (label, assignee, project on cross-project boards).
+- **Ticket detail:** right-side drawer (Sheet) with deep-linkable URL — `/tickets?focus=SWY-47` keeps the list rendered behind the drawer.
+- **Empty / loading:** skeleton loaders everywhere; no spinners.
+
+### Milestone 2.0 — Foundations
+
+- Materialize `client/src/lib/api.types.ts` via `bun run api:gen`.
+- Install shadcn-vue components for the shell (button, input, label, card, avatar, dropdown-menu, separator, scroll-area, sonner, sheet, skeleton).
+- Add deps: `markdown-it`, `date-fns`, `vee-validate`, `@vee-validate/zod`, `@atlaskit/pragmatic-drag-and-drop` family (deferred to 2.4 if not needed yet).
+- Layout shell: sidebar (projects + nav) + topbar (user menu, theme toggle) + main content slot. Empty placeholders inside.
+- Pinia stores: `useThemeStore` (light/dark via `@vueuse/core` `useColorMode`), placeholder `useAuthStore`.
+- TanStack Query setup: client config, key conventions (`['users','me']`, `['projects']`, `['tickets', filters]`, `['ticket', idOrKey]`, `['boards']`, `['board', id, 'columns']`).
+- Top-level error boundary that surfaces API error envelopes via Sonner.
+
+### Milestone 2.1 — Auth flow
+
+- `/login` view: token textarea, validates against `GET /v1/users/me`. On success, stores in localStorage (already wired by the `api.ts` middleware) and redirects to `/`.
+- `useAuthStore` derives the logged-in user from `useQuery(['users','me'])`.
+- Route guard: redirect unauthenticated to `/login`. Logout clears storage and invalidates queries.
+- Topbar shows the user's avatar + dropdown (theme toggle, settings, logout).
+
+### Milestone 2.2 — Tickets list
+
+- `/tickets` route. URL drives filter state (`?project=FLOW&status=in_progress`).
+- Filter bar: chips for status-category / type / priority; comboboxes for project / label / assignee; text search (debounced 250ms).
+- Virtualized table (TanStack Virtual) with columns: key, type icon, title, status pill, priority, assignee avatar, label badges, updated relative.
+- Cursor pagination via `useInfiniteQuery`; "Load more" sentinel triggers `fetchNextPage`.
+- Click row → drawer opens with ticket detail (2.3) and `?focus=KEY-N` query param appended.
+
+### Milestone 2.3 — Ticket detail (drawer + page)
+
+- Right-side `Sheet` drawer with tabs: Description / Comments / Files / Activity.
+- Description: markdown render via markdown-it with DOMPurify; edit via inline textarea + save.
+- Comments: list with author avatar + relative timestamp; markdown body; composer at bottom with file-drop zone (uploads via the multipart endpoint).
+- Files: ticket attachments + comment attachments grouped, with download links and (for audio) transcript display.
+- Activity: events list with field-level diff rendering for `ticket.updated`, status pill transitions for `ticket.status_changed`, etc.
+- Header actions: status transition button (opens menu of allowed transitions; presents resolution selector when target is closed); priority dropdown; assignee picker.
+- Standalone `/tickets/:idOrKey` route renders the same drawer over a blank background for direct deep-link access.
+
+### Milestone 2.4 — Kanban board (single-project)
+
+- `/projects/:key/board` route.
+- Columns by canonical category (Backlog / Planning / In Progress / Blocked / Closed). Display-name aliases shown in column header.
+- Card: ticket key (monospace), title, type icon, assignee avatar, priority pill, label dots.
+- pragmatic-drag-and-drop: drag → `POST /v1/tickets/{id}/transition`. On drop into closed column, prompt for resolution. Optimistic update with rollback on error.
+- Per-column virtualization for projects with hundreds of tickets in one column.
+
+### Milestone 2.5 — Cross-project boards + swimlanes
+
+- `/boards` list + `/boards/new` (multi-project select via combobox).
+- `/boards/:id` view: kanban with optional **swimlanes** (group rows by project / assignee / epic / type).
+- Swimlane picker in the board header; persisted in board.filter or local user prefs.
+- Saved filters per board (types, priorities, label_ids, assignee_ids).
+- Cross-project drag is allowed when target column resolves to a status the receiving project actually has; otherwise rejected with a toast.
+
+### Milestone 2.6 — Settings
+
+- `/settings/profile` — me, avatar (URL field for now), display name.
+- `/settings/tokens` — list / create / revoke own tokens.
+- `/settings/users` (admin) — user CRUD.
+- `/settings/projects` — list / create. Per-project sub-pages: statuses (with reorder + is_default toggle), labels, transitions (graph editor lite), members (skipped if multi-user not enabled yet).
+- `/settings/webhooks` — subscriptions + delivery log. Redeliver button on failed deliveries. Show secret on creation banner.
+
+### Milestone 2.7 — Polish
+
+- Command palette (cmd-K): jump to ticket by key, quick-create ticket, switch project, recent boards.
+- Keyboard shortcuts: `g t` → tickets, `g b` → boards, `c` → new ticket, `?` → shortcut sheet.
+- Empty states for every list (illustration + 1-line copy + primary CTA).
+- Skeleton loaders on every list and detail surface.
+- Per-mutation toast confirmation; error toasts pull from API error envelope.
+- Real-time-ish: TanStack Query `refetchOnWindowFocus` + 30s background refetch on the kanban / tickets list.
+
+Out of scope for Phase 2 (deferred):
+- Charts / dashboards (Phase 3)
+- SSE / websocket real-time push (Phase 3 candidate)
+- WIP limits on kanban columns (cheap to add; defer until needed)
+- Audio playback (metadata-only display)
+- Native automation rules editor (Phase 4)
 
 ## Phase 3 — Dashboards & polish
 

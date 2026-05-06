@@ -4,13 +4,13 @@
   "private": true,
   "workspaces": ["shared", "server", "client"],
   "scripts": {
-    "dev:server": "bun --cwd server run dev",
-    "dev:client": "bun --cwd client run dev",
-    "build": "bun --cwd client run build && bun --cwd server run build",
-    "openapi:gen": "bun --cwd server run openapi:gen",
-    "api:gen": "bun --cwd server run openapi:gen && bun --cwd client run api:gen",
-    "db:generate": "bun --cwd server run db:generate",
-    "db:migrate": "bun --cwd server run db:migrate",
+    "dev:server": "cd server && bun run dev",
+    "dev:client": "cd client && bun run dev",
+    "build": "(cd client && bun run build) && (cd server && bun run build)",
+    "openapi:gen": "cd server && bun run openapi:gen",
+    "api:gen": "(cd server && bun run openapi:gen) && (cd client && bun run api:gen)",
+    "db:generate": "cd server && bun run db:generate",
+    "db:migrate": "cd server && bun run db:migrate",
     "typecheck": "tsc -b shared server client"
   },
   "devDependencies": {

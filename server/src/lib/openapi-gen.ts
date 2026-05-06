@@ -1,5 +1,9 @@
 // Dump the live OpenAPI document to ../openapi.yaml.
 // Reuses the running app's route registry, so the YAML stays in sync with the routes.
+//
+// Loading the route registry pulls auth → db → env, which validates DATABASE_URL
+// at module load. The package.json script provides an inert codegen URL so the
+// generator runs in any environment without a real DB.
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
