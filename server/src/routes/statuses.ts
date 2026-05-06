@@ -1,5 +1,5 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { and, asc, desc, eq, inArray, ne, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, ne, sql } from "drizzle-orm";
 import {
   Status, CreateStatus, UpdateStatus, ReorderStatuses,
   StatusTransition, CreateStatusTransition,
@@ -10,7 +10,7 @@ import * as schema from "../../drizzle/schema.js";
 import { errorResponses, okJson, createdJson, noContent, scope, z, checkScope } from "./_helpers.js";
 import { mapStatus } from "../lib/mappers.js";
 import { getProjectByKey } from "../lib/lookups.js";
-import { badRequest, conflict, notFound, unprocessable } from "../errors.js";
+import { badRequest, catchUnique, notFound, unprocessable } from "../errors.js";
 
 const tag = "Statuses";
 
@@ -108,8 +108,8 @@ export function mount(app: OpenAPIHono) {
     const body = c.req.valid("json");
     const project = await getProjectByKey(key, { includeArchived: true });
 
-    try {
-      const status = await db.transaction(async (tx) => {
+    const status = await catchUnique(`status "${body.display_name}" already exists in this project`, () =>
+      db.transaction(async (tx) => {
         // Default position = current max + 1.
         let position = body.position;
         if (position === undefined) {
@@ -138,13 +138,10 @@ export function mount(app: OpenAPIHono) {
 
         if (!inserted) throw new Error("insert returned nothing");
         return inserted;
-      });
+      })
+    );
 
-      return c.json(mapStatus(status), 201);
-    } catch (err: any) {
-      if (err?.code === "23505") throw conflict(`status "${body.display_name}" already exists in this project`);
-      throw err;
-    }
+    return c.json(mapStatus(status), 201);
   }) as any);
 
   app.openapi(update, (async (c: any) => {
@@ -168,8 +165,8 @@ export function mount(app: OpenAPIHono) {
       return c.json(mapStatus(existing), 200);
     }
 
-    try {
-      const updated = await db.transaction(async (tx) => {
+    const updated = await catchUnique("status display_name already in use", () =>
+      db.transaction(async (tx) => {
         if (body.is_default === true) {
           await tx.update(schema.statuses)
             .set({ is_default: false })
@@ -185,12 +182,9 @@ export function mount(app: OpenAPIHono) {
           .returning();
         if (!u) throw notFound("status");
         return u;
-      });
-      return c.json(mapStatus(updated), 200);
-    } catch (err: any) {
-      if (err?.code === "23505") throw conflict("status display_name already in use");
-      throw err;
-    }
+      })
+    );
+    return c.json(mapStatus(updated), 200);
   }) as any);
 
   app.openapi(remove, (async (c: any) => {
@@ -279,25 +273,22 @@ export function mount(app: OpenAPIHono) {
       throw badRequest("one or more statuses do not belong to this project");
     }
 
-    try {
-      const [created] = await db.insert(schema.statusTransitions).values({
+    const [created] = await catchUnique("transition already defined", () =>
+      db.insert(schema.statusTransitions).values({
         project_id: project.id,
         from_status_id: body.from_status_id ?? null,
         to_status_id: body.to_status_id,
-      }).returning();
-      if (!created) throw new Error("insert returned nothing");
-      return c.json({
-        id: created.id,
-        project_id: created.project_id,
-        from_status_id: created.from_status_id,
-        to_status_id: created.to_status_id,
-        created_at: created.created_at,
-        updated_at: created.updated_at,
-      }, 201);
-    } catch (err: any) {
-      if (err?.code === "23505") throw conflict("transition already defined");
-      throw err;
-    }
+      }).returning()
+    );
+    if (!created) throw new Error("insert returned nothing");
+    return c.json({
+      id: created.id,
+      project_id: created.project_id,
+      from_status_id: created.from_status_id,
+      to_status_id: created.to_status_id,
+      created_at: created.created_at,
+      updated_at: created.updated_at,
+    }, 201);
   }) as any);
 
   app.openapi(removeTransition, (async (c: any) => {
@@ -313,6 +304,4 @@ export function mount(app: OpenAPIHono) {
     if (result.length === 0) throw notFound("transition");
     return c.body(null, 204);
   }) as any);
-
-  void desc;
 }

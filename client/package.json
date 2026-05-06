@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "api:gen": "bunx openapi-typescript ../openapi.yaml -o ./src/lib/api.types.ts"
   },
   "dependencies": {
     "@switchyard/shared": "workspace:*",

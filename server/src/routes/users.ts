@@ -8,12 +8,12 @@ import { db } from "../db.js";
 import * as schema from "../../drizzle/schema.js";
 import { requireAuth } from "../auth.js";
 import { idempotency } from "../lib/idempotency.js";
-import { errorResponses, okJson, createdJson, noContent, stub, scope, z, checkScope } from "./_helpers.js";
+import { errorResponses, okJson, createdJson, noContent, z, checkScope } from "./_helpers.js";
 import { mapUser, mapApiToken } from "../lib/mappers.js";
 import { getUserById } from "../lib/lookups.js";
 import { buildPage, cursorOrderBy, cursorWhere, decodeCursor } from "../lib/pagination.js";
 import { generateApiToken } from "../lib/id.js";
-import { badRequest, conflict, notFound } from "../errors.js";
+import { badRequest, catchUnique, notFound } from "../errors.js";
 
 const tag = "Users";
 
@@ -111,18 +111,15 @@ export function mount(app: OpenAPIHono) {
   app.openapi(create, (async (c: any) => {
     checkScope(c, "users:manage");
     const body = c.req.valid("json");
-    try {
-      const [created] = await db.insert(schema.users).values({
+    const [created] = await catchUnique(`user "${body.name}" already exists`, () =>
+      db.insert(schema.users).values({
         name: body.name,
         type: body.type,
         icon: body.icon ?? null,
-      }).returning();
-      if (!created) throw new Error("insert returned nothing");
-      return c.json(mapUser(created), 201);
-    } catch (err: any) {
-      if (err?.code === "23505") throw conflict(`user "${body.name}" already exists`);
-      throw err;
-    }
+      }).returning()
+    );
+    if (!created) throw new Error("insert returned nothing");
+    return c.json(mapUser(created), 201);
   }) as any);
 
   app.openapi(update, (async (c: any) => {
@@ -141,17 +138,14 @@ export function mount(app: OpenAPIHono) {
       return c.json(mapUser(u), 200);
     }
 
-    try {
-      const [updated] = await db.update(schema.users)
+    const [updated] = await catchUnique("name already in use", () =>
+      db.update(schema.users)
         .set(sets)
         .where(eq(schema.users.id, id))
-        .returning();
-      if (!updated) throw notFound("user");
-      return c.json(mapUser(updated), 200);
-    } catch (err: any) {
-      if (err?.code === "23505") throw conflict("name already in use");
-      throw err;
-    }
+        .returning()
+    );
+    if (!updated) throw notFound("user");
+    return c.json(mapUser(updated), 200);
   }) as any);
 
   app.openapi(remove, (async (c: any) => {
@@ -205,6 +199,4 @@ export function mount(app: OpenAPIHono) {
     if (!updated) throw notFound("token");
     return c.body(null, 204);
   }) as any);
-
-  void stub;
 }

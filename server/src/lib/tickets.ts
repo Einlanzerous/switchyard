@@ -18,24 +18,34 @@ import { badRequest, notFound } from "../errors.js";
 
 type TicketRow = typeof schema.tickets.$inferSelect;
 
+// Drizzle's Postgres-js transaction object is structurally compatible with
+// `db` for the read shapes we use here. Loosely typed on purpose — exporting
+// the precise type would require dragging the dialect types around the codebase.
+type Tx = typeof db;
+
 // Fan out the lookups every ticket-shape handler needs. Keeps the n+1 vs.
 // single-query tradeoff explicit: this is N=1 (single ticket); the list
 // handler in routes/tickets.ts does its own batched joins.
-async function loadTicketSummaryDeps(ticket: TicketRow): Promise<TicketSummaryDeps> {
-  const [project] = await db.select().from(schema.projects).where(eq(schema.projects.id, ticket.project_id)).limit(1);
+//
+// `tx` is optional — pass it when calling from inside a transaction so reads
+// see in-flight writes (e.g. ticket_labels just inserted). Without it, reads
+// use the global pool and only see committed data.
+async function loadTicketSummaryDeps(ticket: TicketRow, tx?: Tx): Promise<TicketSummaryDeps> {
+  const q = tx ?? db;
+  const [project] = await q.select().from(schema.projects).where(eq(schema.projects.id, ticket.project_id)).limit(1);
   if (!project) throw badRequest("orphan ticket: project missing");
 
-  const [status] = await db.select().from(schema.statuses).where(eq(schema.statuses.id, ticket.status_id)).limit(1);
+  const [status] = await q.select().from(schema.statuses).where(eq(schema.statuses.id, ticket.status_id)).limit(1);
   if (!status) throw badRequest("orphan ticket: status missing");
 
-  const [reporter] = await db.select().from(schema.users).where(eq(schema.users.id, ticket.reporter_id)).limit(1);
+  const [reporter] = await q.select().from(schema.users).where(eq(schema.users.id, ticket.reporter_id)).limit(1);
   if (!reporter) throw badRequest("orphan ticket: reporter missing");
 
   const assignee = ticket.assignee_id
-    ? (await db.select().from(schema.users).where(eq(schema.users.id, ticket.assignee_id)).limit(1))[0] ?? null
+    ? (await q.select().from(schema.users).where(eq(schema.users.id, ticket.assignee_id)).limit(1))[0] ?? null
     : null;
 
-  const labels = await db.select({ label: schema.labels })
+  const labels = await q.select({ label: schema.labels })
     .from(schema.ticketLabels)
     .innerJoin(schema.labels, eq(schema.ticketLabels.label_id, schema.labels.id))
     .where(eq(schema.ticketLabels.ticket_id, ticket.id));
@@ -47,12 +57,13 @@ async function loadTicketSummaryDeps(ticket: TicketRow): Promise<TicketSummaryDe
   };
 }
 
-export async function loadTicketSummary(ticket: TicketRow): Promise<ApiTicketSummary> {
-  const deps = await loadTicketSummaryDeps(ticket);
+export async function loadTicketSummary(ticket: TicketRow, tx?: Tx): Promise<ApiTicketSummary> {
+  const deps = await loadTicketSummaryDeps(ticket, tx);
   return mapTicketSummary(ticket, deps);
 }
 
-export async function loadTicketDetail(ticket: TicketRow): Promise<ApiTicket> {
+export async function loadTicketDetail(ticket: TicketRow, tx?: Tx): Promise<ApiTicket> {
+  void tx; // detail is currently always called post-commit; future txn callers can wire this
   const summaryDeps = await loadTicketSummaryDeps(ticket);
 
   // Comments + author lookups.

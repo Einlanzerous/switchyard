@@ -10,7 +10,7 @@ import { db } from "../db.js";
 import * as schema from "../../drizzle/schema.js";
 import { requireAuth } from "../auth.js";
 import { idempotency } from "../lib/idempotency.js";
-import { errorResponses, okJson, createdJson, noContent, stub, z } from "./_helpers.js";
+import { errorResponses, okJson, createdJson, noContent, checkScope, z } from "./_helpers.js";
 import { mapTicketSummary, mapProjectRef } from "../lib/mappers.js";
 import { buildPage, cursorOrderBy, cursorWhere, decodeCursor } from "../lib/pagination.js";
 import { badRequest, notFound } from "../errors.js";
@@ -222,9 +222,123 @@ export function mount(app: OpenAPIHono) {
     }, 200);
   }) as any);
 
-  app.openapi(create, stub);
-  app.openapi(update, stub);
-  app.openapi(remove, stub);
+  // ─── create ──────────────────────────────────────────────────────────────
+  app.openapi(create, (async (c: any) => {
+    checkScope(c, "projects:manage");
+    const body = c.req.valid("json");
+    if (!body.project_ids || body.project_ids.length === 0) {
+      throw badRequest("project_ids must contain at least one project");
+    }
+    await assertProjectsExist(body.project_ids);
+
+    const created = await db.transaction(async (tx) => {
+      const [board] = await tx.insert(schema.boards).values({
+        name: body.name,
+        layout: body.layout ?? "kanban",
+        filter: (body.filter ?? {}) as any,
+      }).returning();
+      if (!board) throw new Error("board insert returned nothing");
+
+      await tx.insert(schema.boardProjects).values(
+        body.project_ids.map((project_id: string) => ({ board_id: board.id, project_id }))
+      );
+
+      return board;
+    });
+
+    const projects = (await fetchBoardProjects([created.id])).get(created.id) ?? [];
+    return c.json({
+      id: created.id,
+      name: created.name,
+      layout: created.layout,
+      filter: (created.filter ?? {}) as ApiBoardFilter,
+      projects,
+      created_at: created.created_at,
+      updated_at: created.updated_at,
+    }, 201);
+  }) as any);
+
+  // ─── update ──────────────────────────────────────────────────────────────
+  app.openapi(update, (async (c: any) => {
+    checkScope(c, "projects:manage");
+    const { id } = c.req.valid("param");
+    const body = c.req.valid("json");
+
+    const [existing] = await db.select().from(schema.boards).where(eq(schema.boards.id, id)).limit(1);
+    if (!existing) throw notFound("board");
+
+    if (body.project_ids !== undefined) {
+      if (body.project_ids.length === 0) {
+        throw badRequest("project_ids must contain at least one project");
+      }
+      await assertProjectsExist(body.project_ids);
+    }
+
+    const sets: Partial<typeof schema.boards.$inferInsert> = {};
+    if (body.name !== undefined) sets.name = body.name;
+    if (body.layout !== undefined) sets.layout = body.layout;
+    if (body.filter !== undefined) sets.filter = (body.filter ?? {}) as any;
+
+    const noFieldChanges = Object.keys(sets).length === 0;
+    const noProjectChange = body.project_ids === undefined;
+
+    const updated = await db.transaction(async (tx) => {
+      let row = existing;
+      if (!noFieldChanges) {
+        const [u] = await tx.update(schema.boards)
+          .set(sets)
+          .where(eq(schema.boards.id, id))
+          .returning();
+        if (!u) throw notFound("board");
+        row = u;
+      }
+      if (!noProjectChange) {
+        await tx.delete(schema.boardProjects).where(eq(schema.boardProjects.board_id, id));
+        await tx.insert(schema.boardProjects).values(
+          body.project_ids!.map((project_id: string) => ({ board_id: id, project_id }))
+        );
+      }
+      return row;
+    });
+
+    const projects = (await fetchBoardProjects([updated.id])).get(updated.id) ?? [];
+    return c.json({
+      id: updated.id,
+      name: updated.name,
+      layout: updated.layout,
+      filter: (updated.filter ?? {}) as ApiBoardFilter,
+      projects,
+      created_at: updated.created_at,
+      updated_at: updated.updated_at,
+    }, 200);
+  }) as any);
+
+  // ─── delete ──────────────────────────────────────────────────────────────
+  app.openapi(remove, (async (c: any) => {
+    checkScope(c, "projects:manage");
+    const { id } = c.req.valid("param");
+    // FK on board_projects has ON DELETE CASCADE — the row goes with the board.
+    const result = await db.delete(schema.boards)
+      .where(eq(schema.boards.id, id))
+      .returning({ id: schema.boards.id });
+    if (result.length === 0) throw notFound("board");
+    return c.body(null, 204);
+  }) as any);
+}
+
+// Ensure every supplied project id maps to a non-deleted project. Throws 400
+// listing the offenders so the agent can fix the input.
+async function assertProjectsExist(projectIds: string[]): Promise<void> {
+  const found = await db.select({ id: schema.projects.id })
+    .from(schema.projects)
+    .where(and(
+      inArray(schema.projects.id, projectIds),
+      isNull(schema.projects.deleted_at),
+    ));
+  if (found.length === projectIds.length) return;
+  const foundSet = new Set(found.map((r) => r.id));
+  const missing = projectIds.filter((id) => !foundSet.has(id));
+  throw badRequest(`unknown or deleted project_id(s): ${missing.join(", ")}`);
 }
 
 // ─── helpers ────────────────────────────────────────────────────────────────

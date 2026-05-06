@@ -1,27 +1,30 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { serveStatic } from "hono/bun";
-import { logger } from "hono/logger";
 import { cors } from "hono/cors";
 import { env } from "./env.js";
-import { assertDatabaseReachable, pingDatabase, shutdownDatabase } from "./db.js";
+import { assertDatabaseReachable, shutdownDatabase } from "./db.js";
 import { installErrorHandler } from "./errors.js";
 import { mountRoutes } from "./routes/index.js";
 import { startDispatcher, stopDispatcher } from "./lib/webhooks/dispatcher.js";
 import { cleanupExpiredIdempotencyKeys } from "./lib/idempotency.js";
+import { accessLog } from "./lib/access-log.js";
+import { buildHealthReport } from "./lib/health.js";
 
 await assertDatabaseReachable();
 
 const app = new OpenAPIHono();
 
-app.use("*", logger());
-app.use("/v1/*", cors({ origin: "*", allowHeaders: ["Authorization", "Content-Type", "Idempotency-Key"], allowMethods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"] }));
+app.use("*", accessLog);
+app.use("/v1/*", cors({ origin: "*", allowHeaders: ["Authorization", "Content-Type", "Idempotency-Key", "X-Request-ID"], exposeHeaders: ["X-Request-ID"], allowMethods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"] }));
 
 installErrorHandler(app);
 
-// Health endpoint — checks DB connectivity. Returns 503 if DB is unreachable.
+// Health endpoint — checks DB + uploads dir + webhook queue depth. Returns 503
+// when any required subsystem is degraded so the orchestrator's healthcheck
+// reflects reality.
 app.get("/healthz", async (c) => {
-  const ok = await pingDatabase();
-  return c.json({ status: ok ? "ok" : "degraded", db: ok }, ok ? 200 : 503);
+  const report = await buildHealthReport();
+  return c.json(report, report.status === "ok" ? 200 : 503);
 });
 
 // OpenAPI document & docs UI.
@@ -58,12 +61,24 @@ const idempotencyCleanup = setInterval(
   60 * 60 * 1000
 );
 
+// Graceful shutdown: stop accepting new conns, let in-flight requests finish,
+// drain the webhook dispatcher, then close the DB. Hard ceiling at 10s total.
+let shuttingDown = false;
 const shutdown = async (signal: string) => {
+  if (shuttingDown) return;
+  shuttingDown = true;
   console.log(`[switchyard] received ${signal}, shutting down`);
+
+  const deadline = Date.now() + 10_000;
+  // Stop accepting new connections; in-flight requests may still complete.
   server.stop();
   clearInterval(idempotencyCleanup);
-  await stopDispatcher(5_000);
+
+  const dispatcherBudget = Math.max(1_000, deadline - Date.now() - 1_000);
+  await stopDispatcher(dispatcherBudget);
   await shutdownDatabase();
+
+  console.log(`[switchyard] shutdown complete in ${Date.now() - (deadline - 10_000)}ms`);
   process.exit(0);
 };
 process.on("SIGTERM", () => void shutdown("SIGTERM"));

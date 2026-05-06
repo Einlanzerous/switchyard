@@ -6,7 +6,7 @@ import * as schema from "../../drizzle/schema.js";
 import { errorResponses, okJson, createdJson, noContent, scope, z, checkScope } from "./_helpers.js";
 import { mapLabel } from "../lib/mappers.js";
 import { getProjectByKey } from "../lib/lookups.js";
-import { conflict, notFound } from "../errors.js";
+import { catchUnique, notFound } from "../errors.js";
 
 const tag = "Labels";
 
@@ -55,18 +55,15 @@ export function mount(app: OpenAPIHono) {
     const { key } = c.req.valid("param");
     const body = c.req.valid("json");
     const project = await getProjectByKey(key, { includeArchived: true });
-    try {
-      const [inserted] = await db.insert(schema.labels).values({
+    const [inserted] = await catchUnique(`label "${body.name}" already exists in this project`, () =>
+      db.insert(schema.labels).values({
         project_id: project.id,
         name: body.name,
         color: body.color,
-      }).returning();
-      if (!inserted) throw new Error("insert returned nothing");
-      return c.json(mapLabel(inserted), 201);
-    } catch (err: any) {
-      if (err?.code === "23505") throw conflict(`label "${body.name}" already exists in this project`);
-      throw err;
-    }
+      }).returning()
+    );
+    if (!inserted) throw new Error("insert returned nothing");
+    return c.json(mapLabel(inserted), 201);
   }) as any);
 
   app.openapi(update, (async (c: any) => {
@@ -85,17 +82,14 @@ export function mount(app: OpenAPIHono) {
     if (body.color !== undefined) sets.color = body.color;
     if (Object.keys(sets).length === 0) return c.json(mapLabel(existing), 200);
 
-    try {
-      const [updated] = await db.update(schema.labels)
+    const [updated] = await catchUnique("label name already in use", () =>
+      db.update(schema.labels)
         .set(sets)
         .where(eq(schema.labels.id, id))
-        .returning();
-      if (!updated) throw notFound("label");
-      return c.json(mapLabel(updated), 200);
-    } catch (err: any) {
-      if (err?.code === "23505") throw conflict("label name already in use");
-      throw err;
-    }
+        .returning()
+    );
+    if (!updated) throw notFound("label");
+    return c.json(mapLabel(updated), 200);
   }) as any);
 
   app.openapi(remove, (async (c: any) => {

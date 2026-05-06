@@ -14,9 +14,9 @@ Living document. Updated as decisions land.
 - Compose / env / init-db diffs for `~/construct-server` (`compose-changes/README.md`).
 - Vue 3 + Vite + Tailwind + shadcn-vue scaffold; placeholder home view that pings `/healthz`.
 
-## Phase 1 — Backend MVP
+## Phase 1 — Backend MVP ✅
 
-Goal: a real, usable API. The imperium-loop migration becomes possible at the end of this phase. Broken into 7 milestones so each lands a usable intermediate state.
+**Shipped.** All 7 milestones (1.0–1.6) plus a correctness/DRY closeout pass. The imperium-loop migration is unblocked from switchyard's side; only `tools/cogitation-patch/` work remains on that front.
 
 ### Locked decisions for Phase 1
 
@@ -27,77 +27,86 @@ Goal: a real, usable API. The imperium-loop migration becomes possible at the en
 - **Bootstrap token UX:** explicit `BOOTSTRAP_TOKEN` env wins. If unset and `api_tokens` is empty on boot, auto-generate one and log it once with a clear delimiter; also write it to `${UPLOAD_DIR}/.bootstrap-token` for one-shot retrieval.
 - **TS client codegen:** `client/src/lib/api.types.ts` is generated from `openapi.yaml` and **committed** for diff visibility on PRs. Regenerated explicitly via a script, not at build time.
 
-### Milestone 1.0 — Foundations (no handlers yet)
+### Milestone 1.0 — Foundations ✅
 
-All cross-cutting infrastructure handlers will use, plus tests. No business endpoints implemented.
+All cross-cutting infrastructure handlers use; tests; no business endpoints yet.
 
-- Initial Drizzle migration generated and committed (`server/drizzle/migrations/`).
-- `migrate.ts` extended: drizzle migrations → `triggers.sql` → `seed.ts`.
-- `seed.ts` — idempotent: 6 canonical users + bootstrap token (per locked UX above).
-- `lib/pagination.ts` — opaque cursor codec + `paginate()` helper.
-- `lib/idempotency.ts` — per `(user, method, path, key)` middleware with 24h TTL + lazy cleanup.
-- `lib/events.ts` — `writeEvent()` writes events row AND enqueues matching webhook deliveries in the same transaction.
-- `lib/webhooks/dispatcher.ts` — polling loop, HMAC signing, backoff (1/4/16/64/256s), abandon after 5 attempts, graceful drain on SIGTERM.
-- `lib/scopes.ts` — formal route → required scope mapping (consumed by tests).
-- `lib/hmac.ts` — HMAC-SHA256 signing helper.
-- Test harness: `db:test:setup` script, transaction-rollback isolation, sample tests for pagination/idempotency/hmac.
+- Initial Drizzle migration committed at `server/drizzle/migrations/`.
+- `migrate.ts` runs migrations → `triggers.sql` → `seed.ts`.
+- `seed.ts` — 6 canonical users (`magos`, `claude`, `n8n-cogitation`, `n8n-vox-dictate`, `servo-signal`, `autosavant-bot`) + bootstrap token (env wins, else auto-generate to stdout banner + `${UPLOAD_DIR}/.bootstrap-token`).
+- `lib/pagination.ts` — opaque base64url `(updated_at, id)` cursor codec + `cursorWhere` / `cursorOrderBy` / `buildPage` helpers.
+- `lib/idempotency.ts` — middleware keyed on `(user, method, path, key)`, 24h TTL, lazy expiration on lookup, hourly cleanup.
+- `lib/events.ts` — `writeEvent(tx, …)` writes `events` row AND enqueues matching webhook deliveries in the same transaction.
+- `lib/webhooks/dispatcher.ts` — single in-process polling loop, claims via `FOR UPDATE SKIP LOCKED`, HMAC signing, backoff `[1, 4, 16, 64, 256]s`, abandons after `WEBHOOK_MAX_ATTEMPTS`, graceful drain.
+- `lib/hmac.ts` — sign + constant-time verify.
+- Test harness: `bun run db:test:setup` (applies schema to `switchyard_test`), transaction-rollback per-test, sample tests for pagination + hmac (15 unit tests passing).
 
-**Done when:** migrations apply cleanly, seed runs idempotently, bootstrap token surfaces once, idempotency replay works in a unit test, fake event with fake subscription delivers end-to-end in a test.
+### Milestone 1.1 — Read-only API ✅
 
-### Milestone 1.1 — Read-only API
+`lib/mappers.ts` (row → API shape) and `lib/lookups.ts` (id/key resolvers) + every GET handler implemented:
 
-Implement read handlers for: `users`, `users/me`, `projects`, `projects/{key}/statuses|labels|transitions`, `tickets` (full filter + cursor pagination), `tickets/{idOrKey}` (full detail with embedded comments + flattened all_attachments), `tickets/{idOrKey}/events|children|comments`, `events`, `boards`, `boards/{id}`, `boards/{id}/columns`, `attachments/{id}/meta`. POST/PATCH/DELETE remain 501.
+- `users`, `users/me`, `users/{id}`, `users/{id}/tokens`
+- `projects`, `projects/{key}`, `projects/{key}/statuses|labels|transitions`
+- `tickets` (full filter set: project, status [id or category], type, label, assignee/`unassigned`, reporter, parent, text, updated_after/before, include_deleted; cursor pagination)
+- `tickets/{idOrKey}` (full detail: embedded comments with their attachments + ticket attachments + `all_attachments` flattened)
+- `tickets/{idOrKey}/events|children|comments`
+- `events` (global feed with project / ticket_id / actor_id / event_type / since / until)
+- `boards`, `boards/{id}`, `boards/{id}/columns`
+- `attachments/{id}/meta`
+- `dev:seed-sample` script for populating realistic data on dev DB.
 
-Key piece: ticket-key resolver (`SWY-47` → split → find project → query by `(project_id, number)`).
+### Milestone 1.2 — Project / admin mutations ✅
 
-**Done when:** smoke tests pass against a seeded DB; `curl /v1/tickets?project=SWY` returns paginated results matching the OpenAPI spec.
+- Idempotency middleware wired on every mutation path (after `requireAuth`).
+- New `projects:manage` scope; project lifecycle events (`project.created/.updated/.deleted`).
+- Users: create/update/soft-delete; token mint (returns secret ONCE) / revoke.
+- Projects: create runs in a single txn (project + `project_counters` + 5 default statuses + event); update rejects key changes + supports `archived` flag; soft-delete with event.
+- Statuses: create with auto-position; `is_default` flips uniqueness in txn; delete refuses if default or referenced; reorder uses two-pass scratch positions to avoid name-uniqueness collisions mid-update.
+- Labels: full CRUD; `ticket_labels` cascade on delete.
+- Transitions: create validates both statuses belong to project; from is nullable wildcard; delete by id.
+- Pattern shift: scope checks moved from middleware-in-handler-chain to in-handler `checkScope(c, …)` for cleaner type inference.
 
-### Milestone 1.2 — Project / admin mutations
+### Milestone 1.3 — Tickets + comments + attachments ✅
 
-Project, status, transition, label, user, token CRUD. POST endpoints run through idempotency middleware. Each mutation calls `writeEvent`.
+`lib/tickets.ts` shared helpers: `loadTicketSummary` / `loadTicketDetail` / `allocateTicketNumber`. `UpdateTicket` schema tightened to omit `status_id` — status changes go exclusively through `/transition`.
 
-`POST /v1/projects` is the heaviest: in one transaction, insert project, insert `project_counters` row, insert 5 default statuses (Backlog/Planning/In Progress/Blocked/Closed), set `is_default` on Backlog.
+- POST: txn allocates a per-project number, validates parent (epic+same project) / assignee / labels, resolves default status, inserts ticket + labels, emits `ticket.created`.
+- PATCH: partial update of title/description/priority/parent/assignee/due/labels/metadata. Emits `ticket.updated` with field-level diff and `ticket.assigned` when assignee changes.
+- DELETE: soft delete + `ticket.deleted`.
+- /transition: enforces transitions table (zero rows = wildcard, any rows = whitelist with NULL-from), resolution required iff target is closed, epic-close guard (rejects 422 with list of non-closed children), optional atomic comment, multi-event emission (`ticket.status_changed` always; `ticket.closed` when entering closed; `ticket.released` when resolution=`released`).
+- Comments: POST/PATCH/DELETE with events.
+- Attachments: `lib/attachments.ts` with magic-byte sniffer (PNG / JPEG / GIF / WebP / WAV / MP3+ID3 / OGG / FLAC / M4A) + UTF-8 fallback for text. Multipart upload, per-kind size cap, path-traversal guard. Token-guarded streamed download. DELETE removes row + best-effort file unlink.
 
-Key field is immutable (PATCH rejects it with 422). Soft-delete on DELETE.
+### Milestone 1.4 — Webhooks ✅
 
-**Done when:** can curl-create a project, get statuses, add a label, mint a token, revoke it. Replaying any POST with the same `Idempotency-Key` returns the cached response.
+- POST mints HMAC secret (returned ONCE in `WebhookSubscriptionWithSecret`); subsequent reads exclude it.
+- PATCH (partial), DELETE, GET (single + paginated list).
+- `/v1/webhooks/{id}/deliveries` paginated delivery log; `/v1/webhooks/deliveries/{id}/redeliver` resets to pending.
+- Integration test (`test/integration/webhooks.test.ts`) — spins up `Bun.serve` mock receiver, subscribes, emits an event via `writeEvent`, asserts `Content-Type` / `X-Switchyard-Event` / `X-Switchyard-Signature` headers, verifies HMAC against body, confirms delivery row reaches `succeeded`.
 
-### Milestone 1.3 — Tickets + comments + attachments
+### Milestone 1.5 — Board mutations ✅
 
-The hot path. Ordered work inside the milestone:
+- POST: validates `project_ids` non-empty + every id maps to a live project; txn inserts board + `board_projects` rows.
+- PATCH: partial of name/layout/filter; project replacement is `delete + reinsert` inside one txn so columns don't briefly flicker through ghost projects.
+- DELETE: hard delete; `board_projects` cascade.
+- `assertProjectsExist` returns 400 listing the offending ids so agents can fix bad input.
 
-1. `POST /v1/tickets` — txn: validate project; increment `project_counters.last_used_number` (renamed from `next_number`); resolve default status; validate parent (epic, same project, not deleted; trigger backstops); validate assignee; insert ticket + ticket_labels; emit `ticket.created`.
-2. `PATCH /v1/tickets/{idOrKey}` — partial; emits `ticket.updated` with `changes.fields[]` diff. Status-change additionally emits `ticket.status_changed`.
-3. `POST /v1/tickets/{idOrKey}/transition` — typed wrapper. Validates `status_transitions` (whitelist or wildcard). Requires `resolution` if target category is closed. **Epic-close guard:** rejects 422 with the list of non-closed children if epic close is attempted with open children.
-4. `DELETE /v1/tickets/{idOrKey}` — soft + `ticket.deleted` event.
-5. Comment CRUD with events.
-6. Attachments: multipart upload via Bun, mime-sniff, per-kind size caps from env, write to `${UPLOAD_DIR}/yyyy/mm/<uuid>.<ext>`, emit `attachment.added`. Token-guarded streamed download. Delete removes row + best-effort file unlink.
+### Milestone 1.6 — Polish + ops ✅
 
-**Done when:** Vox-Dictate-style flow works end-to-end: create ticket, attach audio + transcript, GET returns everything embedded.
+- `/healthz` deepens to subsystem report `{ status, subsystems: { db (with latency), uploads (writability probe), webhooks (queue_depth + warn flag at 1000) } }`. 503 if any required subsystem is degraded.
+- Structured JSON access logs via `lib/access-log.ts` (one line per request: ts, request_id, method, path, status, duration_ms, user_id, token_id). Echoes `X-Request-ID` header. Quiet on `/healthz` and `/v1/openapi.json`.
+- Graceful shutdown unified under one 10s deadline ceiling: stop accepting connections → drain dispatcher → close DB.
+- `client/src/lib/api.ts` is now a real `openapi-fetch` client with a token-injecting middleware. `bun run api:gen` regenerates `client/src/lib/api.types.ts` (committed).
+- README "How agents use this API": auth, idempotency, cursor pagination, error envelope, webhook HMAC verification (Node.js + Python), PATCH-vs-/transition rule, filter syntax, request IDs.
 
-### Milestone 1.4 — Webhooks
+### Phase 1 closeout — correctness + DRY pass ✅
 
-`POST /v1/webhooks` mints secret (returned once). PATCH/DELETE/GET. `GET .../{id}/deliveries` paginated log. `POST .../deliveries/{id}/redeliver` flips status to `pending`. Dispatcher loop (already running from 1.0) is now exercised end-to-end. Add integration test: subscribe → trigger event → assert mock endpoint receives valid HMAC.
+- **Two-phase event emission removed.** Mutations and their `writeEvent` calls now share a single transaction in `tickets.ts` and `comments.ts`. `loadTicketSummary` accepts an optional `tx` so reads inside the txn see in-flight writes (e.g. labels just inserted). Failed event writes now roll back the mutation rather than committing a ticket-without-audit-trail.
+- **`catchUnique(message, fn)` helper** in `errors.ts` collapses 8 try/catch sites with `if (err?.code === "23505") throw conflict(…)` boilerplate (across users, projects, statuses, transitions, labels).
+- **Unused-import cleanup** — all `void <unused>;` markers and the imports they suppressed removed across `users.ts`, `projects.ts`, `statuses.ts`, `comments.ts`, `events.ts`, `tickets.ts`.
+- **Deliberately not refactored:** cursor-pagination glue (per-handler shapes vary too much), partial-`sets` builders (loses type safety from `Partial<typeof X.$inferInsert>`), `(async (c: any) => {...}) as any` handler wrappers (purely cosmetic).
 
-**Done when:** Cogitation Engine could be retargeted at switchyard pending the cogitation-patch URL/payload swap.
-
-### Milestone 1.5 — Boards (write)
-
-`POST/PATCH/DELETE /v1/boards`. Empty project list rejected. Performance test of `GET /v1/boards/{id}/columns` with 10 projects × 100 tickets; add indexes if slow.
-
-**Done when:** create a board scoped to N projects and see its kanban columns under load.
-
-### Milestone 1.6 — Polish + ops
-
-- `/healthz` deepens: DB ping + `UPLOAD_DIR` writable + queue depth (warn > 1000 pending).
-- Structured access logs (JSON; method/path/status/duration_ms/user_id/request_id).
-- Graceful shutdown drains dispatcher with 5s deadline.
-- `client/src/lib/api.types.ts` generated from `openapi.yaml` and committed.
-- README: "How agents use this API" — idempotent POST example, webhook signature verification snippets.
-
-**Done when:** Phase 1 complete. The cogitation engine can be migrated at this point.
-
-Out of scope (defer to later phases):
+Out of scope (deferred to later phases):
 - UI (Phase 2)
 - Charts / dashboards (Phase 3)
 - Native automation rules (Phase 4)

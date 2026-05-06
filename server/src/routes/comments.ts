@@ -1,5 +1,5 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { and, eq, inArray, isNull, lt, type SQL } from "drizzle-orm";
+import { and, eq, inArray, isNull, type SQL } from "drizzle-orm";
 import { Comment, CreateComment, UpdateComment, Uuid, paginated, Pagination, type Attachment as ApiAttachment } from "@switchyard/shared";
 import { db } from "../db.js";
 import * as schema from "../../drizzle/schema.js";
@@ -125,18 +125,17 @@ export function mount(app: OpenAPIHono) {
         body: body.body,
       }).returning();
       if (!created) throw new Error("comment insert returned nothing");
-      return created;
-    });
 
-    const summary = await loadTicketSummary(ticket);
-    await db.transaction(async (tx) => {
+      const summary = await loadTicketSummary(ticket, tx as any);
       await writeEvent(tx as any, {
         event_type: "comment.created",
         actor: mapUserRef(auth.user),
         ticket: summary,
         project_id: ticket.project_id,
-        extras: { comment_id: inserted.id, comment_body: inserted.body },
+        extras: { comment_id: created.id, comment_body: created.body },
       });
+
+      return created;
     });
 
     return c.json(mapComment(inserted, auth.user, []), 201);
@@ -171,19 +170,18 @@ export function mount(app: OpenAPIHono) {
         .where(eq(schema.comments.id, id))
         .returning();
       if (!u) throw notFound("comment");
-      return u;
-    });
 
-    const ticket = (await db.select().from(schema.tickets).where(eq(schema.tickets.id, updated.ticket_id)).limit(1))[0]!;
-    const summary = await loadTicketSummary(ticket);
-    await db.transaction(async (tx) => {
+      const ticket = (await tx.select().from(schema.tickets).where(eq(schema.tickets.id, u.ticket_id)).limit(1))[0]!;
+      const summary = await loadTicketSummary(ticket, tx as any);
       await writeEvent(tx as any, {
         event_type: "comment.updated",
         actor: mapUserRef(auth.user),
         ticket: summary,
         project_id: ticket.project_id,
-        extras: { comment_id: updated.id },
+        extras: { comment_id: u.id },
       });
+
+      return u;
     });
 
     const author = (await db.select().from(schema.users).where(eq(schema.users.id, updated.author_id)).limit(1))[0]!;
@@ -226,6 +224,4 @@ export function mount(app: OpenAPIHono) {
 
     return c.body(null, 204);
   }) as any);
-
-  void lt;
 }

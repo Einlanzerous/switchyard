@@ -1,44 +1,54 @@
-# construct-server changes
+# switchyard ↔ construct-server integration
 
-These are the diffs to apply to `~/construct-server/` to deploy switchyard. Three files change. Apply them by hand — none are auto-applied.
+Runbook for how switchyard plugs into the existing `~/construct-server` Docker stack. Most of this is already applied — keep this around for fresh installs, disaster recovery, and to explain why the integration looks the way it does.
 
-## 1. `db/init-db.sh` — add the database
+## Where switchyard lives in the stack
 
-Add one line to the bottom of the existing script:
+- **Image:** built locally from `~/projects/switchyard/Dockerfile` (multi-stage Bun + Vue), not pulled from a registry.
+- **Network:** `construct_net` only, alongside `postgres`, `n8n`, `servo-signal`, etc.
+- **Database:** dedicated `switchyard` database on the shared Postgres 16 instance, owned by `switchyard_user`. A second `switchyard_test` database (same role) backs the integration test suite.
+- **Storage:** named volume `switchyard_uploads` mounted at `/data/uploads` for attachment files. Postgres only stores `storage_path`.
+- **Watchtower:** **opted out** via `com.centurylinklabs.watchtower.enable=false`. Updates happen via explicit `docker compose up -d --build switchyard`, not the Monday-04:00 rolling restart that's suspected of dropping Vikunja's DB password on a previous service.
+
+## Database provisioning
+
+`~/construct-server/db/init-db.sh` runs on first init of the `postgres_data` volume and provisions per-service databases. switchyard appends two `ensure_db` lines:
 
 ```sh
 ensure_db switchyard_user "$SWITCHYARD_DB_PASSWORD" switchyard
+ensure_db switchyard_user "$SWITCHYARD_DB_PASSWORD" switchyard_test
 ```
 
-Note: `init-db.sh` only runs when the `postgres_data` volume is empty (first-boot init). For an already-running Postgres instance, run the equivalent commands manually:
+For an already-running Postgres (the common case — the volume's been around longer than switchyard), the equivalent one-time provisioning is:
 
 ```bash
 docker exec -i postgres psql -U postgres <<SQL
 CREATE ROLE switchyard_user WITH LOGIN PASSWORD '$SWITCHYARD_DB_PASSWORD';
-CREATE DATABASE switchyard OWNER switchyard_user;
-GRANT ALL PRIVILEGES ON DATABASE switchyard TO switchyard_user;
+CREATE DATABASE switchyard       OWNER switchyard_user;
+CREATE DATABASE switchyard_test  OWNER switchyard_user;
+GRANT ALL PRIVILEGES ON DATABASE switchyard       TO switchyard_user;
+GRANT ALL PRIVILEGES ON DATABASE switchyard_test  TO switchyard_user;
 SQL
 ```
 
-## 2. `.env.example` (and your `.env`) — add new keys
+## Environment variables
 
-Add to the end of `.env.example`:
+In `~/construct-server/.env` (and mirrored in `.env.example`):
 
 ```
 # --- SWITCHYARD ---
-SWITCHYARD_DB_PASSWORD=change_me
+SWITCHYARD_DB_PASSWORD=...
 SWITCHYARD_PORT=4002
 SWITCHYARD_PUBLIC_URL=http://localhost:4002
-# Optional: prints a one-time bootstrap admin token in container logs on first boot
-# if no api_tokens exist. Leave blank to auto-generate.
+# Optional: registers an admin token attached to magos at boot. If unset and
+# api_tokens is empty, a token is auto-generated and surfaced ONCE via stdout
+# banner + ${UPLOAD_DIR}/.bootstrap-token (one-shot file).
 SWITCHYARD_BOOTSTRAP_TOKEN=
 ```
 
-Mirror these keys (with real values) in `~/construct-server/.env`.
+## Compose service
 
-## 3. `docker-compose.yml` — add the service
-
-Add this block alongside the other application services (e.g., near `cook_book` or `vikunja`):
+The service block in `~/construct-server/docker-compose.yml`:
 
 ```yaml
   # --- TASK MANAGEMENT (switchyard — Vikunja replacement) ---
@@ -63,55 +73,59 @@ Add this block alongside the other application services (e.g., near `cook_book` 
     depends_on:
       - postgres
     labels:
-      # Watchtower runs Mondays at 04:00 with rolling restart — opt out so deploys
-      # are explicit. (Vikunja's password-drift bug is suspected to come from this.)
       - "com.centurylinklabs.watchtower.enable=false"
 ```
 
-And add the volume to the `volumes:` block at the bottom:
+…with `switchyard_uploads:` declared in the bottom-of-file `volumes:` block.
 
-```yaml
-volumes:
-  # ... existing volumes ...
-  switchyard_uploads:
-```
-
-## 4. Optional: migrate Vikunja consumers later
-
-The Imperium-Loop pipeline still points at Vikunja. Once switchyard is running, the migration is a separate task tracked in `~/imperium-loop/` — `tools/cogitation-patch/` will get a `swap-to-switchyard` subcommand that rewrites `http://vikunja:3456/api/v1` → `http://switchyard:4002/v1`, replaces the JWT login dance with a static bearer token, and adjusts payload shapes.
-
-Don't delete Vikunja yet — run the two side-by-side until the cogitation engine is fully swapped over.
-
-## Bring-up sequence
-
-```bash
-# 1. Add the env keys above to ~/construct-server/.env
-# 2. Add the compose service + volume
-# 3. From ~/construct-server:
-make network                                  # idempotent if already created
-docker compose up -d switchyard               # builds the image and starts the container
-docker logs -f switchyard                     # watch migrations + startup
-# Look for: "[migrate] done", "[switchyard] listening on :4002"
-# If BOOTSTRAP_TOKEN was unset and api_tokens is empty, the bootstrap token
-# is printed once. Copy it into n8n credentials, then revoke it after creating
-# real per-user tokens.
-
-# 4. Smoke test:
-curl http://localhost:4002/healthz
-# {"status":"ok","db":true}
-```
-
-## Sanity checks against existing patterns
-
-These are how this service deviates (or doesn't) from `cook_book`, the closest sibling in `docker-compose.yml`:
+## How switchyard differs from `cook_book` (the closest sibling)
 
 | Concern | cook_book | switchyard |
 |---|---|---|
 | Builds locally | No (uses `image:`) | Yes (uses `build:`) |
 | Watchtower | enabled (auto-update) | **disabled** |
 | Postgres user | `cook_book_user` | `switchyard_user` |
-| Migrations | Prisma at entrypoint | Drizzle + triggers.sql at entrypoint |
+| Migrations | Prisma at entrypoint | Drizzle + `triggers.sql` + `seed.ts` at entrypoint |
 | Network | `construct_net` only | `construct_net` only |
 | Volume | none | `switchyard_uploads` (attachments) |
 
-The watchtower opt-out is the deliberate change. Updates happen via `git pull && docker compose up -d --build switchyard` instead of the surprise Monday rolling-restart.
+The watchtower opt-out is the deliberate divergence. switchyard exits non-zero on bad config / unreachable DB so docker reports the failure cleanly — the silent restart-loop into a broken state that bit Vikunja can't happen here.
+
+## Bring-up (fresh install)
+
+```bash
+# From ~/construct-server, after the env vars and service block are in place:
+make network                                  # idempotent
+docker compose up -d --build switchyard       # builds image, starts container
+docker logs -f switchyard                     # watch migrations + seed + dispatcher start
+
+# Expected log sequence:
+#   [migrate] running drizzle migrations
+#   [migrate] applying triggers.sql
+#   [migrate] running seed
+#   [seed] created user: magos / claude / n8n-cogitation / ...
+#   ═══ switchyard bootstrap token ═══   (one-shot banner if BOOTSTRAP_TOKEN env unset)
+#   [dispatcher] started
+#   [switchyard] listening on :4002
+
+# Smoke test:
+curl http://localhost:4002/healthz
+# {"status":"ok","subsystems":{"db":{...},"uploads":{...},"webhooks":{...}}}
+```
+
+If `BOOTSTRAP_TOKEN` was unset and `api_tokens` was empty on first boot, the bootstrap token is also written to `/data/uploads/.bootstrap-token` inside the container — read it once with `docker exec switchyard cat /data/uploads/.bootstrap-token`, then mint real per-agent tokens via `POST /v1/users/{id}/tokens` and revoke the bootstrap.
+
+## Updates
+
+```bash
+cd ~/projects/switchyard && git pull
+cd ~/construct-server && docker compose up -d --build switchyard
+```
+
+Migrations are applied on every container start (idempotent). The seed routine is also idempotent — re-running it after canonical-user changes adds new agents without duplicating existing ones.
+
+## Imperium-Loop migration (separate project)
+
+The cogitation engine still points at Vikunja today. Migration belongs in `~/imperium-loop/`, not here — `tools/cogitation-patch/` is expected to gain a `swap-to-switchyard` subcommand that rewrites `http://vikunja:3456/api/v1` → `http://switchyard:4002/v1`, drops the per-run JWT login in favor of a static bearer token (stored in n8n credentials), and adjusts payload shapes (POST /comments instead of PUT, typed `/transition` endpoint instead of bucket-move).
+
+Run switchyard side-by-side with Vikunja during the swap-over; only retire Vikunja once the cogitation engine has been fully retargeted.

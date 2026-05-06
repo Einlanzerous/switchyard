@@ -27,6 +27,18 @@ export const unprocessable = (message: string, details?: Record<string, unknown>
 export const notImplemented = () =>
   new HttpError(501, "internal", "handler not yet implemented");
 
+// Wrap an INSERT/UPDATE that may fail with a Postgres unique-constraint
+// violation. Translates the 23505 SQLSTATE into a friendly 409 with the
+// caller's message; lets every other error propagate.
+export async function catchUnique<T>(message: string, fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (err: any) {
+    if (err?.code === "23505") throw conflict(message);
+    throw err;
+  }
+}
+
 export function toEnvelope(err: unknown) {
   if (err instanceof HttpError) {
     return {

@@ -9,11 +9,11 @@ import * as schema from "../../drizzle/schema.js";
 import { requireAuth } from "../auth.js";
 import { idempotency } from "../lib/idempotency.js";
 import { errorResponses, okJson, createdJson, noContent, scope, z, checkScope } from "./_helpers.js";
-import { mapProject, mapProjectRef, mapUserRef } from "../lib/mappers.js";
+import { mapProject, mapUserRef } from "../lib/mappers.js";
 import { getProjectByKey } from "../lib/lookups.js";
 import { buildPage, cursorOrderBy, cursorWhere, decodeCursor } from "../lib/pagination.js";
 import { writeEvent } from "../lib/events.js";
-import { badRequest, conflict } from "../errors.js";
+import { badRequest, catchUnique } from "../errors.js";
 
 const tag = "Projects";
 
@@ -95,8 +95,8 @@ export function mount(app: OpenAPIHono) {
     const body = c.req.valid("json");
     const auth = c.get("auth");
 
-    try {
-      const project = await db.transaction(async (tx) => {
+    const project = await catchUnique(`project key "${body.key}" already exists`, () =>
+      db.transaction(async (tx) => {
         const [created] = await tx.insert(schema.projects).values({
           key: body.key,
           name: body.name,
@@ -126,13 +126,10 @@ export function mount(app: OpenAPIHono) {
         });
 
         return created;
-      });
+      })
+    );
 
-      return c.json(mapProject(project), 201);
-    } catch (err: any) {
-      if (err?.code === "23505") throw conflict(`project key "${body.key}" already exists`);
-      throw err;
-    }
+    return c.json(mapProject(project), 201);
   }) as any);
 
   app.openapi(update, (async (c: any) => {
@@ -202,6 +199,4 @@ export function mount(app: OpenAPIHono) {
 
     return c.body(null, 204);
   }) as any);
-
-  void mapProjectRef;
 }

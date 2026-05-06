@@ -222,6 +222,51 @@ function stripEnvelopeFields(p: EventPayload): Record<string, unknown> | undefin
 
 // ─── api tokens ────────────────────────────────────────────────────────────
 
+// ─── webhooks ──────────────────────────────────────────────────────────────
+
+type WebhookSubRow = typeof schema.webhookSubscriptions.$inferSelect;
+type WebhookDeliveryRow = typeof schema.webhookDeliveries.$inferSelect;
+
+import type {
+  WebhookSubscription as ApiWebhookSubscription,
+  WebhookSubscriptionWithSecret as ApiWebhookSubscriptionWithSecret,
+  WebhookDelivery as ApiWebhookDelivery,
+} from "@switchyard/shared";
+
+export function mapWebhookSubscription(s: WebhookSubRow): ApiWebhookSubscription {
+  return {
+    id: s.id,
+    url: s.url,
+    event_types: s.event_types as ApiWebhookSubscription["event_types"],
+    status_filter: (s.status_filter ?? null) as ApiWebhookSubscription["status_filter"],
+    active: s.active,
+    created_at: s.created_at,
+    updated_at: s.updated_at,
+  };
+}
+
+export function mapWebhookSubscriptionWithSecret(s: WebhookSubRow): ApiWebhookSubscriptionWithSecret {
+  return { ...mapWebhookSubscription(s), secret: s.secret };
+}
+
+export function mapWebhookDelivery(d: WebhookDeliveryRow): ApiWebhookDelivery {
+  return {
+    id: d.id,
+    subscription_id: d.subscription_id,
+    event_id: d.event_id,
+    status: d.status as ApiWebhookDelivery["status"],
+    response_code: d.response_code,
+    response_body_excerpt: d.response_body_excerpt,
+    attempts: d.attempts,
+    last_error: d.last_error,
+    last_attempt_at: d.last_attempt_at,
+    next_attempt_at: d.next_attempt_at,
+    created_at: d.created_at,
+  };
+}
+
+// ─── api tokens ────────────────────────────────────────────────────────────
+
 export function mapApiToken(t: TokenRow): ApiToken {
   return {
     id: t.id,

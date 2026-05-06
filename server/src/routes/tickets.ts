@@ -1,6 +1,6 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import {
-  and, asc, desc, eq, gt, gte, ilike, inArray, isNull, lt, lte, ne, or, sql, type SQL,
+  and, asc, desc, eq, gt, ilike, inArray, isNull, lt, ne, or, sql, type SQL,
 } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import {
@@ -19,7 +19,7 @@ import { resolveTicket, getProjectByKey, getStatusById, getUserById } from "../l
 import { buildPage, cursorOrderBy, cursorWhere, decodeCursor } from "../lib/pagination.js";
 import { writeEvent } from "../lib/events.js";
 import { loadTicketDetail, loadTicketSummary, allocateTicketNumber } from "../lib/tickets.js";
-import { badRequest, notFound, unprocessable } from "../errors.js";
+import { badRequest, unprocessable } from "../errors.js";
 
 const tag = "Tickets";
 const idOrKey = z.string().min(1);
@@ -262,6 +262,8 @@ export function mount(app: OpenAPIHono) {
       }
     }
 
+    // One txn covers ticket insert + label inserts + ticket.created event so
+    // the audit log can never disagree with the ticket table.
     const inserted = await db.transaction(async (tx) => {
       const number = await allocateTicketNumber(tx, project.id);
 
@@ -288,18 +290,15 @@ export function mount(app: OpenAPIHono) {
         );
       }
 
-      return t;
-    });
-
-    // Build summary OUTSIDE the txn for the event — read-after-write of the freshly-committed row.
-    const summary = await loadTicketSummary(inserted);
-    await db.transaction(async (tx) => {
+      const summary = await loadTicketSummary(t, tx as any);
       await writeEvent(tx as any, {
         event_type: "ticket.created",
         actor: mapUserRef(auth.user),
         ticket: summary,
         project_id: project.id,
       });
+
+      return t;
     });
 
     return c.json(await loadTicketDetail(inserted), 201);
@@ -374,19 +373,16 @@ export function mount(app: OpenAPIHono) {
         }
       }
 
-      return row;
-    });
+      // ticket.updated event with field diff. Build summary inside the txn so
+      // the embedded label set reflects the just-replaced ticket_labels.
+      const summary = await loadTicketSummary(row, tx as any);
+      const fields = Object.keys(sets).map((field) => ({
+        field,
+        from: (existing as any)[field] ?? null,
+        to: (sets as any)[field] ?? null,
+      }));
+      if (!noLabelChange) fields.push({ field: "labels", from: null, to: null });
 
-    // Emit ticket.updated with field diff (skip "labels" — too noisy as a string diff).
-    const summary = await loadTicketSummary(updated);
-    const fields = Object.keys(sets).map((field) => ({
-      field,
-      from: (existing as any)[field] ?? null,
-      to: (sets as any)[field] ?? null,
-    }));
-    if (!noLabelChange) fields.push({ field: "labels", from: null, to: null });
-
-    await db.transaction(async (tx) => {
       await writeEvent(tx as any, {
         event_type: "ticket.updated",
         actor: mapUserRef(auth.user),
@@ -402,6 +398,8 @@ export function mount(app: OpenAPIHono) {
           project_id: existing.project_id,
         });
       }
+
+      return row;
     });
 
     return c.json(await loadTicketDetail(updated), 200);
@@ -493,7 +491,9 @@ export function mount(app: OpenAPIHono) {
       }
     }
 
-    // Apply.
+    // Apply state change + comment + the event cluster atomically. If any
+    // event insert fails we'd rather roll back the whole transition than have
+    // a status change with no audit trail.
     const updated = await db.transaction(async (tx) => {
       const [u] = await tx.update(schema.tickets)
         .set({
@@ -512,45 +512,24 @@ export function mount(app: OpenAPIHono) {
         });
       }
 
-      return u;
-    });
+      const summary = await loadTicketSummary(u, tx as any);
+      const statusChange = {
+        from: mapStatusRef(fromStatus),
+        to: mapStatusRef(toStatus),
+        resolution: body.resolution ?? null,
+      };
 
-    const summary = await loadTicketSummary(updated);
-
-    // Emit the cluster of events. Order: status_changed (always),
-    // closed (if closed), released (if resolution=released).
-    await db.transaction(async (tx) => {
-      await writeEvent(tx as any, {
-        event_type: "ticket.status_changed",
-        actor: mapUserRef(auth.user),
-        ticket: summary,
-        project_id: existing.project_id,
-        changes: {
-          status: {
-            from: mapStatusRef(fromStatus),
-            to: mapStatusRef(toStatus),
-            resolution: body.resolution ?? null,
-          },
-        },
-      });
-
-      const extraEvents: EventType[] = [];
-      if (toStatus.category === "closed") extraEvents.push("ticket.closed");
-      if (body.resolution === "released") extraEvents.push("ticket.released");
-
-      for (const evt of extraEvents) {
+      // status_changed always; closed if entering closed; released if resolution=released.
+      const eventTypes: EventType[] = ["ticket.status_changed"];
+      if (toStatus.category === "closed") eventTypes.push("ticket.closed");
+      if (body.resolution === "released") eventTypes.push("ticket.released");
+      for (const evt of eventTypes) {
         await writeEvent(tx as any, {
           event_type: evt,
           actor: mapUserRef(auth.user),
           ticket: summary,
           project_id: existing.project_id,
-          changes: {
-            status: {
-              from: mapStatusRef(fromStatus),
-              to: mapStatusRef(toStatus),
-              resolution: body.resolution ?? null,
-            },
-          },
+          changes: { status: statusChange },
         });
       }
 
@@ -563,6 +542,8 @@ export function mount(app: OpenAPIHono) {
           extras: { comment_body: body.comment },
         });
       }
+
+      return u;
     });
 
     return c.json(await loadTicketDetail(updated), 200);
@@ -654,7 +635,6 @@ export function mount(app: OpenAPIHono) {
     return c.json(buildPage(summaries, limit), 200);
   }) as any);
 
-  void gte; void lte; void notFound;
 }
 
 // ─── helpers ────────────────────────────────────────────────────────────────

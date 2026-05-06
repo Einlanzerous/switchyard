@@ -4,7 +4,7 @@ import { Event, EventType, ProjectKey, Iso8601, paginated, Pagination, Uuid } fr
 import { db } from "../db.js";
 import * as schema from "../../drizzle/schema.js";
 import { requireAuth } from "../auth.js";
-import { errorResponses, okJson, stub, z } from "./_helpers.js";
+import { errorResponses, okJson, z } from "./_helpers.js";
 import { mapEvent } from "../lib/mappers.js";
 import { decodeCursor, encodeCursor } from "../lib/pagination.js";
 import { badRequest } from "../errors.js";
@@ -80,6 +80,4 @@ export function mount(app: OpenAPIHono) {
 
     return c.json({ items, page: { next_cursor, has_more } }, 200);
   }) as any);
-
-  void stub;
 }
