@@ -59,6 +59,10 @@ export function useBoardDetail(boardId: ComputedRef<string | null>) {
       if (error) throw error;
       return data;
     },
+    // Cross-project board mirrors single-project — keep ticket positions
+    // fresh while the user watches agents work.
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
   });
 
   // Fan out one statuses fetch per project in the board. useQueries handles

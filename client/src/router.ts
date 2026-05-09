@@ -6,12 +6,29 @@ import TicketDetailView from "./views/TicketDetailView.vue";
 import ProjectBoardView from "./views/ProjectBoardView.vue";
 import BoardsListView from "./views/BoardsListView.vue";
 import BoardView from "./views/BoardView.vue";
-import PlaceholderView from "./views/PlaceholderView.vue";
+import ProjectsView from "./views/ProjectsView.vue";
+
+// Settings is a nested layout so each sub-section is its own route while
+// sharing the sidebar. /settings on its own redirects to the profile page.
+import SettingsLayout from "./views/settings/SettingsLayout.vue";
+import SettingsProfile from "./views/settings/SettingsProfile.vue";
+import SettingsTokens from "./views/settings/SettingsTokens.vue";
+import SettingsLabels from "./views/settings/SettingsLabels.vue";
+import SettingsProjects from "./views/settings/SettingsProjects.vue";
+import SettingsProject from "./views/settings/SettingsProject.vue";
+import SettingsProjectStatuses from "./views/settings/SettingsProjectStatuses.vue";
+import SettingsProjectTransitions from "./views/settings/SettingsProjectTransitions.vue";
+import SettingsUsers from "./views/settings/SettingsUsers.vue";
+
+// Automations is its own top-level area; webhooks (and Phase-4 rules) live
+// under it rather than under /settings, since they're a primary integration
+// surface, not admin chrome.
+import AutomationsLayout from "./views/automations/AutomationsLayout.vue";
+import AutomationsWebhooks from "./views/automations/AutomationsWebhooks.vue";
+import AutomationsWebhookDeliveries from "./views/automations/AutomationsWebhookDeliveries.vue";
+
 import { getStoredToken } from "./lib/api.js";
 
-// Placeholder routes are wired so the sidebar's RouterLinks resolve and the
-// router doesn't warn at render time. Each placeholder advertises the milestone
-// it'll be replaced in.
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
@@ -22,10 +39,46 @@ export const router = createRouter({
     { path: "/tickets/:idOrKey", name: "ticket", component: TicketDetailView },
     { path: "/boards", name: "boards", component: BoardsListView },
     { path: "/boards/:id", name: "board", component: BoardView },
-    { path: "/projects", name: "projects", component: PlaceholderView, meta: { milestone: "2.6" } },
+    { path: "/projects", name: "projects", component: ProjectsView },
     { path: "/projects/:key/board", name: "project-board", component: ProjectBoardView },
-    { path: "/settings", name: "settings", component: PlaceholderView, meta: { milestone: "2.6" } },
-    { path: "/settings/:section", name: "settings-section", component: PlaceholderView, meta: { milestone: "2.6" } },
+
+    {
+      path: "/settings",
+      component: SettingsLayout,
+      redirect: "/settings/profile",
+      children: [
+        { path: "profile", name: "settings-profile", component: SettingsProfile },
+        { path: "tokens", name: "settings-tokens", component: SettingsTokens },
+        { path: "labels", name: "settings-labels", component: SettingsLabels },
+        { path: "projects", name: "settings-projects", component: SettingsProjects },
+        { path: "projects/:key", name: "settings-project", component: SettingsProject },
+        {
+          path: "projects/:key/statuses",
+          name: "settings-project-statuses",
+          component: SettingsProjectStatuses,
+        },
+        {
+          path: "projects/:key/transitions",
+          name: "settings-project-transitions",
+          component: SettingsProjectTransitions,
+        },
+        { path: "users", name: "settings-users", component: SettingsUsers },
+      ],
+    },
+
+    {
+      path: "/automations",
+      component: AutomationsLayout,
+      redirect: "/automations/webhooks",
+      children: [
+        { path: "webhooks", name: "automations-webhooks", component: AutomationsWebhooks },
+        {
+          path: "webhooks/:id/deliveries",
+          name: "automations-webhook-deliveries",
+          component: AutomationsWebhookDeliveries,
+        },
+      ],
+    },
   ],
 });
 

@@ -189,7 +189,7 @@ Goal: the user can do everything via the UI that they'd otherwise do via curl. L
 
 ### Milestone 2.7 — Polish
 
-- Command palette (cmd-K): jump to ticket by key, quick-create ticket, switch project, recent boards.
+- Command palette (Ctrl+K): jump to ticket by key, quick-create ticket, switch project, recent boards.
 - Keyboard shortcuts: `g t` → tickets, `g b` → boards, `c` → new ticket, `?` → shortcut sheet.
 - **Search-as-DSL** (replaces dedicated dropdowns once the loop feels right): `assignee=magos status=in_progress,blocked type=bug urgent` parses inline tokens out of the search field, falls back to ILIKE for the remaining text. Lets keyboard-first users skip the chip toggles and gives the search bar real power.
 - Empty states for every list (illustration + 1-line copy + primary CTA).

@@ -17,8 +17,8 @@ const milestones: Array<{ id: string; label: string; done: boolean }> = [
   { id: "2.3", label: "Ticket detail (drawer + page)", done: true },
   { id: "2.4", label: "Kanban board", done: true },
   { id: "2.5", label: "Cross-project boards + swimlanes", done: true },
-  { id: "2.6", label: "Settings", done: false },
-  { id: "2.7", label: "Polish (cmd-K, shortcuts, empty states)", done: false },
+  { id: "2.6", label: "Settings", done: true },
+  { id: "2.7", label: "Polish (Ctrl+K, shortcuts, empty states)", done: true },
 ];
 
 // Defensive: older container builds (pre-1.6) returned `{ status, db }` instead

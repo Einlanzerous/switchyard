@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch, useTemplateRef, onMounted, onBeforeUnmount } from "vue";
+import { computed, watch, useTemplateRef, onMounted, onBeforeUnmount } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import { Inbox, Loader2, AlertCircle, KanbanSquare, Plus } from "lucide-vue-next";
@@ -7,11 +7,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import FilterBar from "@/components/tickets/FilterBar.vue";
 import TicketRow from "@/components/tickets/TicketRow.vue";
-import CreateTicketDialog from "@/components/tickets/CreateTicketDialog.vue";
 import { useTicketFilters } from "@/composables/useTicketFilters";
 import { useTicketsList } from "@/composables/useTicketsList";
+import { useUiStore } from "@/stores/ui";
 
-const showCreate = ref(false);
+const ui = useUiStore();
 
 const { filters, isAnySet, clear } = useTicketFilters();
 
@@ -92,17 +92,12 @@ const errMessage = computed(() => {
           <KanbanSquare class="h-3.5 w-3.5 mr-1.5" />
           Board view
         </Button>
-        <Button size="sm" class="h-8" @click="showCreate = true">
+        <Button size="sm" class="h-8" @click="ui.openCreateTicket(singleProjectKey)">
           <Plus class="h-3.5 w-3.5 mr-1.5" />
           New ticket
         </Button>
       </template>
     </FilterBar>
-
-    <CreateTicketDialog
-      v-model:open="showCreate"
-      :default-project-key="singleProjectKey"
-    />
 
     <!-- Initial-load skeleton -->
     <div v-if="isLoading" class="flex-1 px-4 py-2 space-y-2">

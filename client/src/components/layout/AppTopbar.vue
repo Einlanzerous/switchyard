@@ -2,7 +2,6 @@
 import { Search, Sun, Moon, Monitor, LogOut, User as UserIcon } from "lucide-vue-next";
 import { computed } from "vue";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,10 +13,12 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useThemeStore } from "@/stores/theme";
 import { useAuthStore } from "@/stores/auth";
+import { useUiStore } from "@/stores/ui";
 import { useRouter } from "vue-router";
 
 const theme = useThemeStore();
 const auth = useAuthStore();
+const ui = useUiStore();
 const router = useRouter();
 
 const initials = computed(() => {
@@ -37,19 +38,19 @@ function logout() {
 
 <template>
   <header class="flex h-14 items-center gap-3 border-b px-4">
-    <div class="flex-1 max-w-md">
-      <div class="relative">
-        <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search tickets…"
-          class="pl-9 pr-16 bg-muted/50 border-transparent focus-visible:ring-1"
-          disabled
-          aria-label="Search (command palette wires up in milestone 2.7)"
-        />
+    <div class="flex-1 max-w-2xl">
+      <button
+        type="button"
+        class="relative w-full h-9 rounded-md border border-transparent bg-muted/50 hover:bg-muted text-left text-sm text-muted-foreground pl-9 pr-16 transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        aria-label="Open command palette"
+        @click="ui.openPalette()"
+      >
+        <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" />
+        Search tickets, projects, boards…
         <kbd class="absolute right-2 top-1/2 -translate-y-1/2 hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border bg-background px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
           Ctrl+K
         </kbd>
-      </div>
+      </button>
     </div>
 
     <div class="ml-auto flex items-center gap-2">

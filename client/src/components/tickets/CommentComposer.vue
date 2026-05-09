@@ -150,7 +150,7 @@ function onKeydown(e: KeyboardEvent) {
       v-model="body"
       rows="3"
       class="w-full bg-transparent text-sm leading-relaxed focus:outline-none resize-y placeholder:text-muted-foreground"
-      placeholder="Write a comment… markdown supported, drop files anywhere on this card. Cmd/Ctrl+Enter to send."
+      placeholder="Write a comment… markdown supported, drop files anywhere on this card. Ctrl+Enter to send."
       @keydown="onKeydown"
     />
 

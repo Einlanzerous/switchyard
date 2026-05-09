@@ -129,7 +129,7 @@ function onKeydown(e: KeyboardEvent) {
       <DialogHeader>
         <DialogTitle>New ticket</DialogTitle>
         <DialogDescription>
-          Cmd/Ctrl+Enter to create. The drawer opens to the new ticket on success.
+          Ctrl+Enter to create. The drawer opens to the new ticket on success.
         </DialogDescription>
       </DialogHeader>
 

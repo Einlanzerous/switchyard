@@ -33,6 +33,10 @@ export function useTicketsList(filters: ComputedRef<TicketFilters>) {
     },
     getNextPageParam: (lastPage) =>
       lastPage.page.has_more ? (lastPage.page.next_cursor ?? undefined) : undefined,
+    // Quietly refresh the list every 30s while the tab is focused so agent
+    // activity (~90% of writes) shows up without forcing a manual refresh.
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
   });
 
   // Apply priority filter client-side (until the API supports it natively).

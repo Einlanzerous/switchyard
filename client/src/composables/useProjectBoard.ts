@@ -71,6 +71,11 @@ export function useProjectBoard(projectKey: ComputedRef<string | null>) {
       if (error) throw error;
       return data;
     },
+    // Background refresh while focused — kanban needs to reflect agent
+    // activity without a manual reload. Statuses are static; only tickets
+    // poll.
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
   });
 
   const statuses = computed<Status[]>(() => statusesQuery.data.value?.items ?? []);

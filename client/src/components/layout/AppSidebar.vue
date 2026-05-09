@@ -1,28 +1,41 @@
 <script setup lang="ts">
 import { RouterLink, useRoute } from "vue-router";
 import { computed } from "vue";
-import { Inbox, LayoutDashboard, KanbanSquare, FolderKanban, Settings, Webhook } from "lucide-vue-next";
+import { Inbox, LayoutDashboard, KanbanSquare, FolderKanban, Settings, Zap } from "lucide-vue-next";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-type NavItem = { to: string; label: string; icon: any; group: "main" | "settings" };
+type NavItem = { to: string; label: string; icon: any; group: "main" | "admin" };
 
 const items: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, group: "main" },
   { to: "/tickets", label: "Tickets", icon: Inbox, group: "main" },
   { to: "/boards", label: "Boards", icon: KanbanSquare, group: "main" },
   { to: "/projects", label: "Projects", icon: FolderKanban, group: "main" },
-  { to: "/settings/webhooks", label: "Webhooks", icon: Webhook, group: "settings" },
-  { to: "/settings", label: "Settings", icon: Settings, group: "settings" },
+  { to: "/automations", label: "Automations", icon: Zap, group: "main" },
+  { to: "/settings", label: "Settings", icon: Settings, group: "admin" },
 ];
 
 const route = useRoute();
 const main = computed(() => items.filter((i) => i.group === "main"));
-const settings = computed(() => items.filter((i) => i.group === "settings"));
+const admin = computed(() => items.filter((i) => i.group === "admin"));
+
+// Active state needs to be the *most-specific* match, so when the user is on
+// `/automations/webhooks/:id/deliveries`, only "Automations" highlights and
+// "Settings" doesn't (despite both having a `/` prefix overlap with nothing).
+// Find the longest matching `to`; everyone else is inactive.
+const activeKey = computed(() => {
+  let best: string | null = null;
+  for (const item of items) {
+    if (item.to === "/" ? route.path === "/" : route.path === item.to || route.path.startsWith(item.to + "/")) {
+      if (!best || item.to.length > best.length) best = item.to;
+    }
+  }
+  return best;
+});
 
 function isActive(to: string) {
-  if (to === "/") return route.path === "/";
-  return route.path.startsWith(to);
+  return activeKey.value === to;
 }
 </script>
 
@@ -54,7 +67,7 @@ function isActive(to: string) {
         </div>
 
         <RouterLink
-          v-for="item in settings"
+          v-for="item in admin"
           :key="item.to"
           :to="item.to"
           class="flex items-center gap-2 rounded-md px-3 py-1.5 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"

@@ -12,9 +12,9 @@ import {
 import BoardCell from "@/components/boards/BoardCell.vue";
 import SwimlaneSelector, { type SwimlaneBy } from "@/components/boards/SwimlaneSelector.vue";
 import EditBoardDialog from "@/components/boards/EditBoardDialog.vue";
-import CreateTicketDialog from "@/components/tickets/CreateTicketDialog.vue";
 import { effectivePosition } from "@/lib/positions";
 import { useBoardDetail } from "@/composables/useBoards";
+import { useUiStore } from "@/stores/ui";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
 import { CATEGORY_ORDER } from "@/composables/useProjectBoard";
@@ -38,7 +38,7 @@ const { board, columns, statusLookup, isLoading, error } = useBoardDetail(boardI
 // header dropdown when they want the visual separation.
 const swimlaneBy = ref<SwimlaneBy>("none");
 const showEdit = ref(false);
-const showCreate = ref(false);
+const ui = useUiStore();
 
 // Default project for the create dialog: first project on the board. Users
 // can pick another from the project select inside the dialog.
@@ -348,7 +348,7 @@ const errMessage = computed(() => {
         <Button variant="outline" size="sm" class="h-8" :disabled="!board" @click="showEdit = true">
           <Pencil class="h-3.5 w-3.5 mr-1.5" /> Edit
         </Button>
-        <Button size="sm" class="h-8" :disabled="!board" @click="showCreate = true">
+        <Button size="sm" class="h-8" :disabled="!board" @click="ui.openCreateTicket(defaultProjectKey)">
           <Plus class="h-3.5 w-3.5 mr-1.5" /> New ticket
         </Button>
         <Loader2
@@ -456,6 +456,5 @@ const errMessage = computed(() => {
     </Dialog>
 
     <EditBoardDialog v-if="board" v-model:open="showEdit" :board="board" />
-    <CreateTicketDialog v-model:open="showCreate" :default-project-key="defaultProjectKey" />
   </div>
 </template>

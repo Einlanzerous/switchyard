@@ -10,12 +10,12 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import BoardColumn from "@/components/tickets/BoardColumn.vue";
-import CreateTicketDialog from "@/components/tickets/CreateTicketDialog.vue";
-
-const showCreate = ref(false);
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
+import { useUiStore } from "@/stores/ui";
 import { useProjectBoard, type BoardColumn as Col } from "@/composables/useProjectBoard";
+
+const ui = useUiStore();
 import type { Resolution, TicketSummary } from "@switchyard/shared";
 
 const route = useRoute();
@@ -222,7 +222,7 @@ const errMessage = computed(() => {
         <Button variant="outline" size="sm" class="h-8" @click="viewAsList">
           <List class="h-3.5 w-3.5 mr-1.5" /> List
         </Button>
-        <Button size="sm" class="h-8" @click="showCreate = true">
+        <Button size="sm" class="h-8" @click="ui.openCreateTicket(projectKey)">
           <Plus class="h-3.5 w-3.5 mr-1.5" /> New ticket
         </Button>
         <Loader2
@@ -231,8 +231,6 @@ const errMessage = computed(() => {
         />
       </div>
     </div>
-
-    <CreateTicketDialog v-model:open="showCreate" :default-project-key="projectKey" />
 
     <!-- Loading -->
     <div v-if="isLoading" class="flex-1 p-4 flex gap-3 overflow-x-auto">

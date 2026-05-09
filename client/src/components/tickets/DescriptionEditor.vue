@@ -82,7 +82,7 @@ function onKeydown(e: KeyboardEvent) {
         v-model="draft"
         rows="8"
         class="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono leading-relaxed focus:outline-none focus:ring-1 focus:ring-ring resize-y"
-        placeholder="Markdown supported. Cmd/Ctrl+Enter to save, Esc to cancel."
+        placeholder="Markdown supported. Ctrl+Enter to save, Esc to cancel."
         @keydown="onKeydown"
       />
       <div class="flex items-center justify-end gap-2">
