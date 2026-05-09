@@ -13,6 +13,7 @@ import BoardCell from "@/components/boards/BoardCell.vue";
 import SwimlaneSelector, { type SwimlaneBy } from "@/components/boards/SwimlaneSelector.vue";
 import EditBoardDialog from "@/components/boards/EditBoardDialog.vue";
 import CreateTicketDialog from "@/components/tickets/CreateTicketDialog.vue";
+import { effectivePosition } from "@/lib/positions";
 import { useBoardDetail } from "@/composables/useBoards";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
@@ -112,8 +113,10 @@ function groupByCategory(tickets: TicketSummary[]): Map<StatusCategory, TicketSu
     const arr = out.get(t.status.category);
     if (arr) arr.push(t);
   }
+  // Sort by effective position descending — manual reorders win, legacy rows
+  // fall through to updated_at via effectivePosition.
   for (const arr of out.values()) {
-    arr.sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1));
+    arr.sort((a, b) => effectivePosition(b) - effectivePosition(a));
   }
   return out;
 }

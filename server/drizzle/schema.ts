@@ -169,21 +169,24 @@ export const statusTransitions = pgTable(
 );
 
 // ─── labels ─────────────────────────────────────────────────────────────────
+//
+// Labels are GLOBAL — a single shared catalog spans all projects. Cross-cutting
+// concerns ("frontend", "urgent", "docs") apply uniformly without per-project
+// duplication. The migration in 0002_global_labels.sql dedupes any
+// project-scoped duplicates from the previous schema before dropping the
+// project_id column.
 
 export const labels = pgTable(
   "labels",
   {
     id: id(),
-    project_id: uuid("project_id")
-      .notNull()
-      .references(() => projects.id, { onDelete: "cascade" }),
     name: varchar("name", { length: 50 }).notNull(),
     color: varchar("color", { length: 7 }).notNull(),
     created_at: createdAt(),
     updated_at: updatedAt(),
   },
   (t) => ({
-    nameUnique: uniqueIndex("labels_project_name_unique").on(t.project_id, t.name),
+    nameUnique: uniqueIndex("labels_name_unique").on(t.name),
   })
 );
 

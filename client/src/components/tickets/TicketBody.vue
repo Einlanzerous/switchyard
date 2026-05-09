@@ -3,9 +3,7 @@ import { computed, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { Skeleton } from "@/components/ui/skeleton";
 import StatusBadge from "./StatusBadge.vue";
-import PriorityBadge from "./PriorityBadge.vue";
 import TypeIcon from "./TypeIcon.vue";
-import LabelChip from "./LabelChip.vue";
 import DescriptionEditor from "./DescriptionEditor.vue";
 import CommentItem from "./CommentItem.vue";
 import CommentComposer from "./CommentComposer.vue";
@@ -13,6 +11,9 @@ import TransitionButton from "./TransitionButton.vue";
 import ActivityList from "./ActivityList.vue";
 import AttachmentLink from "./AttachmentLink.vue";
 import LinkedWork from "./LinkedWork.vue";
+import PriorityEditor from "./PriorityEditor.vue";
+import AssigneeEditor from "./AssigneeEditor.vue";
+import LabelEditor from "./LabelEditor.vue";
 import { cn } from "@/lib/utils";
 import { useTicketDetail } from "@/composables/useTicketDetail";
 
@@ -117,32 +118,25 @@ const showLinkedWork = computed(() => {
          right. Wraps the transition under the meta when narrow. -->
     <div class="space-y-2">
       <div class="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
-        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 flex-1 min-w-0">
-          <span class="inline-flex items-center gap-1.5 capitalize text-foreground/90">
+        <div class="flex flex-wrap items-center gap-x-1 gap-y-1 flex-1 min-w-0">
+          <span class="inline-flex items-center gap-1.5 capitalize text-foreground/90 px-1.5">
             <TypeIcon :type="ticket.type" />
             {{ ticket.type }}
           </span>
           <span class="text-muted-foreground/40">·</span>
-          <span v-if="ticket.assignee" class="text-muted-foreground">
-            Assigned to <span class="text-foreground">{{ ticket.assignee.name }}</span>
-          </span>
-          <span v-else class="text-muted-foreground">Unassigned</span>
-          <template v-if="ticket.priority">
-            <span class="text-muted-foreground/40">·</span>
-            <PriorityBadge :priority="ticket.priority" show-label />
-          </template>
+          <AssigneeEditor :ticket="ticket" />
+          <span class="text-muted-foreground/40">·</span>
+          <PriorityEditor :ticket="ticket" />
         </div>
         <TransitionButton :ticket="ticket" :allowed-statuses="allowedStatuses" />
       </div>
 
-      <!-- Status + labels on one row. The pipe separator only renders when
-           there are labels to follow it. -->
+      <!-- Status + labels (editable) on one row. The pipe separator only
+           renders when there's something to separate. -->
       <div class="flex flex-wrap items-center gap-2">
         <StatusBadge :category="ticket.status.category" :display-name="ticket.status.display_name" />
-        <template v-if="ticket.labels.length > 0">
-          <span class="text-muted-foreground/40 text-sm select-none">|</span>
-          <LabelChip v-for="lbl in ticket.labels" :key="lbl.id" :label="lbl" />
-        </template>
+        <span class="text-muted-foreground/40 text-sm select-none">|</span>
+        <LabelEditor :ticket="ticket" />
       </div>
     </div>
 

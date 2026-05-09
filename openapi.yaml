@@ -4980,18 +4980,11 @@ paths:
                       - message
                 required:
                   - error
-  /v1/projects/{key}/labels:
+  /v1/labels:
     get:
       tags:
         - Labels
-      summary: List a project's labels
-      parameters:
-        - schema:
-            type: string
-            pattern: ^[A-Z][A-Z0-9]{1,9}$
-          required: true
-          name: key
-          in: path
+      summary: List labels
       responses:
         "200":
           description: ok
@@ -5006,9 +4999,6 @@ paths:
                       type: object
                       properties:
                         id:
-                          type: string
-                          format: uuid
-                        project_id:
                           type: string
                           format: uuid
                         name:
@@ -5026,7 +5016,6 @@ paths:
                           format: date-time
                       required:
                         - id
-                        - project_id
                         - name
                         - color
                         - created_at
@@ -5205,13 +5194,6 @@ paths:
       tags:
         - Labels
       summary: Create a label
-      parameters:
-        - schema:
-            type: string
-            pattern: ^[A-Z][A-Z0-9]{1,9}$
-          required: true
-          name: key
-          in: path
       requestBody:
         content:
           application/json:
@@ -5239,9 +5221,6 @@ paths:
                   id:
                     type: string
                     format: uuid
-                  project_id:
-                    type: string
-                    format: uuid
                   name:
                     type: string
                     minLength: 1
@@ -5257,7 +5236,6 @@ paths:
                     format: date-time
                 required:
                   - id
-                  - project_id
                   - name
                   - color
                   - created_at
@@ -5430,18 +5408,12 @@ paths:
                       - message
                 required:
                   - error
-  /v1/projects/{key}/labels/{id}:
+  /v1/labels/{id}:
     patch:
       tags:
         - Labels
       summary: Update a label
       parameters:
-        - schema:
-            type: string
-            pattern: ^[A-Z][A-Z0-9]{1,9}$
-          required: true
-          name: key
-          in: path
         - schema:
             type: string
             format: uuid
@@ -5472,9 +5444,6 @@ paths:
                   id:
                     type: string
                     format: uuid
-                  project_id:
-                    type: string
-                    format: uuid
                   name:
                     type: string
                     minLength: 1
@@ -5490,7 +5459,6 @@ paths:
                     format: date-time
                 required:
                   - id
-                  - project_id
                   - name
                   - color
                   - created_at
@@ -5668,12 +5636,6 @@ paths:
         - Labels
       summary: Delete a label
       parameters:
-        - schema:
-            type: string
-            pattern: ^[A-Z][A-Z0-9]{1,9}$
-          required: true
-          name: key
-          in: path
         - schema:
             type: string
             format: uuid

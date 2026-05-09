@@ -88,7 +88,6 @@ export function mapStatusRef(s: StatusRow): StatusRef {
 export function mapLabel(l: LabelRow): Label {
   return {
     id: l.id,
-    project_id: l.project_id,
     name: l.name,
     color: l.color,
     created_at: l.created_at,

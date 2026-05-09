@@ -3784,21 +3784,19 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/projects/{key}/labels": {
+    "/v1/labels": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** List a project's labels */
+        /** List labels */
         get: {
             parameters: {
                 query?: never;
                 header?: never;
-                path: {
-                    key: string;
-                };
+                path?: never;
                 cookie?: never;
             };
             requestBody?: never;
@@ -3813,8 +3811,6 @@ export interface paths {
                             items: {
                                 /** Format: uuid */
                                 id: string;
-                                /** Format: uuid */
-                                project_id: string;
                                 name: string;
                                 color: string;
                                 /** Format: date-time */
@@ -3959,9 +3955,7 @@ export interface paths {
             parameters: {
                 query?: never;
                 header?: never;
-                path: {
-                    key: string;
-                };
+                path?: never;
                 cookie?: never;
             };
             requestBody?: {
@@ -3982,8 +3976,6 @@ export interface paths {
                         "application/json": {
                             /** Format: uuid */
                             id: string;
-                            /** Format: uuid */
-                            project_id: string;
                             name: string;
                             color: string;
                             /** Format: date-time */
@@ -4127,7 +4119,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/projects/{key}/labels/{id}": {
+    "/v1/labels/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -4143,7 +4135,6 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
-                    key: string;
                     id: string;
                 };
                 cookie?: never;
@@ -4293,7 +4284,6 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
-                    key: string;
                     id: string;
                 };
                 cookie?: never;
@@ -4316,8 +4306,6 @@ export interface paths {
                         "application/json": {
                             /** Format: uuid */
                             id: string;
-                            /** Format: uuid */
-                            project_id: string;
                             name: string;
                             color: string;
                             /** Format: date-time */

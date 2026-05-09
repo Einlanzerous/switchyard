@@ -12,6 +12,7 @@ import { computed, type ComputedRef } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
+import { effectivePosition } from "@/lib/positions";
 import type { Status, StatusCategory, TicketSummary } from "@switchyard/shared";
 
 export const CATEGORY_ORDER: StatusCategory[] = [
@@ -95,9 +96,12 @@ export function useProjectBoard(projectKey: ComputedRef<string | null>) {
       const inCat = byCategory.get(cat);
       if (!inCat || inCat.length === 0) return [];
       const head = inCat[0]!;
+      // Sort by effective position descending — manual reorder writes a
+      // position; legacy rows fall through to updated_at via effectivePosition,
+      // so all cards live on the same numeric axis.
       const ticketsInCol = tickets.value
         .filter((t) => t.status.category === cat)
-        .sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1));
+        .sort((a, b) => effectivePosition(b) - effectivePosition(a));
       return [{
         category: cat,
         displayName: head.display_name,

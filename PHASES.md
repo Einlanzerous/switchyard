@@ -183,7 +183,8 @@ Goal: the user can do everything via the UI that they'd otherwise do via curl. L
 - `/settings/profile` — me, avatar (URL field for now), display name.
 - `/settings/tokens` — list / create / revoke own tokens.
 - `/settings/users` (admin) — user CRUD.
-- `/settings/projects` — list / create. Per-project sub-pages: statuses (with reorder + is_default toggle), labels, transitions (graph editor lite), members (skipped if multi-user not enabled yet).
+- `/settings/projects` — list / create. Per-project sub-pages: statuses (with reorder + is_default toggle), transitions (graph editor lite), members (skipped if multi-user not enabled yet).
+- `/settings/labels` — global label catalog (a single shared list across all projects). CRUD with name + color picker.
 - `/settings/webhooks` — subscriptions + delivery log. Redeliver button on failed deliveries. Show secret on creation banner.
 
 ### Milestone 2.7 — Polish

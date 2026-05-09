@@ -255,10 +255,11 @@ export function mount(app: OpenAPIHono) {
     }
 
     if (body.label_ids && body.label_ids.length > 0) {
+      // Labels are global — just verify each id resolves to a real row.
       const labels = await db.select({ id: schema.labels.id }).from(schema.labels)
-        .where(and(eq(schema.labels.project_id, project.id), inArray(schema.labels.id, body.label_ids)));
+        .where(inArray(schema.labels.id, body.label_ids));
       if (labels.length !== body.label_ids.length) {
-        throw badRequest("one or more labels do not belong to this project");
+        throw badRequest("one or more label_ids do not exist");
       }
     }
 
@@ -335,10 +336,11 @@ export function mount(app: OpenAPIHono) {
     }
 
     if (body.label_ids !== undefined && body.label_ids.length > 0) {
+      // Labels are global — just verify each id resolves to a real row.
       const labels = await db.select({ id: schema.labels.id }).from(schema.labels)
-        .where(and(eq(schema.labels.project_id, existing.project_id), inArray(schema.labels.id, body.label_ids)));
+        .where(inArray(schema.labels.id, body.label_ids));
       if (labels.length !== body.label_ids.length) {
-        throw badRequest("one or more labels do not belong to this project");
+        throw badRequest("one or more label_ids do not exist");
       }
     }
 

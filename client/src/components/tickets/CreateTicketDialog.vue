@@ -53,7 +53,7 @@ const projectsQuery = useQuery({
   queryKey: queryKeys.projects(),
   staleTime: 5 * 60 * 1000,
   queryFn: async () => {
-    const { data, error } = await api.GET("/v1/projects", { params: { query: { limit: 500 } } });
+    const { data, error } = await api.GET("/v1/projects", { params: { query: { limit: 200 } } });
     if (error) throw error;
     return data;
   },
@@ -121,7 +121,11 @@ function onKeydown(e: KeyboardEvent) {
 
 <template>
   <Dialog :open="open" @update:open="(v) => emit('update:open', v)">
-    <DialogContent class="sm:max-w-lg" @keydown="onKeydown">
+    <DialogContent class="sm:max-w-lg">
+      <!-- @keydown sits on a real DOM wrapper because radix's DialogContent
+           renders through a portal and complains about extraneous listeners
+           that can't be inherited onto a fragment. -->
+      <div @keydown="onKeydown">
       <DialogHeader>
         <DialogTitle>New ticket</DialogTitle>
         <DialogDescription>
@@ -221,6 +225,7 @@ function onKeydown(e: KeyboardEvent) {
           Create ticket
         </Button>
       </DialogFooter>
+      </div>
     </DialogContent>
   </Dialog>
 </template>

@@ -77,18 +77,19 @@ async function main() {
   const statusByCategory = new Map(statuses.map((s) => [s.category, s]));
 
   // Labels
+  // Labels are global — seed once into the shared catalog if absent.
   for (const lbl of [
     { name: "urgent", color: "#ef4444" },
     { name: "frontend", color: "#3b82f6" },
     { name: "backend", color: "#10b981" },
   ]) {
     const [existing] = await db.select().from(schema.labels)
-      .where(and(eq(schema.labels.project_id, project.id), eq(schema.labels.name, lbl.name))).limit(1);
+      .where(eq(schema.labels.name, lbl.name)).limit(1);
     if (!existing) {
-      await db.insert(schema.labels).values({ ...lbl, project_id: project.id });
+      await db.insert(schema.labels).values(lbl);
     }
   }
-  const labels = await db.select().from(schema.labels).where(eq(schema.labels.project_id, project.id));
+  const labels = await db.select().from(schema.labels);
 
   // Tickets — top up to 10 by always inserting 2 per run, hopping categories.
   const sampleTickets: Array<{ type: "task" | "bug" | "spike" | "epic"; title: string; category: StatusSeed["category"]; assignee?: string }> = [
