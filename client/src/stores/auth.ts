@@ -37,6 +37,9 @@ export const useAuthStore = defineStore("auth", () => {
   const me = computed(() => meQuery.data.value);
   const loading = computed(() => meQuery.isLoading.value || meQuery.isFetching.value);
   const isAuthenticated = computed(() => hasToken.value && !!me.value);
+  // Expose error as a top-level computed so consumers don't have to know about
+  // the underlying Vue Query ref shape (which Pinia auto-unwraps awkwardly).
+  const error = computed(() => meQuery.error.value);
 
-  return { me, loading, isAuthenticated, hasToken, login, logout, meQuery };
+  return { me, loading, isAuthenticated, hasToken, error, login, logout };
 });

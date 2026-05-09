@@ -41,11 +41,30 @@ app.doc("/v1/openapi.json", {
 
 mountRoutes(app);
 
-// Static client — served from /app/client/dist in the production image.
-// In dev, the client runs on Vite's dev server (port 5173) and proxies /v1 here,
-// so this fallback only matters in production.
+// Static client. Two layers:
+//   1. Try to serve hashed assets (JS/CSS chunks) from client-dist. If the file
+//      doesn't exist, serveStatic calls next() and we fall through to notFound.
+//   2. notFound handles two cases distinctly: API requests get a JSON 404 (so
+//      agent retries see a structured error), everything else gets index.html
+//      (the SPA shell handles client-side routing from there).
+//
+// The previous dual-serveStatic pattern always served index.html for any path,
+// which could mask API responses depending on middleware-vs-route ordering.
 app.use("/*", serveStatic({ root: "./client-dist" }));
-app.use("/*", serveStatic({ path: "./client-dist/index.html" }));
+
+app.notFound((c) => {
+  const path = new URL(c.req.url).pathname;
+  if (path.startsWith("/v1") || path === "/healthz" || path.startsWith("/api")) {
+    return c.json(
+      { error: { code: "not_found" as const, message: `${c.req.method} ${path} not found` } },
+      404
+    );
+  }
+  // SPA shell — Vue Router takes over from here.
+  return new Response(Bun.file("./client-dist/index.html"), {
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+});
 
 console.log(`[switchyard] listening on :${env.PORT}`);
 

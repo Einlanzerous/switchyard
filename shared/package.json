@@ -9,6 +9,10 @@
     ".": "./src/index.ts",
     "./schemas/*": "./src/schemas/*.ts"
   },
+  "scripts": {
+    "build": "tsc -b --force",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo"
+  },
   "dependencies": {
     "zod": "^3.23.8"
   }

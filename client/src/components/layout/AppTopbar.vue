@@ -41,46 +41,51 @@ function logout() {
       <div class="relative">
         <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search tickets…  ⌘K"
-          class="pl-9 bg-muted/50 border-transparent focus-visible:ring-1"
+          placeholder="Search tickets…"
+          class="pl-9 pr-16 bg-muted/50 border-transparent focus-visible:ring-1"
           disabled
           aria-label="Search (command palette wires up in milestone 2.7)"
         />
+        <kbd class="absolute right-2 top-1/2 -translate-y-1/2 hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border bg-background px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+          Ctrl+K
+        </kbd>
       </div>
     </div>
 
-    <Button
-      variant="ghost"
-      size="icon"
-      :aria-label="`Theme: ${theme.mode}`"
-      @click="theme.cycle"
-    >
-      <Sun v-if="theme.mode === 'light'" class="h-4 w-4" />
-      <Moon v-else-if="theme.mode === 'dark'" class="h-4 w-4" />
-      <Monitor v-else class="h-4 w-4" />
-    </Button>
+    <div class="ml-auto flex items-center gap-2">
+      <Button
+        variant="ghost"
+        size="icon"
+        :aria-label="`Theme: ${theme.mode}`"
+        @click="theme.cycle"
+      >
+        <Sun v-if="theme.mode === 'light'" class="h-4 w-4" />
+        <Moon v-else-if="theme.mode === 'dark'" class="h-4 w-4" />
+        <Monitor v-else class="h-4 w-4" />
+      </Button>
 
-    <DropdownMenu v-if="auth.isAuthenticated">
-      <DropdownMenuTrigger as-child>
-        <Button variant="ghost" size="icon" class="rounded-full" aria-label="User menu">
-          <Avatar class="h-8 w-8">
-            <AvatarFallback>{{ initials }}</AvatarFallback>
-          </Avatar>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" class="w-48">
-        <DropdownMenuLabel class="text-xs text-muted-foreground">
-          {{ auth.me?.name }} · {{ auth.me?.type }}
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem @click="router.push('/settings')">
-          <UserIcon class="h-4 w-4 mr-2" /> Settings
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem @click="logout">
-          <LogOut class="h-4 w-4 mr-2" /> Log out
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+      <DropdownMenu v-if="auth.isAuthenticated">
+        <DropdownMenuTrigger as-child>
+          <Button variant="ghost" size="icon" class="rounded-full" aria-label="User menu">
+            <Avatar class="h-8 w-8">
+              <AvatarFallback>{{ initials }}</AvatarFallback>
+            </Avatar>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" class="w-48">
+          <DropdownMenuLabel class="text-xs text-muted-foreground">
+            {{ auth.me?.name }} · {{ auth.me?.type }}
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem @click="router.push('/settings')">
+            <UserIcon class="h-4 w-4 mr-2" /> Settings
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem @click="logout">
+            <LogOut class="h-4 w-4 mr-2" /> Log out
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   </header>
 </template>

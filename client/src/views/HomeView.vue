@@ -3,18 +3,36 @@ import { ref, onMounted, computed } from "vue";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Activity, Database, FolderOpen, Webhook } from "lucide-vue-next";
+import { Activity, Database, FolderOpen, Webhook, CheckCircle2, Circle } from "lucide-vue-next";
 import { useAuthStore } from "@/stores/auth";
 
 const auth = useAuthStore();
 
+// Update `done: true` as each milestone ships. Keeps the roadmap card honest
+// without per-card edits.
+const milestones: Array<{ id: string; label: string; done: boolean }> = [
+  { id: "2.0", label: "Foundations", done: true },
+  { id: "2.1", label: "Auth flow", done: true },
+  { id: "2.2", label: "Tickets list", done: true },
+  { id: "2.3", label: "Ticket detail (drawer)", done: false },
+  { id: "2.4", label: "Kanban board", done: false },
+  { id: "2.5", label: "Cross-project boards + swimlanes", done: false },
+  { id: "2.6", label: "Settings", done: false },
+  { id: "2.7", label: "Polish (cmd-K, shortcuts, empty states)", done: false },
+];
+
+// Defensive: older container builds (pre-1.6) returned `{ status, db }` instead
+// of the subsystems block. Treat both shapes uniformly so the dashboard renders
+// regardless of which build is running.
 type HealthReport = {
   status: "ok" | "degraded";
-  subsystems: {
-    db: { ok: boolean; latency_ms: number | null };
-    uploads: { ok: boolean; dir: string };
-    webhooks: { queue_depth: number; warn: boolean };
+  subsystems?: {
+    db?: { ok: boolean; latency_ms: number | null };
+    uploads?: { ok: boolean; dir: string };
+    webhooks?: { queue_depth: number; warn: boolean };
   };
+  // Pre-1.6 shape — kept so old containers still render usefully.
+  db?: boolean;
 };
 
 const health = ref<HealthReport | null>(null);
@@ -29,7 +47,17 @@ onMounted(async () => {
   }
 });
 
-const dbBadge = computed(() => health.value?.subsystems.db.ok ? "ok" : "down");
+// Normalize across the old and new shapes.
+const db = computed(() => {
+  const sub = health.value?.subsystems?.db;
+  if (sub) return { ok: sub.ok, label: sub.ok ? `${sub.latency_ms}ms` : "down" };
+  if (typeof health.value?.db === "boolean") {
+    return { ok: health.value.db, label: health.value.db ? "ok" : "down" };
+  }
+  return null;
+});
+const uploads = computed(() => health.value?.subsystems?.uploads ?? null);
+const webhooks = computed(() => health.value?.subsystems?.webhooks ?? null);
 </script>
 
 <template>
@@ -59,26 +87,27 @@ const dbBadge = computed(() => health.value?.subsystems.db.ok ? "ok" : "down");
           </div>
           <p v-else-if="error" class="text-sm text-destructive font-mono">{{ error }}</p>
           <ul v-else-if="health" class="space-y-2 text-sm">
-            <li class="flex items-center gap-2">
+            <li v-if="db" class="flex items-center gap-2">
               <Database class="h-4 w-4 text-muted-foreground" />
               <span class="flex-1">Database</span>
-              <Badge :variant="dbBadge === 'ok' ? 'secondary' : 'destructive'">
-                {{ health.subsystems.db.ok ? `${health.subsystems.db.latency_ms}ms` : "down" }}
-              </Badge>
+              <Badge :variant="db.ok ? 'secondary' : 'destructive'">{{ db.label }}</Badge>
             </li>
-            <li class="flex items-center gap-2">
+            <li v-if="uploads" class="flex items-center gap-2">
               <FolderOpen class="h-4 w-4 text-muted-foreground" />
               <span class="flex-1">Uploads</span>
-              <Badge :variant="health.subsystems.uploads.ok ? 'secondary' : 'destructive'">
-                {{ health.subsystems.uploads.ok ? "writable" : "fail" }}
+              <Badge :variant="uploads.ok ? 'secondary' : 'destructive'">
+                {{ uploads.ok ? "writable" : "fail" }}
               </Badge>
             </li>
-            <li class="flex items-center gap-2">
+            <li v-if="webhooks" class="flex items-center gap-2">
               <Webhook class="h-4 w-4 text-muted-foreground" />
               <span class="flex-1">Webhook queue</span>
-              <Badge :variant="health.subsystems.webhooks.warn ? 'destructive' : 'secondary'">
-                {{ health.subsystems.webhooks.queue_depth }} pending
+              <Badge :variant="webhooks.warn ? 'destructive' : 'secondary'">
+                {{ webhooks.queue_depth }} pending
               </Badge>
+            </li>
+            <li v-if="!uploads && !webhooks" class="text-xs text-muted-foreground italic">
+              Older API shape — rebuild the container for the full subsystem report.
             </li>
           </ul>
         </CardContent>
@@ -91,17 +120,16 @@ const dbBadge = computed(() => health.value?.subsystems.db.ok ? "ok" : "down");
         </CardHeader>
         <CardContent>
           <ol class="space-y-1.5 text-sm">
-            <li class="flex items-center gap-2">
-              <span class="inline-block h-1.5 w-1.5 rounded-full bg-primary" />
-              <span class="text-muted-foreground line-through">2.0 Foundations</span>
+            <li
+              v-for="m in milestones"
+              :key="m.id"
+              class="flex items-center gap-2"
+              :class="m.done && 'text-muted-foreground'"
+            >
+              <CheckCircle2 v-if="m.done" class="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+              <Circle v-else class="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
+              <span :class="m.done && 'line-through'">{{ m.id }} {{ m.label }}</span>
             </li>
-            <li>2.1 Auth flow</li>
-            <li>2.2 Tickets list</li>
-            <li>2.3 Ticket detail (drawer)</li>
-            <li>2.4 Kanban board</li>
-            <li>2.5 Cross-project boards + swimlanes</li>
-            <li>2.6 Settings</li>
-            <li>2.7 Polish (cmd-K, shortcuts, empty states)</li>
           </ol>
         </CardContent>
       </Card>
