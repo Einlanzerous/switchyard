@@ -2,16 +2,25 @@
 import { computed, ref, watch, useTemplateRef, onMounted, onBeforeUnmount } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useVirtualizer } from "@tanstack/vue-virtual";
-import { Inbox, Loader2, AlertCircle } from "lucide-vue-next";
+import { Inbox, Loader2, AlertCircle, KanbanSquare, Plus } from "lucide-vue-next";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import FilterBar from "@/components/tickets/FilterBar.vue";
 import TicketRow from "@/components/tickets/TicketRow.vue";
-import TicketDrawer from "@/components/tickets/TicketDrawer.vue";
+import CreateTicketDialog from "@/components/tickets/CreateTicketDialog.vue";
 import { useTicketFilters } from "@/composables/useTicketFilters";
 import { useTicketsList } from "@/composables/useTicketsList";
 
+const showCreate = ref(false);
+
 const { filters, isAnySet, clear } = useTicketFilters();
+
+// Board view is only useful when scoped to a single project — otherwise the
+// kanban columns would mix tickets across projects with possibly conflicting
+// statuses. Cross-project boards are a separate surface (milestone 2.5).
+const singleProjectKey = computed(() =>
+  filters.value.project.length === 1 ? filters.value.project[0]! : null
+);
 const { items, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage, error } =
   useTicketsList(filters);
 
@@ -71,7 +80,29 @@ const errMessage = computed(() => {
 
 <template>
   <div class="flex flex-col h-full">
-    <FilterBar />
+    <FilterBar>
+      <template #actions>
+        <Button
+          v-if="singleProjectKey"
+          variant="outline"
+          size="sm"
+          class="h-8"
+          @click="router.push(`/projects/${singleProjectKey}/board`)"
+        >
+          <KanbanSquare class="h-3.5 w-3.5 mr-1.5" />
+          Board view
+        </Button>
+        <Button size="sm" class="h-8" @click="showCreate = true">
+          <Plus class="h-3.5 w-3.5 mr-1.5" />
+          New ticket
+        </Button>
+      </template>
+    </FilterBar>
+
+    <CreateTicketDialog
+      v-model:open="showCreate"
+      :default-project-key="singleProjectKey"
+    />
 
     <!-- Initial-load skeleton -->
     <div v-if="isLoading" class="flex-1 px-4 py-2 space-y-2">
@@ -99,7 +130,7 @@ const errMessage = computed(() => {
       <div :style="{ height: `${totalSize}px`, width: '100%', position: 'relative' }">
         <div
           v-for="vi in virtualItems"
-          :key="vi.key"
+          :key="String(vi.key)"
           :style="{
             position: 'absolute',
             top: 0,
@@ -125,6 +156,5 @@ const errMessage = computed(() => {
       </div>
     </div>
 
-    <TicketDrawer />
   </div>
 </template>

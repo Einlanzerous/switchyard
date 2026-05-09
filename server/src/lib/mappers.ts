@@ -160,6 +160,7 @@ export function mapTicketSummary(t: TicketRow, deps: TicketSummaryDeps): TicketS
     reporter: mapUserRef(deps.reporter),
     due_date: t.due_date,
     labels: deps.labels.map(mapLabelRef),
+    position: t.position,
     created_at: t.created_at,
     updated_at: t.updated_at,
     deleted_at: t.deleted_at,

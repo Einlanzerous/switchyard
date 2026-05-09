@@ -14,9 +14,9 @@ const milestones: Array<{ id: string; label: string; done: boolean }> = [
   { id: "2.0", label: "Foundations", done: true },
   { id: "2.1", label: "Auth flow", done: true },
   { id: "2.2", label: "Tickets list", done: true },
-  { id: "2.3", label: "Ticket detail (drawer)", done: false },
-  { id: "2.4", label: "Kanban board", done: false },
-  { id: "2.5", label: "Cross-project boards + swimlanes", done: false },
+  { id: "2.3", label: "Ticket detail (drawer + page)", done: true },
+  { id: "2.4", label: "Kanban board", done: true },
+  { id: "2.5", label: "Cross-project boards + swimlanes", done: true },
   { id: "2.6", label: "Settings", done: false },
   { id: "2.7", label: "Polish (cmd-K, shortcuts, empty states)", done: false },
 ];

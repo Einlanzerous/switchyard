@@ -9,6 +9,7 @@ import {
   boolean,
   integer,
   bigint,
+  doublePrecision,
   jsonb,
   primaryKey,
   uniqueIndex,
@@ -210,6 +211,11 @@ export const tickets = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
     due_date: timestamp("due_date", { withTimezone: true, mode: "string" }),
+    // Manual sort order within a column. Higher number = higher in column.
+    // Backfilled to epoch_ms(updated_at) on first migrate (see triggers.sql)
+    // so existing tickets keep their date-descending order without any
+    // explicit reorder. New rows get position = epoch_ms(now()) at insert.
+    position: doublePrecision("position"),
     metadata: jsonb("metadata").notNull().default({}),
     created_at: createdAt(),
     updated_at: updatedAt(),
@@ -221,6 +227,7 @@ export const tickets = pgTable(
     assigneeIdx: index("tickets_assignee_idx").on(t.assignee_id),
     parentIdx: index("tickets_parent_idx").on(t.parent_id),
     updatedIdx: index("tickets_updated_idx").on(t.updated_at),
+    positionIdx: index("tickets_position_idx").on(t.status_id, t.position),
     noSelfParent: check("tickets_no_self_parent", sql`${t.id} <> ${t.parent_id}`),
   })
 );

@@ -190,6 +190,7 @@ Goal: the user can do everything via the UI that they'd otherwise do via curl. L
 
 - Command palette (cmd-K): jump to ticket by key, quick-create ticket, switch project, recent boards.
 - Keyboard shortcuts: `g t` → tickets, `g b` → boards, `c` → new ticket, `?` → shortcut sheet.
+- **Search-as-DSL** (replaces dedicated dropdowns once the loop feels right): `assignee=magos status=in_progress,blocked type=bug urgent` parses inline tokens out of the search field, falls back to ILIKE for the remaining text. Lets keyboard-first users skip the chip toggles and gives the search bar real power.
 - Empty states for every list (illustration + 1-line copy + primary CTA).
 - Skeleton loaders on every list and detail surface.
 - Per-mutation toast confirmation; error toasts pull from API error envelope.
@@ -201,6 +202,20 @@ Out of scope for Phase 2 (deferred):
 - WIP limits on kanban columns (cheap to add; defer until needed)
 - Audio playback (metadata-only display)
 - Native automation rules editor (Phase 4)
+- **Project ↔ repo linking + PR/commit indicators on cards.** Tie each project
+  to one or more GitHub repos, surface PR/commit references on ticket cards
+  via a small icon (closed/open/draft PR state, commit count), let agents
+  attach PR URLs when they ship work. Likely involves: (a) `project_repos`
+  table or `metadata.repos[]` on projects, (b) `ticket_links` table for
+  PR/commit refs (URL + state polled or webhook'd), (c) a card slot for the
+  GitHub icon + tooltip. Probably Phase 3 alongside dashboards, since the
+  data is also useful for "tickets shipped this week" charts.
+- **User-defined custom swimlanes.** Today swimlanes group by project /
+  assignee / type. Expand to "named groups" — user defines categories like
+  "Documentation row" or "Engineering row" and assigns tickets/labels/projects
+  to them. Probably stored as `board.filter.swimlane` config plus a tagging
+  mechanism. Defer until the basic swimlanes have shipped and we know the
+  shape we want.
 
 ## Phase 3 — Dashboards & polish
 

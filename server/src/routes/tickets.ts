@@ -279,6 +279,10 @@ export function mount(app: OpenAPIHono) {
         assignee_id: body.assignee_id ?? null,
         reporter_id: auth.user.id,
         due_date: body.due_date ?? null,
+        // Default position: epoch-ms-now, matching the backfill so newly
+        // created tickets show up at the top of their column. Manual reorder
+        // overrides via PATCH or /transition.
+        position: Date.now(),
         metadata: (body.metadata ?? {}) as any,
       }).returning();
 
@@ -346,6 +350,7 @@ export function mount(app: OpenAPIHono) {
     if (body.assignee_id !== undefined) sets.assignee_id = body.assignee_id ?? null;
     if (body.due_date !== undefined) sets.due_date = body.due_date ?? null;
     if (body.metadata !== undefined) sets.metadata = body.metadata as any;
+    if (body.position !== undefined) sets.position = body.position;
 
     const noFieldChanges = Object.keys(sets).length === 0;
     const noLabelChange = body.label_ids === undefined;
@@ -495,11 +500,16 @@ export function mount(app: OpenAPIHono) {
     // event insert fails we'd rather roll back the whole transition than have
     // a status change with no audit trail.
     const updated = await db.transaction(async (tx) => {
+      // The transition can also reposition the ticket inside its new column
+      // — the drag-to-reorder UX uses this to drop into a specific index.
+      const transitionSets: Partial<typeof schema.tickets.$inferInsert> = {
+        status_id: toStatus.id,
+        resolution: body.resolution ?? null,
+      };
+      if (body.position !== undefined) transitionSets.position = body.position;
+
       const [u] = await tx.update(schema.tickets)
-        .set({
-          status_id: toStatus.id,
-          resolution: body.resolution ?? null,
-        })
+        .set(transitionSets)
         .where(eq(schema.tickets.id, existing.id))
         .returning();
       if (!u) throw new Error("update returned nothing");

@@ -30,6 +30,10 @@ export const TicketSummary = z
     reporter: UserRef,
     due_date: Iso8601.nullable(),
     labels: z.array(LabelRef),
+    // Manual sort order within a column. Higher = closer to the top.
+    // Newly-created tickets get epoch-ms-at-create; manual drag reorders
+    // overwrite via fractional indexing.
+    position: z.number().nullable(),
   })
   .merge(SoftDeletable);
 export type TicketSummary = z.infer<typeof TicketSummary>;
@@ -67,6 +71,9 @@ export const UpdateTicket = CreateTicket.omit({ project_key: true, type: true, s
   .partial()
   .extend({
     label_ids: z.array(Uuid).optional(), // replaces full set when provided
+    // Manual sort order. The drag-to-reorder UX computes a fractional value
+    // between the new neighbors' positions; the server just stores it.
+    position: z.number().optional(),
   });
 export type UpdateTicket = z.infer<typeof UpdateTicket>;
 
@@ -76,6 +83,10 @@ export const TransitionTicket = z.object({
   status_id: Uuid,
   resolution: Resolution.optional(), // required when target status is `closed` category
   comment: z.string().max(50_000).optional(), // optional comment created atomically with the transition
+  // Optional manual position in the destination column. Cross-column drag
+  // gestures use this to land the card at a specific index rather than the
+  // top by default.
+  position: z.number().optional(),
 });
 export type TransitionTicket = z.infer<typeof TransitionTicket>;
 

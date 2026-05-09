@@ -1,5 +1,5 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { and, eq, inArray, isNull, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import {
   Board, CreateBoard, UpdateBoard, BoardColumns,
@@ -166,7 +166,11 @@ export function mount(app: OpenAPIHono) {
       .innerJoin(schema.statuses, eq(schema.tickets.status_id, schema.statuses.id))
       .leftJoin(assignee, eq(schema.tickets.assignee_id, assignee.id))
       .innerJoin(reporter, eq(schema.tickets.reporter_id, reporter.id))
-      .where(and(...conds));
+      .where(and(...conds))
+      // Position-aware default sort: explicit positions win, fall back to
+      // updated_at desc for any rows that haven't been manually reordered yet.
+      // The board UI relies on this ordering when rendering kanban columns.
+      .orderBy(sql`${schema.tickets.position} DESC NULLS LAST`, desc(schema.tickets.updated_at));
 
     // Bulk-fetch labels.
     const ticketIds = rows.map((r) => r.t.id);

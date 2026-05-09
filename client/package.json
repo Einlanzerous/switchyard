@@ -10,6 +10,8 @@
     "api:gen": "bunx openapi-typescript ../openapi.yaml -o ./src/lib/api.types.ts"
   },
   "dependencies": {
+    "@atlaskit/pragmatic-drag-and-drop": "^1.8.1",
+    "@atlaskit/pragmatic-drag-and-drop-hitbox": "^1.1.0",
     "@switchyard/shared": "workspace:*",
     "@tanstack/vue-query": "^5.62.0",
     "@tanstack/vue-virtual": "^3.10.9",
@@ -32,6 +34,7 @@
     "vue-sonner": "^2.0.9"
   },
   "devDependencies": {
+    "@tailwindcss/typography": "^0.5.19",
     "@types/bun": "^1.1.14",
     "@types/dompurify": "^3.0.5",
     "@types/markdown-it": "^14.1.2",

@@ -18,6 +18,7 @@ export const queryKeys = {
   projectStatuses: (key: string) => ["sw", "projects", key, "statuses"] as const,
   projectLabels: (key: string) => ["sw", "projects", key, "labels"] as const,
   projectTransitions: (key: string) => ["sw", "projects", key, "transitions"] as const,
+  projectBoard: (key: string) => ["sw", "projects", key, "board"] as const,
 
   tickets: (filters?: Partial<TicketListFilters>) => ["sw", "tickets", filters ?? {}] as const,
   ticket: (idOrKey: string) => ["sw", "ticket", idOrKey] as const,

@@ -93,3 +93,13 @@ BEGIN
     EXECUTE format('CREATE TRIGGER bump_updated_at BEFORE UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION bump_updated_at()', t);
   END LOOP;
 END $$;
+
+-- ─── Backfill tickets.position ──────────────────────────────────────────────
+-- New tickets get an explicit position assigned in the application layer
+-- (epoch_ms at create time). Existing tickets pre-dating the column have
+-- NULL — backfill them to epoch_ms(updated_at) so the default sort
+-- (position DESC NULLS LAST, updated_at DESC) keeps the prior date-desc order
+-- without anyone having to manually reorder. Idempotent: only touches NULLs.
+UPDATE tickets
+   SET position = EXTRACT(EPOCH FROM updated_at) * 1000
+ WHERE position IS NULL;

@@ -100,15 +100,20 @@ watch(localText, (v) => {
 
 <template>
   <div class="border-b bg-background/95 backdrop-blur sticky top-0 z-10">
-    <!-- Search row — alone so it never gets squeezed below readable width. -->
-    <div class="px-4 pt-2">
-      <div class="relative w-full max-w-md">
+    <!-- Search row — alone so it never gets squeezed below readable width.
+         The optional `actions` slot lets the parent surface a context-aware
+         action (e.g. "Board view" toggle) right-aligned next to the search. -->
+    <div class="px-4 pt-2 flex items-center gap-2">
+      <div class="relative flex-1 max-w-md">
         <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           v-model="localText"
           placeholder="Search title or description…"
           class="pl-9 bg-muted/50 border-transparent focus-visible:ring-1 h-8"
         />
+      </div>
+      <div class="ml-auto flex items-center gap-2">
+        <slot name="actions" />
       </div>
     </div>
 
@@ -117,14 +122,18 @@ watch(localText, (v) => {
     <div class="px-4 py-2 flex flex-wrap items-center gap-x-4 gap-y-2">
       <div class="flex flex-wrap items-center gap-2">
         <Select v-model="projectValue">
-          <SelectTrigger class="h-8 w-[11rem] [&>span]:truncate">
-            <SelectValue placeholder="Project" />
+          <SelectTrigger class="h-8 w-[11rem]">
+            <!-- Trigger shows the key only when a project is picked;
+                 otherwise the placeholder. SelectValue would glue the inner
+                 SelectItem text together as "FLOWFlow Project". -->
+            <span v-if="projectValue !== ALL" class="font-mono">{{ projectValue }}</span>
+            <SelectValue v-else placeholder="Project" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem :value="ALL">All projects</SelectItem>
             <SelectItem v-for="p in projects" :key="p.id" :value="p.key">
               <span class="font-mono">{{ p.key }}</span>
-              <span class="ml-1.5 text-muted-foreground">{{ shortName(p.name) }}</span>
+              <span class="ml-2 text-muted-foreground">{{ shortName(p.name) }}</span>
             </SelectItem>
           </SelectContent>
         </Select>

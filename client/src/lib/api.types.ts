@@ -4547,6 +4547,7 @@ export interface paths {
                                     name: string;
                                     color: string;
                                 }[];
+                                position: number | null;
                                 /** Format: date-time */
                                 created_at: string;
                                 /** Format: date-time */
@@ -4784,6 +4785,7 @@ export interface paths {
                                 name: string;
                                 color: string;
                             }[];
+                            position: number | null;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
@@ -5107,6 +5109,7 @@ export interface paths {
                                 name: string;
                                 color: string;
                             }[];
+                            position: number | null;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
@@ -5527,6 +5530,7 @@ export interface paths {
                         metadata?: {
                             [key: string]: unknown;
                         };
+                        position?: number;
                     };
                 };
             };
@@ -5589,6 +5593,7 @@ export interface paths {
                                 name: string;
                                 color: string;
                             }[];
+                            position: number | null;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
@@ -5860,6 +5865,7 @@ export interface paths {
                         /** @enum {string} */
                         resolution?: "done" | "released" | "cancelled";
                         comment?: string;
+                        position?: number;
                     };
                 };
             };
@@ -5922,6 +5928,7 @@ export interface paths {
                                 name: string;
                                 color: string;
                             }[];
+                            position: number | null;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
@@ -6264,6 +6271,7 @@ export interface paths {
                                         name: string;
                                         color: string;
                                     }[];
+                                    position: number | null;
                                     /** Format: date-time */
                                     created_at: string;
                                     /** Format: date-time */
@@ -6524,6 +6532,7 @@ export interface paths {
                                     name: string;
                                     color: string;
                                 }[];
+                                position: number | null;
                                 /** Format: date-time */
                                 created_at: string;
                                 /** Format: date-time */
@@ -9178,6 +9187,7 @@ export interface paths {
                                         name: string;
                                         color: string;
                                     }[];
+                                    position: number | null;
                                     /** Format: date-time */
                                     created_at: string;
                                     /** Format: date-time */
@@ -10682,6 +10692,7 @@ export interface paths {
                                         name: string;
                                         color: string;
                                     }[];
+                                    position: number | null;
                                     /** Format: date-time */
                                     created_at: string;
                                     /** Format: date-time */

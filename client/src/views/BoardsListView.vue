@@ -1,0 +1,100 @@
+<script setup lang="ts">
+import { computed, ref } from "vue";
+import { Plus, KanbanSquare, AlertCircle } from "lucide-vue-next";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import CreateBoardDialog from "@/components/boards/CreateBoardDialog.vue";
+import { useBoardsList } from "@/composables/useBoards";
+import { formatDistanceToNow } from "date-fns";
+
+const boards = useBoardsList();
+const items = computed(() => boards.data.value?.items ?? []);
+const showCreate = ref(false);
+
+const errMessage = computed(() => {
+  const e = boards.error.value;
+  if (!e) return null;
+  return (e as { error?: { message?: string } }).error?.message ?? "Failed to load boards";
+});
+
+function relative(iso: string): string {
+  try { return formatDistanceToNow(new Date(iso), { addSuffix: true }); }
+  catch { return ""; }
+}
+</script>
+
+<template>
+  <div class="container max-w-5xl py-8 space-y-6">
+    <header>
+      <h1 class="text-2xl font-semibold tracking-tight">Boards</h1>
+      <p class="text-sm text-muted-foreground mt-1">
+        Saved kanban views across one or more projects.
+      </p>
+    </header>
+
+    <div v-if="boards.isLoading.value" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <Skeleton v-for="n in 3" :key="n" class="h-36" />
+    </div>
+
+    <div v-else-if="errMessage" class="text-sm text-destructive flex items-center gap-2">
+      <AlertCircle class="h-4 w-4" /> {{ errMessage }}
+    </div>
+
+    <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <RouterLink
+        v-for="b in items"
+        :key="b.id"
+        :to="`/boards/${b.id}`"
+        class="group"
+      >
+        <Card class="h-full hover:border-primary/60 hover:shadow-md transition-all">
+          <CardHeader>
+            <CardTitle class="text-base flex items-center gap-2">
+              <KanbanSquare class="h-4 w-4 text-muted-foreground" />
+              <span class="truncate">{{ b.name }}</span>
+            </CardTitle>
+            <CardDescription class="text-xs">
+              {{ b.projects.length }} project{{ b.projects.length === 1 ? "" : "s" }}
+              · updated {{ relative(b.updated_at) }}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div class="flex flex-wrap gap-1">
+              <span
+                v-for="p in b.projects.slice(0, 6)"
+                :key="p.id"
+                class="inline-flex items-center rounded border bg-muted/40 px-1.5 h-5 text-[10px] font-mono"
+                :style="p.color ? { borderColor: p.color + '55' } : undefined"
+              >
+                {{ p.key }}
+              </span>
+              <span
+                v-if="b.projects.length > 6"
+                class="text-[10px] text-muted-foreground self-center"
+              >
+                +{{ b.projects.length - 6 }} more
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      </RouterLink>
+
+      <!-- Dotted "New board" tile that fills its grid slot. When there are no
+           boards yet, it spans all columns and acts as the empty-state CTA. -->
+      <button
+        type="button"
+        class="rounded-lg border-2 border-dashed border-border bg-card/30 hover:bg-accent/30 hover:border-primary/50 transition-colors flex flex-col items-center justify-center text-center text-muted-foreground py-10 px-4 min-h-[10rem]"
+        :class="items.length === 0 && 'sm:col-span-2 lg:col-span-3'"
+        @click="showCreate = true"
+      >
+        <Plus class="h-5 w-5 mb-1.5" />
+        <span class="text-sm font-medium">New board</span>
+        <span v-if="items.length === 0" class="text-xs mt-1">
+          Group one or more projects into a single kanban view.
+        </span>
+      </button>
+    </div>
+
+    <CreateBoardDialog v-model:open="showCreate" />
+  </div>
+</template>

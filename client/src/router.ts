@@ -2,6 +2,10 @@ import { createRouter, createWebHistory } from "vue-router";
 import HomeView from "./views/HomeView.vue";
 import LoginView from "./views/LoginView.vue";
 import TicketsView from "./views/TicketsView.vue";
+import TicketDetailView from "./views/TicketDetailView.vue";
+import ProjectBoardView from "./views/ProjectBoardView.vue";
+import BoardsListView from "./views/BoardsListView.vue";
+import BoardView from "./views/BoardView.vue";
 import PlaceholderView from "./views/PlaceholderView.vue";
 import { getStoredToken } from "./lib/api.js";
 
@@ -15,11 +19,11 @@ export const router = createRouter({
     { path: "/", name: "home", component: HomeView },
 
     { path: "/tickets", name: "tickets", component: TicketsView },
-    { path: "/tickets/:idOrKey", name: "ticket", component: PlaceholderView, meta: { milestone: "2.3" } },
-    { path: "/boards", name: "boards", component: PlaceholderView, meta: { milestone: "2.5" } },
-    { path: "/boards/:id", name: "board", component: PlaceholderView, meta: { milestone: "2.5" } },
+    { path: "/tickets/:idOrKey", name: "ticket", component: TicketDetailView },
+    { path: "/boards", name: "boards", component: BoardsListView },
+    { path: "/boards/:id", name: "board", component: BoardView },
     { path: "/projects", name: "projects", component: PlaceholderView, meta: { milestone: "2.6" } },
-    { path: "/projects/:key/board", name: "project-board", component: PlaceholderView, meta: { milestone: "2.4" } },
+    { path: "/projects/:key/board", name: "project-board", component: ProjectBoardView },
     { path: "/settings", name: "settings", component: PlaceholderView, meta: { milestone: "2.6" } },
     { path: "/settings/:section", name: "settings-section", component: PlaceholderView, meta: { milestone: "2.6" } },
   ],

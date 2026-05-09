@@ -1,0 +1,22 @@
+name: Release Please
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          # `simple` is the right pick for switchyard: the project is a bun
+          # workspace with three package.json files, none of which are
+          # individually published. release-please tracks a top-level
+          # version.txt that it creates on first run.
+          release-type: simple

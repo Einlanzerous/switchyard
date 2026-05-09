@@ -2,6 +2,7 @@
 import { RouterView } from "vue-router";
 import AppSidebar from "./AppSidebar.vue";
 import AppTopbar from "./AppTopbar.vue";
+import TicketDrawer from "@/components/tickets/TicketDrawer.vue";
 </script>
 
 <template>
@@ -13,5 +14,9 @@ import AppTopbar from "./AppTopbar.vue";
         <RouterView />
       </main>
     </div>
+    <!-- Single global drawer instance. Any view that sets `?focus=KEY` in the
+         URL pops the drawer open with that ticket. Lives at the shell level so
+         we don't have to remember to mount it inside every list/board view. -->
+    <TicketDrawer />
   </div>
 </template>
