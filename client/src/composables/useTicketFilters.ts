@@ -83,5 +83,19 @@ export function useTicketFilters() {
       || !!f.assignee || !!f.text;
   });
 
-  return { filters, set, toggle, clear, isAnySet };
+  // Replace the entire filter set in one router push. Used by saved views
+  // to apply a stored filter combination — going through `set` per key
+  // would trigger N router.replace calls back-to-back.
+  function replaceAll(next: Partial<TicketFilters>) {
+    writeQuery({
+      project: next.project ?? [],
+      status: next.status ?? [],
+      type: next.type ?? [],
+      priority: next.priority ?? [],
+      assignee: next.assignee ?? undefined,
+      text: next.text ?? undefined,
+    });
+  }
+
+  return { filters, set, toggle, clear, replaceAll, isAnySet };
 }

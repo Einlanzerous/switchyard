@@ -54,4 +54,6 @@ export const queryKeys = {
   statsStale: () => ["sw", "stats", "stale"] as const,
 
   myMentions: () => ["sw", "users", "me", "mentions"] as const,
+
+  savedViews: () => ["sw", "views"] as const,
 };

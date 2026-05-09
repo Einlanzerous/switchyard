@@ -420,6 +420,37 @@ export const apiTokens = pgTable(
   })
 );
 
+// ─── saved_views (named filter combinations on the tickets list) ────────────
+//
+// Personal views are visible only to the owner; shared views are visible to
+// every user. (`scope = 'shared'` is opt-in via the save dialog — default is
+// 'personal'.) Filter shape mirrors the URL filter slots on /tickets so
+// applying a view is a router.replace away.
+//
+// Uniqueness: per (owner_id, name). Two users can each have a "My queue";
+// shared views still pin their owner so we know who can edit.
+
+export const savedViewScope = pgEnum("saved_view_scope", ["personal", "shared"]);
+
+export const savedViews = pgTable(
+  "saved_views",
+  {
+    id: id(),
+    name: varchar("name", { length: 100 }).notNull(),
+    owner_id: uuid("owner_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    scope: savedViewScope("scope").notNull().default("personal"),
+    filters: jsonb("filters").notNull().default({}),
+    created_at: createdAt(),
+    updated_at: updatedAt(),
+  },
+  (t) => ({
+    ownerNameUnique: uniqueIndex("saved_views_owner_name_unique").on(t.owner_id, t.name),
+    scopeIdx: index("saved_views_scope_idx").on(t.scope),
+  })
+);
+
 // ─── system_settings (singleton key/value store) ────────────────────────────
 //
 // Holds runtime-configurable globals — currently the stale-in-progress

@@ -11,6 +11,7 @@ import * as webhooks from "./webhooks.js";
 import * as events from "./events.js";
 import * as settings from "./settings.js";
 import * as stats from "./stats.js";
+import * as savedViews from "./savedViews.js";
 
 export function mountRoutes(app: OpenAPIHono) {
   users.mount(app);
@@ -25,4 +26,5 @@ export function mountRoutes(app: OpenAPIHono) {
   events.mount(app);
   settings.mount(app);
   stats.mount(app);
+  savedViews.mount(app);
 }

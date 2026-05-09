@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useQuery } from "@tanstack/vue-query";
 import {
-  Inbox, KanbanSquare, FolderKanban, Plus, Settings, Zap, ArrowRight,
+  Inbox, KanbanSquare, FolderKanban, Plus, Settings, Zap, ArrowRight, Bookmark,
 } from "lucide-vue-next";
 import {
   CommandDialog, CommandEmpty, CommandGroup, CommandInput,
@@ -12,10 +12,15 @@ import {
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
 import { useUiStore } from "@/stores/ui";
+import { useSavedViewsList } from "@/composables/useSavedViews";
+import { useTicketFilters } from "@/composables/useTicketFilters";
 import TypeIcon from "@/components/tickets/TypeIcon.vue";
+import type { SavedView } from "@switchyard/shared";
 
 const ui = useUiStore();
 const router = useRouter();
+const route = useRoute();
+const { replaceAll } = useTicketFilters();
 
 const open = computed({
   get: () => ui.paletteOpen,
@@ -99,6 +104,42 @@ const filteredBoards = computed(() => {
 
 const tickets = computed(() => ticketsQuery.data.value?.items ?? []);
 
+// Saved views — fetched once when the palette opens. We surface them in
+// their own group so power users can hop between filter combinations
+// without leaving the keyboard.
+const savedViewsQuery = useSavedViewsList();
+const filteredSavedViews = computed(() => {
+  const all = (savedViewsQuery.data.value?.items ?? []) as SavedView[];
+  const q = query.value.trim();
+  return all.filter((v) => fuzzy(v.name, q)).slice(0, 8);
+});
+
+function applySavedView(v: SavedView) {
+  ui.closePalette();
+  // Make sure we're on /tickets so the URL filters take effect on the list.
+  if (!route.path.startsWith("/tickets")) {
+    router.push("/tickets").then(() => {
+      replaceAll({
+        project: v.filters.project ?? [],
+        status: v.filters.status ?? [],
+        type: v.filters.type ?? [],
+        priority: v.filters.priority ?? [],
+        assignee: v.filters.assignee ?? undefined,
+        text: v.filters.text ?? undefined,
+      });
+    });
+    return;
+  }
+  replaceAll({
+    project: v.filters.project ?? [],
+    status: v.filters.status ?? [],
+    type: v.filters.type ?? [],
+    priority: v.filters.priority ?? [],
+    assignee: v.filters.assignee ?? undefined,
+    text: v.filters.text ?? undefined,
+  });
+}
+
 // ─── actions ────────────────────────────────────────────────────────────────
 
 function go(path: string) {
@@ -178,6 +219,21 @@ function newTicket() {
         >
           <KanbanSquare class="h-4 w-4 mr-2 text-muted-foreground" />
           <span class="truncate">{{ b.name }}</span>
+        </CommandItem>
+      </CommandGroup>
+
+      <CommandGroup v-if="filteredSavedViews.length > 0" heading="Saved views">
+        <CommandItem
+          v-for="v in filteredSavedViews"
+          :key="v.id"
+          :value="`view-${v.id}`"
+          @select="applySavedView(v)"
+        >
+          <Bookmark class="h-4 w-4 mr-2 text-muted-foreground" />
+          <span class="truncate flex-1">{{ v.name }}</span>
+          <span class="ml-2 text-[10px] text-muted-foreground shrink-0">
+            {{ v.scope === "shared" ? `shared · ${v.owner.name}` : "personal" }}
+          </span>
         </CommandItem>
       </CommandGroup>
 

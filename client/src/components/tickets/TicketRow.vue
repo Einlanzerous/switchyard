@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import { formatDistanceToNow } from "date-fns";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Checkbox } from "@/components/ui/checkbox";
 import StatusBadge from "./StatusBadge.vue";
 import PriorityBadge from "./PriorityBadge.vue";
 import TypeIcon from "./TypeIcon.vue";
@@ -12,10 +13,15 @@ import type { TicketSummary } from "@switchyard/shared";
 const props = defineProps<{
   ticket: TicketSummary;
   active?: boolean;
+  selected?: boolean;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   open: [key: string];
+  // Bulk-select toggle. Receives the modifier so the parent can implement
+  // shift-click range selection without re-listening to the underlying
+  // mouse event.
+  toggleSelect: [key: string, withRange: boolean];
 }>();
 
 const updatedRel = computed(() => {
@@ -33,37 +39,69 @@ const assigneeInitials = computed(() => {
 
 const visibleLabels = computed(() => props.ticket.labels.slice(0, 3));
 const extraLabelCount = computed(() => Math.max(0, props.ticket.labels.length - 3));
+
+// The checkbox cell needs to stop the click bubbling up to the row button so
+// selecting a row doesn't also pop the drawer. Same for the keyboard space
+// activation on the checkbox.
+function onSelectClick(e: MouseEvent) {
+  e.stopPropagation();
+  e.preventDefault();
+  emit("toggleSelect", props.ticket.key, e.shiftKey);
+}
 </script>
 
 <template>
-  <button
-    type="button"
+  <div
     :class="cn(
-      'flex h-12 w-full items-center gap-3 px-4 text-left text-sm border-b border-border/60 transition-colors',
-      'hover:bg-accent/50 focus:bg-accent focus:outline-none',
+      'flex h-12 w-full items-center gap-3 pr-4 text-left text-sm border-b border-border/60 transition-colors group',
+      'hover:bg-accent/50',
       active && 'bg-accent/70',
+      selected && 'bg-primary/5',
     )"
-    @click="$emit('open', ticket.key)"
   >
-    <span class="font-mono text-xs text-muted-foreground w-20 shrink-0 truncate">{{ ticket.key }}</span>
-    <TypeIcon :type="ticket.type" />
-    <span class="flex-1 min-w-0 truncate font-medium text-foreground">{{ ticket.title }}</span>
-
-    <div class="hidden md:flex items-center gap-1.5 shrink-0">
-      <LabelChip v-for="lbl in visibleLabels" :key="lbl.id" :label="lbl" />
-      <span v-if="extraLabelCount > 0" class="text-[10px] text-muted-foreground">+{{ extraLabelCount }}</span>
+    <!-- Bulk-select cell. Always visible (muted) but clearer on hover and
+         when selected. Lives outside the main click-target button so clicks
+         here don't trigger the drawer. -->
+    <div
+      class="flex items-center justify-center pl-4 pr-1 shrink-0"
+      @click="onSelectClick"
+    >
+      <Checkbox
+        :model-value="!!selected"
+        :class="cn(
+          'transition-opacity',
+          selected ? 'opacity-100' : 'opacity-40 group-hover:opacity-100'
+        )"
+        :aria-label="`Select ${ticket.key}`"
+        tabindex="-1"
+      />
     </div>
 
-    <PriorityBadge :priority="ticket.priority" class="hidden sm:inline-flex" />
-    <StatusBadge :category="ticket.status.category" :display-name="ticket.status.display_name" size="sm" />
+    <button
+      type="button"
+      class="flex flex-1 min-w-0 items-center gap-3 h-full text-left focus:outline-none focus:bg-accent"
+      @click="emit('open', ticket.key)"
+    >
+      <span class="font-mono text-xs text-muted-foreground w-20 shrink-0 truncate">{{ ticket.key }}</span>
+      <TypeIcon :type="ticket.type" />
+      <span class="flex-1 min-w-0 truncate font-medium text-foreground">{{ ticket.title }}</span>
 
-    <Avatar v-if="ticket.assignee" class="h-6 w-6 hidden sm:flex" :title="ticket.assignee.name">
-      <AvatarFallback class="text-[10px]">{{ assigneeInitials }}</AvatarFallback>
-    </Avatar>
-    <div v-else class="h-6 w-6 hidden sm:block" />
+      <div class="hidden md:flex items-center gap-1.5 shrink-0">
+        <LabelChip v-for="lbl in visibleLabels" :key="lbl.id" :label="lbl" />
+        <span v-if="extraLabelCount > 0" class="text-[10px] text-muted-foreground">+{{ extraLabelCount }}</span>
+      </div>
 
-    <span class="hidden lg:inline text-xs text-muted-foreground w-32 text-right shrink-0 truncate">
-      {{ updatedRel }}
-    </span>
-  </button>
+      <PriorityBadge :priority="ticket.priority" class="hidden sm:inline-flex" />
+      <StatusBadge :category="ticket.status.category" :display-name="ticket.status.display_name" size="sm" />
+
+      <Avatar v-if="ticket.assignee" class="h-6 w-6 hidden sm:flex" :title="ticket.assignee.name">
+        <AvatarFallback class="text-[10px]">{{ assigneeInitials }}</AvatarFallback>
+      </Avatar>
+      <div v-else class="h-6 w-6 hidden sm:block" />
+
+      <span class="hidden lg:inline text-xs text-muted-foreground w-32 text-right shrink-0 truncate">
+        {{ updatedRel }}
+      </span>
+    </button>
+  </div>
 </template>

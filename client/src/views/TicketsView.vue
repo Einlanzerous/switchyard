@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watch, useTemplateRef, onMounted, onBeforeUnmount } from "vue";
+import { computed, ref, watch, useTemplateRef, onMounted, onBeforeUnmount } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import { Inbox, Loader2, AlertCircle, KanbanSquare, Plus } from "lucide-vue-next";
@@ -7,13 +7,39 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import FilterBar from "@/components/tickets/FilterBar.vue";
 import TicketRow from "@/components/tickets/TicketRow.vue";
+import SavedViewsMenu from "@/components/tickets/SavedViewsMenu.vue";
+import SaveViewDialog from "@/components/tickets/SaveViewDialog.vue";
+import BulkActionBar from "@/components/tickets/BulkActionBar.vue";
 import { useTicketFilters } from "@/composables/useTicketFilters";
 import { useTicketsList } from "@/composables/useTicketsList";
 import { useUiStore } from "@/stores/ui";
 
 const ui = useUiStore();
+const showSaveView = ref(false);
 
 const { filters, isAnySet, clear } = useTicketFilters();
+
+// ─── bulk selection ─────────────────────────────────────────────────────────
+//
+// Selection lives on this view (no Pinia) because it's transient — moving
+// off the page or filtering should clear it. We track ticket keys (not ids)
+// so range-select on shift-click is positional within the visible list.
+
+const selected = ref<Set<string>>(new Set());
+const selectionAnchor = ref<string | null>(null);
+
+function clearSelection() {
+  selected.value = new Set();
+  selectionAnchor.value = null;
+}
+
+// Filter changes invalidate range-select intent (the visible order may
+// reshuffle); easiest is to drop the anchor. We DON'T drop the selection
+// outright — a user filtering and bulk-acting on the filtered set is
+// reasonable, even if some selected rows are now offscreen.
+watch(() => filters.value, () => {
+  selectionAnchor.value = null;
+});
 
 // Board view is only useful when scoped to a single project — otherwise the
 // kanban columns would mix tickets across projects with possibly conflicting
@@ -34,6 +60,51 @@ const focusedKey = computed(() => {
 
 function openTicket(key: string) {
   router.replace({ query: { ...route.query, focus: key } });
+}
+
+function toggleSelect(key: string, withRange: boolean) {
+  if (withRange && selectionAnchor.value) {
+    // Range-select: from anchor to clicked, both inclusive, in current
+    // visible order. Each ticket key in that span gets ADDED to the
+    // selection (range-select is additive, like Linear / Gmail).
+    const list = items.value;
+    const a = list.findIndex((t) => t.key === selectionAnchor.value);
+    const b = list.findIndex((t) => t.key === key);
+    if (a >= 0 && b >= 0) {
+      const [lo, hi] = a < b ? [a, b] : [b, a];
+      const next = new Set(selected.value);
+      for (let i = lo; i <= hi; i++) next.add(list[i]!.key);
+      selected.value = next;
+      return;
+    }
+  }
+  // Single-toggle. Update anchor to this row so a later shift-click ranges
+  // from here.
+  const next = new Set(selected.value);
+  if (next.has(key)) next.delete(key);
+  else next.add(key);
+  selected.value = next;
+  selectionAnchor.value = key;
+}
+
+const allOnPageSelected = computed(() =>
+  items.value.length > 0 && items.value.every((t) => selected.value.has(t.key))
+);
+const someSelected = computed(() => selected.value.size > 0);
+
+// The bulk action bar needs full TicketSummary objects (it operates on
+// labels / project / id), not just keys. Resolve from the loaded list.
+const selectedTickets = computed(() => items.value.filter((t) => selected.value.has(t.key)));
+
+function toggleSelectAll() {
+  if (allOnPageSelected.value) {
+    clearSelection();
+  } else {
+    const next = new Set<string>();
+    for (const t of items.value) next.add(t.key);
+    selected.value = next;
+    selectionAnchor.value = items.value[0]?.key ?? null;
+  }
 }
 
 // ─── virtualization ─────────────────────────────────────────────────────────
@@ -82,6 +153,7 @@ const errMessage = computed(() => {
   <div class="flex flex-col h-full">
     <FilterBar>
       <template #actions>
+        <SavedViewsMenu @save="showSaveView = true" />
         <Button
           v-if="singleProjectKey"
           variant="outline"
@@ -98,6 +170,10 @@ const errMessage = computed(() => {
         </Button>
       </template>
     </FilterBar>
+
+    <SaveViewDialog v-model:open="showSaveView" />
+
+    <BulkActionBar :selected-tickets="selectedTickets" @clear="clearSelection" />
 
     <!-- Initial-load skeleton -->
     <div v-if="isLoading" class="flex-1 px-4 py-2 space-y-2">
@@ -138,7 +214,9 @@ const errMessage = computed(() => {
           <TicketRow
             :ticket="items[vi.index]!"
             :active="items[vi.index]?.key === focusedKey"
+            :selected="selected.has(items[vi.index]!.key)"
             @open="openTicket"
+            @toggle-select="toggleSelect"
           />
         </div>
       </div>
