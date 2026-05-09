@@ -420,6 +420,20 @@ export const apiTokens = pgTable(
   })
 );
 
+// ─── system_settings (singleton key/value store) ────────────────────────────
+//
+// Holds runtime-configurable globals — currently the stale-in-progress
+// threshold used by the project stats endpoint, eventually any other admin
+// knob we don't want to bake into env vars. Values are JSONB so each key
+// can carry whatever shape it needs (number, string, object) without
+// schema churn per setting.
+
+export const systemSettings = pgTable("system_settings", {
+  key: varchar("key", { length: 80 }).primaryKey(),
+  value: jsonb("value").notNull(),
+  updated_at: updatedAt(),
+});
+
 // ─── idempotency keys (request deduplication for POSTs) ─────────────────────
 
 export const idempotencyKeys = pgTable(

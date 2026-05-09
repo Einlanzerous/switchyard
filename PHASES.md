@@ -222,12 +222,24 @@ Out of scope for Phase 2 (deferred):
 
 Goal: the "how much work is left, how much done over time" view.
 
-- **Charts** derived from `events`: burndown per board, throughput (closed/week), cycle time per type, status distribution, plan→build→close funnel.
-- **Per-project dashboard** + **per-board dashboard** + **personal "my work" dashboard**.
-- **Saved views** (extend boards with stronger filter expressions).
-- **Bulk operations** — select N tickets in the list, bulk-edit labels/assignee/status.
-- **Real-time updates** via SSE — minimal: ticket-list views reload when relevant events fire. Removes the "agent moved a ticket but my UI doesn't know" friction.
-- Polish pass: empty states, skeleton loaders, keyboard nav, accessibility audit.
+Locked breakdown:
+
+- **3.0 — Stats/aggregation backend.** `GET /v1/projects/:key/stats` (counts + by_category/priority/type/assignee + stale_in_progress + most_recent_activity), `GET /v1/stats/projects` (bulk feed for the directory), `GET /v1/stats/throughput` (closed-per-period over a window), `GET /v1/stats/cycle-time` (in_progress duration distribution; in_progress only — blocked excluded by design). Plus `system_settings` table + `GET/PATCH /v1/settings` for runtime config (default `stale_in_progress_days = 30`). All event-scan endpoints capped at 5000 events; 400 if exceeded. Side effect: ProjectsView ticket-count column lights up.
+- **3.0b — Cumulative flow.** `GET /v1/stats/cumulative-flow` for burndown + CFD charts. Split out because the per-bucket category replay over events is ~half the work of the other four combined.
+- **3.1 — Dashboards.** Chart lib: **Apache ECharts via vue-echarts** (may roll our own later for visual polish). Personal HomeView rewrite (my open, my mentions, stale, recent activity), per-project Insights tab, per-board Insights tab. Reusable `<DashboardWidget>` + `<Chart>` framework.
+- **3.2 — Power tools on tickets list.** Saved views (`saved_views` table, CRUD, palette integration) + bulk operations (multi-select, bulk-edit labels/assignee/status).
+- **3.3 — Polish & a11y.** Empty-state audit, skeleton-loader audit, keyboard-nav per-view (`j/k` on tickets list, `←/→` between board columns), aria audit, configurable Projects columns, command palette `=`-token autocomplete.
+
+Locked Phase 3 decisions:
+
+- **Cycle time counts in_progress only**, not blocked. Blocked time is its own future metric (companies tracking SLAs would care; personal use mostly doesn't).
+- **Stale-in-progress threshold is a global system setting**, default **30 days** (low for personal use; lower for SLA-sensitive deploys).
+- **Event-scan endpoints bounded at 5000 events** per request, 400 if exceeded — never silently truncate.
+- **ECharts now**, may roll custom later if visual polish demands it.
+
+Deferred from Phase 3 → Phase 5:
+
+- **SSE / real-time updates.** Current 30s `refetchInterval` (shipped in 2.7) is acceptable for now. Revisit if "agent moved a ticket but my UI doesn't know" feels laggy in practice.
 
 ## Phase 4 — Native automation rules
 

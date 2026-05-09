@@ -37,4 +37,16 @@ export const queryKeys = {
   webhooks: () => ["sw", "webhooks"] as const,
   webhook: (id: string) => ["sw", "webhooks", id] as const,
   webhookDeliveries: (id: string) => ["sw", "webhooks", id, "deliveries"] as const,
+
+  systemSettings: () => ["sw", "settings"] as const,
+
+  // Stats endpoints. Bulk projects-stats is keyed without parameters since
+  // it always returns the full set; per-project + windowed endpoints carry
+  // their inputs in the key so different views can coexist in the cache.
+  statsProjects: () => ["sw", "stats", "projects"] as const,
+  projectStats: (key: string) => ["sw", "projects", key, "stats"] as const,
+  statsThroughput: (params: Record<string, unknown>) =>
+    ["sw", "stats", "throughput", params] as const,
+  statsCycleTime: (params: Record<string, unknown>) =>
+    ["sw", "stats", "cycle-time", params] as const,
 };

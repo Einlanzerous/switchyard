@@ -11,3 +11,5 @@ export * from "./schemas/event.js";
 export * from "./schemas/board.js";
 export * from "./schemas/webhook.js";
 export * from "./schemas/token.js";
+export * from "./schemas/settings.js";
+export * from "./schemas/stats.js";

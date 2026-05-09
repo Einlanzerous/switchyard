@@ -9,6 +9,8 @@ import * as attachments from "./attachments.js";
 import * as boards from "./boards.js";
 import * as webhooks from "./webhooks.js";
 import * as events from "./events.js";
+import * as settings from "./settings.js";
+import * as stats from "./stats.js";
 
 export function mountRoutes(app: OpenAPIHono) {
   users.mount(app);
@@ -21,4 +23,6 @@ export function mountRoutes(app: OpenAPIHono) {
   boards.mount(app);
   webhooks.mount(app);
   events.mount(app);
+  settings.mount(app);
+  stats.mount(app);
 }

@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/tooltip";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
+import { useProjectsStats } from "@/composables/useProjectStats";
 import CreateProjectDialog from "@/components/projects/CreateProjectDialog.vue";
 
 const router = useRouter();
@@ -57,6 +58,20 @@ const projectsQuery = useQuery({
   },
 });
 const allProjects = computed(() => projectsQuery.data.value?.items ?? []);
+
+// Counts come from the bulk stats endpoint. Pre-indexed so each row's lookup
+// is O(1) without recomputing per render.
+const statsQuery = useProjectsStats();
+const countsByProjectId = computed(() => {
+  const map = new Map<string, { open: number; closed: number; total: number }>();
+  for (const r of statsQuery.data.value?.items ?? []) {
+    map.set(r.project.id, r.totals);
+  }
+  return map;
+});
+function counts(id: string): { open: number; closed: number; total: number } {
+  return countsByProjectId.value.get(id) ?? { open: 0, closed: 0, total: 0 };
+}
 
 const visible = computed(() => {
   const q = search.value.trim().toLowerCase();
@@ -215,6 +230,10 @@ function onCreated(p: { key: string }) {
                 {{ p.description }}
               </div>
             </div>
+            <div class="text-xs text-muted-foreground tabular-nums shrink-0 hidden sm:flex items-center gap-3">
+              <span><span class="font-medium text-foreground">{{ counts(p.id).open }}</span> open</span>
+              <span class="text-muted-foreground/60">/ {{ counts(p.id).total }}</span>
+            </div>
             <ChevronRight class="h-4 w-4 text-muted-foreground shrink-0" />
           </li>
         </ul>
@@ -238,9 +257,13 @@ function onCreated(p: { key: string }) {
           </Badge>
         </div>
         <div class="font-medium truncate">{{ p.name }}</div>
-        <p v-if="p.description" class="text-xs text-muted-foreground line-clamp-2">
+        <p v-if="p.description" class="text-xs text-muted-foreground line-clamp-2 flex-1">
           {{ p.description }}
         </p>
+        <div class="mt-auto pt-1 text-xs text-muted-foreground tabular-nums flex items-center gap-3">
+          <span><span class="font-medium text-foreground">{{ counts(p.id).open }}</span> open</span>
+          <span class="text-muted-foreground/60">/ {{ counts(p.id).total }}</span>
+        </div>
       </button>
     </div>
 

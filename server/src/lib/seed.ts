@@ -15,6 +15,7 @@ import { resolve, dirname } from "node:path";
 import { db, schema } from "../db.js";
 import { env } from "../env.js";
 import { generateApiToken, hashToken } from "./id.js";
+import { DEFAULT_STALE_IN_PROGRESS_DAYS } from "@switchyard/shared";
 
 type CanonicalUser = {
   name: string;
@@ -34,6 +35,27 @@ const CANONICAL_USERS: CanonicalUser[] = [
 export async function seed(): Promise<void> {
   const userIdsByName = await ensureUsers();
   await ensureBootstrapToken(userIdsByName.get("magos")!);
+  await ensureDefaultSettings();
+}
+
+// Insert default values for any system_settings keys that don't have a row
+// yet. Existing rows are left alone so an admin's runtime tweaks survive a
+// redeploy. Adding a new key here is the canonical way to ship a new
+// default — it'll only write on first boot post-update.
+async function ensureDefaultSettings(): Promise<void> {
+  const defaults = [
+    { key: "stale_in_progress_days", value: DEFAULT_STALE_IN_PROGRESS_DAYS },
+  ];
+  for (const d of defaults) {
+    const [existing] = await db
+      .select({ key: schema.systemSettings.key })
+      .from(schema.systemSettings)
+      .where(eq(schema.systemSettings.key, d.key))
+      .limit(1);
+    if (existing) continue;
+    await db.insert(schema.systemSettings).values({ key: d.key, value: d.value });
+    console.log(`[seed] default system_settings.${d.key} = ${JSON.stringify(d.value)}`);
+  }
 }
 
 async function ensureUsers(): Promise<Map<string, string>> {
