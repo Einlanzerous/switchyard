@@ -56,9 +56,16 @@ const ariaTitle = computed(() => props.title ?? props.user?.name ?? undefined);
          src 404s or is empty, so this block is safe even if user.icon is
          a junk URL. -->
     <AvatarImage v-if="user?.icon" :src="user.icon" :alt="user?.name ?? ''" />
+    <!--
+      reka-ui's AvatarFallback is content-sized by default — without
+      explicit h-full/w-full + flex centering, the inline backgroundColor
+      paints only a tight box around the initials and the parent's
+      bg-secondary shows through as a ring. These classes make the
+      colored chip fill the whole circle, Jira-style.
+    -->
     <AvatarFallback
       :style="{ backgroundColor: color, color: '#fff' }"
-      class="font-medium"
+      class="flex h-full w-full items-center justify-center font-medium"
     >
       {{ initials }}
     </AvatarFallback>
