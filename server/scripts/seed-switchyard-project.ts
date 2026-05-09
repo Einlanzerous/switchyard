@@ -122,6 +122,35 @@ const PHASES: Phase[] = [
       { title: "Phase 3.2 · Power tools (saved views + bulk operations)", started_days_ago: 0, closed_days_ago: null, status: "backlog" },
       { title: "Phase 3.3 · Notifications / @mentions persistence", started_days_ago: 0, closed_days_ago: null, status: "backlog" },
       { title: "Phase 3.4 · Polish & a11y", started_days_ago: 0, closed_days_ago: null, status: "backlog" },
+      {
+        title: "Phase 3.5 · Playwright E2E",
+        started_days_ago: 0,
+        closed_days_ago: null,
+        status: "backlog",
+        description:
+          "Mirror the playwright setup from Einlanzerous/legislator-lookup-tool-cc, adapted for "
+          + "switchyard's bun-driven dev server and bearer-token auth.\n\n"
+          + "Sub-milestones:\n"
+          + "  3.5.0 Scaffolding — install @playwright/test, write playwright.config.ts (chromium + firefox, "
+          + "bun run dev as webServer, baseURL :5173, html reporter, trace on first retry), add e2e/ and "
+          + ".gitignore entries, wire test:e2e + test:e2e:ui scripts into client/package.json.\n"
+          + "  3.5.1 Auth fixture — Playwright setup project that exchanges the bootstrap token for a real "
+          + "user token via POST /v1/users/:id/tokens, persists state to playwright/.auth/admin.json, "
+          + "reused across all subsequent tests.\n"
+          + "  3.5.2 Smoke tests — app boots, login flow, sidebar nav between Home / Tickets / Boards / "
+          + "Projects / Automations / Settings / Health renders without console errors. Sub-30s; PR gate.\n"
+          + "  3.5.3 Tickets list E2E — filter DSL parses, chips render and remove, saved-view round-trip "
+          + "(create → menu apply → palette apply).\n"
+          + "  3.5.4 Bulk ops E2E — multi-select via checkbox + shift-click range, bulk assign/label/delete "
+          + "with toast verification, bulk transition modal category mapping.\n"
+          + "  3.5.5 Board E2E — drag-to-reorder within a column persists, cross-column drag fires "
+          + "transition with resolution dialog when target is closed.\n"
+          + "  3.5.6 Dashboard E2E — KPI cards numeric, charts mount without console errors, stale-work "
+          + "widget visibility tracks seeded data.\n"
+          + "  3.5.7 CI — .github/workflows/e2e.yml runs on push/PR, caches browser binaries, uploads "
+          + "playwright-report on failure.\n\n"
+          + "All tests run against a fresh dev server with deterministic seed in CI.",
+      },
     ],
   },
   {

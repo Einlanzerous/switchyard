@@ -6,7 +6,7 @@ import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useQuery } from "@tanstack/vue-query";
 import { Activity } from "lucide-vue-next";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import UserAvatar from "@/components/UserAvatar.vue";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
 import { formatRelativeTime } from "@/lib/formatTime";
@@ -63,14 +63,6 @@ function open(item: typeof items.value[number]) {
   if (!item.ticket?.key) return;
   router.replace({ query: { ...route.query, focus: item.ticket.key } });
 }
-
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .map((p) => p[0]?.toUpperCase() ?? "")
-    .slice(0, 2)
-    .join("");
-}
 </script>
 
 <template>
@@ -92,9 +84,7 @@ function initials(name: string): string {
       :class="ev.ticket ? 'cursor-pointer' : 'cursor-default'"
       @click="open(ev)"
     >
-      <Avatar class="h-6 w-6 shrink-0">
-        <AvatarFallback class="text-[10px]">{{ ev.actor ? initials(ev.actor.name) : "—" }}</AvatarFallback>
-      </Avatar>
+      <UserAvatar :user="ev.actor" class="shrink-0" />
       <span class="text-muted-foreground truncate flex-1 min-w-0">
         <span class="text-foreground font-medium">{{ ev.actor?.name ?? "system" }}</span>
         {{ " " }}{{ actionVerb(ev.event) }}{{ " " }}

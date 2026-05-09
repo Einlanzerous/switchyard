@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { ref, computed, useTemplateRef } from "vue";
-import { useMutation, useQueryClient } from "@tanstack/vue-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
 import { Paperclip, Loader2, X, Image as ImageIcon, Music, FileText } from "lucide-vue-next";
 import { toast } from "vue-sonner";
 import { Button } from "@/components/ui/button";
 import { api, getStoredToken } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
+import { useMentionAutocomplete } from "@/composables/useMentionAutocomplete";
+import MentionAutocomplete from "@/components/MentionAutocomplete.vue";
+import type { UserRef } from "@switchyard/shared";
 
 const props = defineProps<{
   ticketKey: string;
@@ -17,7 +20,24 @@ const body = ref("");
 const pendingFiles = ref<File[]>([]);
 const isDragging = ref(false);
 const fileInput = useTemplateRef<HTMLInputElement>("fileInput");
+const textareaRef = useTemplateRef<HTMLTextAreaElement>("textareaRef");
 const submitting = ref(false);
+
+// User list for the @mention autocomplete. Cache-shared with FilterBar +
+// BulkActionBar via the canonical queryKey, so the first composer mount
+// usually piggybacks on already-loaded data.
+const usersQuery = useQuery({
+  queryKey: queryKeys.users(),
+  staleTime: 5 * 60 * 1000,
+  queryFn: async () => {
+    const { data, error } = await api.GET("/v1/users", { params: { query: { limit: 200 } } });
+    if (error) throw error;
+    return data;
+  },
+});
+const users = computed<UserRef[]>(() => usersQuery.data.value?.items ?? []);
+
+const mention = useMentionAutocomplete({ textareaRef, bodyRef: body, users });
 
 function classifyKind(file: File): "image" | "audio" | "text" | null {
   if (file.type.startsWith("image/")) return "image";
@@ -129,6 +149,10 @@ async function submit() {
 }
 
 function onKeydown(e: KeyboardEvent) {
+  // The mention autocomplete claims keys when its popover is open
+  // (ArrowDown/Up, Enter without modifier, Tab, Escape). If it doesn't
+  // handle the event, fall through to the composer's own shortcuts.
+  if (mention.onKeydown(e)) return;
   if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
     e.preventDefault();
     void submit();
@@ -146,13 +170,24 @@ function onKeydown(e: KeyboardEvent) {
     @dragleave.stop="onDragLeave"
     @drop.stop="onDrop"
   >
-    <textarea
-      v-model="body"
-      rows="3"
-      class="w-full bg-transparent text-sm leading-relaxed focus:outline-none resize-y placeholder:text-muted-foreground"
-      placeholder="Write a comment… markdown supported, drop files anywhere on this card. Ctrl+Enter to send."
-      @keydown="onKeydown"
-    />
+    <div class="relative">
+      <textarea
+        ref="textareaRef"
+        v-model="body"
+        rows="3"
+        class="w-full bg-transparent text-sm leading-relaxed focus:outline-none resize-y placeholder:text-muted-foreground"
+        placeholder="Write a comment… markdown supported, drop files anywhere on this card. Ctrl+Enter to send."
+        @input="mention.onInput"
+        @keydown="onKeydown"
+        @blur="mention.onBlur"
+      />
+      <MentionAutocomplete
+        :open="mention.open.value"
+        :users="mention.filtered.value"
+        :selected-index="mention.selectedIndex.value"
+        @pick="mention.pick"
+      />
+    </div>
 
     <ul v-if="pendingFiles.length > 0" class="flex flex-wrap gap-1.5 pt-2 border-t mt-2">
       <li

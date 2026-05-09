@@ -4,7 +4,7 @@ import { draggable, dropTargetForElements } from "@atlaskit/pragmatic-drag-and-d
 import {
   attachClosestEdge, extractClosestEdge, type Edge,
 } from "@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import UserAvatar from "@/components/UserAvatar.vue";
 import { cn } from "@/lib/utils";
 import TypeIcon from "./TypeIcon.vue";
 import PriorityBadge from "./PriorityBadge.vue";
@@ -87,11 +87,6 @@ onBeforeUnmount(() => {
   cleanups = [];
 });
 
-const assigneeInitials = computed(() => {
-  const name = props.ticket.assignee?.name ?? "";
-  return name.split(/\s+/).map((p) => p[0]?.toUpperCase() ?? "").slice(0, 2).join("");
-});
-
 const visibleLabels = computed(() => props.ticket.labels.slice(0, 3));
 const extraLabelCount = computed(() => Math.max(0, props.ticket.labels.length - 3));
 </script>
@@ -131,9 +126,7 @@ const extraLabelCount = computed(() => Math.max(0, props.ticket.labels.length - 
           +{{ extraLabelCount }}
         </span>
       </div>
-      <Avatar v-if="ticket.assignee" class="h-5 w-5 shrink-0" :title="ticket.assignee.name">
-        <AvatarFallback class="text-[9px]">{{ assigneeInitials }}</AvatarFallback>
-      </Avatar>
+      <UserAvatar v-if="ticket.assignee" :user="ticket.assignee" size="xs" class="shrink-0" />
     </div>
   </div>
 </template>

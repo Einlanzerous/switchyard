@@ -6,7 +6,7 @@ import { toast } from "vue-sonner";
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import UserAvatar from "@/components/UserAvatar.vue";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
@@ -60,11 +60,6 @@ const mutation = useMutation({
 function pick(id: string | null) {
   mutation.mutate(id);
 }
-
-const currentInitials = computed(() => {
-  const name = props.ticket.assignee?.name ?? "";
-  return name.split(/\s+/).map((p) => p[0]?.toUpperCase() ?? "").slice(0, 2).join("");
-});
 </script>
 
 <template>
@@ -80,9 +75,7 @@ const currentInitials = computed(() => {
       >
         <Loader2 v-if="mutation.isPending.value" class="h-3.5 w-3.5 animate-spin" />
         <template v-else-if="ticket.assignee">
-          <Avatar class="h-5 w-5">
-            <AvatarFallback class="text-[9px]">{{ currentInitials }}</AvatarFallback>
-          </Avatar>
+          <UserAvatar :user="ticket.assignee" size="xs" />
           <span class="text-foreground">{{ ticket.assignee.name }}</span>
         </template>
         <span v-else class="inline-flex items-center gap-1.5 text-muted-foreground">

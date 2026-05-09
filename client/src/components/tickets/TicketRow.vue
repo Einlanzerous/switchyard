@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { formatDistanceToNow } from "date-fns";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import UserAvatar from "@/components/UserAvatar.vue";
 import { Checkbox } from "@/components/ui/checkbox";
 import StatusBadge from "./StatusBadge.vue";
 import PriorityBadge from "./PriorityBadge.vue";
@@ -30,11 +30,6 @@ const updatedRel = computed(() => {
   } catch {
     return "—";
   }
-});
-
-const assigneeInitials = computed(() => {
-  const name = props.ticket.assignee?.name ?? "";
-  return name.split(/\s+/).map((p) => p[0]?.toUpperCase() ?? "").slice(0, 2).join("");
 });
 
 const visibleLabels = computed(() => props.ticket.labels.slice(0, 3));
@@ -94,9 +89,11 @@ function onSelectClick(e: MouseEvent) {
       <PriorityBadge :priority="ticket.priority" class="hidden sm:inline-flex" />
       <StatusBadge :category="ticket.status.category" :display-name="ticket.status.display_name" size="sm" />
 
-      <Avatar v-if="ticket.assignee" class="h-6 w-6 hidden sm:flex" :title="ticket.assignee.name">
-        <AvatarFallback class="text-[10px]">{{ assigneeInitials }}</AvatarFallback>
-      </Avatar>
+      <UserAvatar
+        v-if="ticket.assignee"
+        :user="ticket.assignee"
+        class="hidden sm:flex"
+      />
       <div v-else class="h-6 w-6 hidden sm:block" />
 
       <span class="hidden lg:inline text-xs text-muted-foreground w-32 text-right shrink-0 truncate">

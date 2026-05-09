@@ -1,9 +1,10 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { and, desc, eq, gte, ilike, inArray, isNull, or, type SQL } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import {
   User, CreateUser, UpdateUser, Uuid,
   ApiToken, CreateApiToken, ApiTokenWithSecret, paginated, Pagination,
   MentionList,
+  NotificationsPage, ListNotificationsQuery, MarkReadInput, UnreadCount,
 } from "@switchyard/shared";
 import { db } from "../db.js";
 import * as schema from "../../drizzle/schema.js";
@@ -12,7 +13,7 @@ import { idempotency } from "../lib/idempotency.js";
 import { errorResponses, okJson, createdJson, noContent, z, checkScope } from "./_helpers.js";
 import { mapUser, mapApiToken, mapTicketSummary } from "../lib/mappers.js";
 import { getUserById } from "../lib/lookups.js";
-import { buildPage, cursorOrderBy, cursorWhere, decodeCursor } from "../lib/pagination.js";
+import { buildPage, cursorOrderBy, cursorWhere, decodeCursor, encodeCursor } from "../lib/pagination.js";
 import { generateApiToken } from "../lib/id.js";
 import { badRequest, catchUnique, notFound } from "../errors.js";
 
@@ -57,7 +58,7 @@ const me = createRoute({
 
 const myMentions = createRoute({
   method: "get", path: "/v1/users/me/mentions", tags: [tag],
-  summary: "Live scan of @mentions in recent comments + ticket descriptions",
+  summary: "Live scan of @mentions (DEPRECATED: prefer /v1/users/me/notifications)",
   request: {
     query: z.object({
       // Optional ISO bound; defaults to 30 days ago.
@@ -66,6 +67,26 @@ const myMentions = createRoute({
     }),
   },
   responses: { ...okJson(MentionList), ...errorResponses },
+});
+
+const myNotifications = createRoute({
+  method: "get", path: "/v1/users/me/notifications", tags: [tag],
+  summary: "Persistent notifications (mentions today; more kinds later)",
+  request: { query: ListNotificationsQuery },
+  responses: { ...okJson(NotificationsPage), ...errorResponses },
+});
+
+const markNotificationsRead = createRoute({
+  method: "post", path: "/v1/users/me/notifications/mark-read", tags: [tag],
+  summary: "Mark a set of notifications (or all) as read",
+  request: { body: { content: { "application/json": { schema: MarkReadInput } } } },
+  responses: { ...okJson(UnreadCount), ...errorResponses },
+});
+
+const myUnreadCount = createRoute({
+  method: "get", path: "/v1/users/me/notifications/unread-count", tags: [tag],
+  summary: "Cheap unread-count for the topbar bell",
+  responses: { ...okJson(UnreadCount), ...errorResponses },
 });
 
 const update = createRoute({
@@ -277,6 +298,160 @@ export function mount(app: OpenAPIHono) {
       .filter((x): x is NonNullable<typeof x> => x !== null);
 
     return c.json({ items }, 200);
+  }) as any);
+
+  // ─── /v1/users/me/notifications ─────────────────────────────────────────
+  //
+  // Persistent backing for @mentions. Reads from the notifications table
+  // populated synchronously inside the comment / ticket-description write
+  // handlers. List handler joins back to ticket summaries so the client
+  // can render type icons / titles without a follow-up fetch.
+
+  app.openapi(myNotifications, (async (c: any) => {
+    const auth = c.get("auth");
+    const me = auth.user as typeof schema.users.$inferSelect;
+    const q = c.req.valid("query");
+    const limit = q.limit;
+
+    const conds: SQL[] = [eq(schema.notifications.user_id, me.id)];
+    if (q.status === "unread") conds.push(isNull(schema.notifications.read_at));
+    if (q.since) conds.push(gte(schema.notifications.created_at, q.since));
+    if (q.cursor) {
+      const cur = decodeCursor(q.cursor);
+      if (!cur) throw badRequest("invalid cursor");
+      conds.push(or(
+        sql`${schema.notifications.created_at} < ${cur.u}`,
+        sql`(${schema.notifications.created_at} = ${cur.u} AND ${schema.notifications.id} < ${cur.i})`
+      )!);
+    }
+
+    const rows = await db
+      .select()
+      .from(schema.notifications)
+      .where(and(...conds))
+      .orderBy(desc(schema.notifications.created_at), desc(schema.notifications.id))
+      .limit(limit + 1);
+
+    const has_more = rows.length > limit;
+    const trimmed = has_more ? rows.slice(0, limit) : rows;
+
+    // Hydrate ticket summaries in batch, same shape the /mentions endpoint
+    // produces. Tickets that have been hard-deleted are dropped (the
+    // notification stays in the table but the row is filtered from the
+    // response).
+    const ticketIds = [...new Set(trimmed.map((n) => n.ticket_id).filter((x): x is string => !!x))];
+    const ticketRows = ticketIds.length > 0
+      ? await db.select().from(schema.tickets).where(inArray(schema.tickets.id, ticketIds))
+      : [];
+    const ticketById = new Map(ticketRows.map((t) => [t.id, t]));
+
+    const projectIds = [...new Set(ticketRows.map((t) => t.project_id))];
+    const statusIds = [...new Set(ticketRows.map((t) => t.status_id))];
+    const userIds = [...new Set([
+      ...trimmed.map((n) => n.actor_id).filter((x): x is string => !!x),
+      ...ticketRows.flatMap((t) => [t.assignee_id, t.reporter_id]).filter((x): x is string => !!x),
+    ])];
+
+    const [projectRows, statusRows, userRows, labelRows] = await Promise.all([
+      projectIds.length > 0
+        ? db.select().from(schema.projects).where(inArray(schema.projects.id, projectIds))
+        : Promise.resolve([]),
+      statusIds.length > 0
+        ? db.select().from(schema.statuses).where(inArray(schema.statuses.id, statusIds))
+        : Promise.resolve([]),
+      userIds.length > 0
+        ? db.select().from(schema.users).where(inArray(schema.users.id, userIds))
+        : Promise.resolve([]),
+      ticketIds.length > 0
+        ? db.select({ ticket_id: schema.ticketLabels.ticket_id, label: schema.labels })
+            .from(schema.ticketLabels)
+            .innerJoin(schema.labels, eq(schema.ticketLabels.label_id, schema.labels.id))
+            .where(inArray(schema.ticketLabels.ticket_id, ticketIds))
+        : Promise.resolve([]),
+    ]);
+    const projectById = new Map(projectRows.map((p) => [p.id, p]));
+    const statusById = new Map(statusRows.map((s) => [s.id, s]));
+    const userById = new Map(userRows.map((u) => [u.id, u]));
+    const labelsByTicket = new Map<string, typeof schema.labels.$inferSelect[]>();
+    for (const lr of labelRows) {
+      const list = labelsByTicket.get(lr.ticket_id) ?? [];
+      list.push(lr.label);
+      labelsByTicket.set(lr.ticket_id, list);
+    }
+
+    const items = trimmed.map((n) => {
+      const ticket = n.ticket_id ? ticketById.get(n.ticket_id) ?? null : null;
+      const summary = (() => {
+        if (!ticket) return null;
+        const project = projectById.get(ticket.project_id);
+        const status = statusById.get(ticket.status_id);
+        const reporter = userById.get(ticket.reporter_id);
+        if (!project || !status || !reporter) return null;
+        const assignee = ticket.assignee_id ? userById.get(ticket.assignee_id) ?? null : null;
+        return mapTicketSummary(ticket, {
+          project, status, assignee, reporter,
+          labels: labelsByTicket.get(ticket.id) ?? [],
+          number: ticket.number,
+        });
+      })();
+      const actor = n.actor_id ? userById.get(n.actor_id) ?? null : null;
+      return {
+        id: n.id,
+        kind: n.kind,
+        actor: actor ? { id: actor.id, name: actor.name, icon: actor.icon, type: actor.type } : null,
+        ticket: summary,
+        comment_id: n.comment_id,
+        payload: (n.payload ?? {}) as { source: "comment" | "description"; snippet: string; actor?: any },
+        read_at: n.read_at,
+        created_at: n.created_at,
+      };
+    });
+
+    const last = has_more ? trimmed[trimmed.length - 1] : null;
+    const next_cursor = last ? encodeCursor({ u: last.created_at, i: last.id }) : null;
+    return c.json({ items, page: { next_cursor, has_more } }, 200);
+  }) as any);
+
+  app.openapi(markNotificationsRead, (async (c: any) => {
+    const auth = c.get("auth");
+    const me = auth.user as typeof schema.users.$inferSelect;
+    const body = c.req.valid("json");
+    const nowIso = new Date().toISOString();
+
+    if ("all" in body && body.all) {
+      await db.update(schema.notifications)
+        .set({ read_at: nowIso })
+        .where(and(
+          eq(schema.notifications.user_id, me.id),
+          isNull(schema.notifications.read_at)
+        ));
+    } else if ("ids" in body && Array.isArray(body.ids) && body.ids.length > 0) {
+      await db.update(schema.notifications)
+        .set({ read_at: nowIso })
+        .where(and(
+          eq(schema.notifications.user_id, me.id),
+          inArray(schema.notifications.id, body.ids),
+          isNull(schema.notifications.read_at)
+        ));
+    }
+
+    const [row] = await db.execute<{ count: number }>(
+      sql`SELECT COUNT(*)::int AS count FROM notifications
+          WHERE user_id = ${me.id} AND read_at IS NULL` as any
+    ) as unknown as Array<{ count: number }>;
+    const r = (row as any) ?? ((await db.execute(sql`SELECT 0::int AS count`)) as any).rows?.[0];
+    return c.json({ count: r?.count ?? 0 }, 200);
+  }) as any);
+
+  app.openapi(myUnreadCount, (async (c: any) => {
+    const auth = c.get("auth");
+    const me = auth.user as typeof schema.users.$inferSelect;
+    const result = await db.execute<{ count: number }>(
+      sql`SELECT COUNT(*)::int AS count FROM notifications
+          WHERE user_id = ${me.id} AND read_at IS NULL` as any
+    ) as unknown as Array<{ count: number }>;
+    const row = (result as any).rows ? (result as any).rows[0] : (result as any)[0];
+    return c.json({ count: row?.count ?? 0 }, 200);
   }) as any);
 
   app.openapi(get, (async (c: any) => {

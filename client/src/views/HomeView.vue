@@ -13,12 +13,12 @@
 import { computed } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import { useRouter } from "vue-router";
-import { Inbox, Activity, AtSign, Clock, AlertCircle, BarChart2, PieChart } from "lucide-vue-next";
+import { Inbox, Activity, Clock, BarChart2, PieChart } from "lucide-vue-next";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/stores/auth";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
-import { useThroughput, useStaleRollup, useMyMentions } from "@/composables/useDashboardData";
+import { useThroughput, useStaleRollup } from "@/composables/useDashboardData";
 import { formatDurationMs, formatDeltaPercent } from "@/lib/formatDuration";
 import KpiCard from "@/components/dashboard/KpiCard.vue";
 import DashboardWidget from "@/components/dashboard/DashboardWidget.vue";
@@ -128,8 +128,6 @@ const cycleDelta = computed(() => {
   return formatDeltaPercent(now, prev);
 });
 
-const mentionsQ = useMyMentions();
-const mentionsCount = computed(() => mentionsQ.data.value?.items?.length ?? 0);
 </script>
 
 <template>
@@ -200,22 +198,7 @@ const mentionsCount = computed(() => mentionsQ.data.value?.items?.length ?? 0);
         <MyOpenTickets />
       </DashboardWidget>
 
-      <DashboardWidget
-        title="Mentions"
-        class="lg:col-span-4"
-        :padded="false"
-      >
-        <template #title-prefix>
-          <AtSign class="h-3.5 w-3.5 text-muted-foreground" />
-        </template>
-        <template #title-suffix>
-          <span
-            v-if="mentionsCount > 0"
-            class="ml-1 text-[10px] font-medium tabular-nums text-muted-foreground"
-          >{{ mentionsCount }}</span>
-        </template>
-        <MentionsWidget />
-      </DashboardWidget>
+      <MentionsWidget class="lg:col-span-4" />
     </div>
 
     <!-- Row 3: Recent activity (full width) ──────────────────────────────── -->

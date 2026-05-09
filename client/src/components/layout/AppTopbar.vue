@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Search, Sun, Moon, Monitor, LogOut, User as UserIcon } from "lucide-vue-next";
-import { computed } from "vue";
 import { Button } from "@/components/ui/button";
+import NotificationsBell from "./NotificationsBell.vue";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import UserAvatar from "@/components/UserAvatar.vue";
 import { useThemeStore } from "@/stores/theme";
 import { useAuthStore } from "@/stores/auth";
 import { useUiStore } from "@/stores/ui";
@@ -20,15 +20,6 @@ const theme = useThemeStore();
 const auth = useAuthStore();
 const ui = useUiStore();
 const router = useRouter();
-
-const initials = computed(() => {
-  const name = auth.me?.name ?? "?";
-  return name
-    .split(/\s+/)
-    .map((p) => p[0]?.toUpperCase() ?? "")
-    .slice(0, 2)
-    .join("");
-});
 
 function logout() {
   auth.logout();
@@ -54,6 +45,8 @@ function logout() {
     </div>
 
     <div class="ml-auto flex items-center gap-2">
+      <NotificationsBell v-if="auth.isAuthenticated" />
+
       <Button
         variant="ghost"
         size="icon"
@@ -68,9 +61,7 @@ function logout() {
       <DropdownMenu v-if="auth.isAuthenticated">
         <DropdownMenuTrigger as-child>
           <Button variant="ghost" size="icon" class="rounded-full" aria-label="User menu">
-            <Avatar class="h-8 w-8">
-              <AvatarFallback>{{ initials }}</AvatarFallback>
-            </Avatar>
+            <UserAvatar :user="auth.me" size="lg" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" class="w-48">

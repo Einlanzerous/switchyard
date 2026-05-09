@@ -420,6 +420,44 @@ export const apiTokens = pgTable(
   })
 );
 
+// ─── notifications (persistent @mention surface) ────────────────────────────
+//
+// Replaces the 3.1 live-scan with a real unread/seen state. Currently only
+// `mention` kind; `assigned` and `comment_on_my_ticket` are deliberately
+// out of scope per the Phase 3 plan ("My open tickets" + dashboards already
+// cover those signals).
+//
+// Dedup is in application code rather than via a unique constraint so we
+// don't have to depend on PG 15's NULLS NOT DISTINCT semantics.
+
+export const notificationKind = pgEnum("notification_kind", ["mention"]);
+
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: id(),
+    user_id: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    kind: notificationKind("kind").notNull(),
+    actor_id: uuid("actor_id").references(() => users.id, { onDelete: "set null" }),
+    ticket_id: uuid("ticket_id").references(() => tickets.id, { onDelete: "cascade" }),
+    comment_id: uuid("comment_id").references(() => comments.id, { onDelete: "cascade" }),
+    payload: jsonb("payload").notNull().default({}),
+    read_at: timestamp("read_at", { withTimezone: true, mode: "string" }),
+    created_at: createdAt(),
+    updated_at: updatedAt(),
+  },
+  (t) => ({
+    // Partial index — bell-badge unread-count + dropdown query both walk
+    // the same prefix.
+    unreadIdx: index("notifications_unread_idx")
+      .on(t.user_id, t.created_at)
+      .where(sql`${t.read_at} IS NULL`),
+    listIdx: index("notifications_list_idx").on(t.user_id, t.created_at),
+  })
+);
+
 // ─── saved_views (named filter combinations on the tickets list) ────────────
 //
 // Personal views are visible only to the owner; shared views are visible to

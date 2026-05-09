@@ -716,7 +716,7 @@ paths:
     get:
       tags:
         - Users
-      summary: Live scan of @mentions in recent comments + ticket descriptions
+      summary: "Live scan of @mentions (DEPRECATED: prefer /v1/users/me/notifications)"
       parameters:
         - schema:
             type: string
@@ -782,7 +782,7 @@ paths:
                                 - color
                             type:
                               type: string
-                              enum: &a5
+                              enum: &a3
                                 - spike
                                 - task
                                 - bug
@@ -816,14 +816,14 @@ paths:
                             resolution:
                               type: string
                               nullable: true
-                              enum: &a6
+                              enum: &a5
                                 - done
                                 - released
                                 - cancelled
                             priority:
                               type: string
                               nullable: true
-                              enum: &a7
+                              enum: &a6
                                 - low
                                 - medium
                                 - high
@@ -948,6 +948,889 @@ paths:
                         - mentioned_at
                 required:
                   - items
+        "400":
+          description: bad request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "401":
+          description: unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "403":
+          description: forbidden
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "404":
+          description: not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "409":
+          description: conflict
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "422":
+          description: unprocessable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "500":
+          description: internal
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+  /v1/users/me/notifications:
+    get:
+      tags:
+        - Users
+      summary: Persistent notifications (mentions today; more kinds later)
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+          required: false
+          name: cursor
+          in: query
+        - schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+          required: false
+          name: limit
+          in: query
+        - schema:
+            type: string
+            enum:
+              - all
+              - unread
+            default: unread
+          required: false
+          name: status
+          in: query
+        - schema:
+            type: string
+            format: date-time
+          required: false
+          name: since
+          in: query
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        kind:
+                          type: string
+                          enum:
+                            - mention
+                        actor:
+                          type: object
+                          nullable: true
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            name:
+                              type: string
+                              minLength: 1
+                              maxLength: 100
+                            icon:
+                              type: string
+                              nullable: true
+                              maxLength: 500
+                            type:
+                              type: string
+                              enum: *a2
+                          required:
+                            - id
+                            - name
+                            - icon
+                            - type
+                        ticket:
+                          type: object
+                          nullable: true
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            key:
+                              type: string
+                              pattern: ^[A-Z][A-Z0-9]{1,9}-[1-9][0-9]*$
+                            number:
+                              type: integer
+                              minimum: 0
+                              exclusiveMinimum: true
+                            project:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                  format: uuid
+                                key:
+                                  type: string
+                                  pattern: ^[A-Z][A-Z0-9]{1,9}$
+                                name:
+                                  type: string
+                                  minLength: 1
+                                  maxLength: 200
+                                color:
+                                  type: string
+                                  nullable: true
+                                  pattern: ^#[0-9a-fA-F]{6}$
+                              required:
+                                - id
+                                - key
+                                - name
+                                - color
+                            type:
+                              type: string
+                              enum: *a3
+                            title:
+                              type: string
+                              minLength: 1
+                              maxLength: 500
+                            status:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                  format: uuid
+                                category:
+                                  type: string
+                                  enum: *a4
+                                display_name:
+                                  type: string
+                                  minLength: 1
+                                  maxLength: 50
+                              required:
+                                - id
+                                - category
+                                - display_name
+                            resolution:
+                              type: string
+                              nullable: true
+                              enum: *a5
+                            priority:
+                              type: string
+                              nullable: true
+                              enum: *a6
+                            parent_id:
+                              type: string
+                              nullable: true
+                              format: uuid
+                            assignee:
+                              type: object
+                              nullable: true
+                              properties:
+                                id:
+                                  type: string
+                                  format: uuid
+                                name:
+                                  type: string
+                                  minLength: 1
+                                  maxLength: 100
+                                icon:
+                                  type: string
+                                  nullable: true
+                                  maxLength: 500
+                                type:
+                                  type: string
+                                  enum: *a2
+                              required:
+                                - id
+                                - name
+                                - icon
+                                - type
+                            reporter:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                  format: uuid
+                                name:
+                                  type: string
+                                  minLength: 1
+                                  maxLength: 100
+                                icon:
+                                  type: string
+                                  nullable: true
+                                  maxLength: 500
+                                type:
+                                  type: string
+                                  enum: *a2
+                              required:
+                                - id
+                                - name
+                                - icon
+                                - type
+                            due_date:
+                              type: string
+                              nullable: true
+                              format: date-time
+                            labels:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  id:
+                                    type: string
+                                    format: uuid
+                                  name:
+                                    type: string
+                                    minLength: 1
+                                    maxLength: 50
+                                  color:
+                                    type: string
+                                    pattern: ^#[0-9a-fA-F]{6}$
+                                required:
+                                  - id
+                                  - name
+                                  - color
+                            position:
+                              type: number
+                              nullable: true
+                            created_at:
+                              type: string
+                              format: date-time
+                            updated_at:
+                              type: string
+                              format: date-time
+                            deleted_at:
+                              type: string
+                              nullable: true
+                              format: date-time
+                          required:
+                            - id
+                            - key
+                            - number
+                            - project
+                            - type
+                            - title
+                            - status
+                            - resolution
+                            - priority
+                            - parent_id
+                            - assignee
+                            - reporter
+                            - due_date
+                            - labels
+                            - position
+                            - created_at
+                            - updated_at
+                            - deleted_at
+                        comment_id:
+                          type: string
+                          nullable: true
+                          format: uuid
+                        payload:
+                          type: object
+                          properties:
+                            source:
+                              type: string
+                              enum:
+                                - comment
+                                - description
+                            snippet:
+                              type: string
+                            actor:
+                              type: object
+                              nullable: true
+                              properties:
+                                id:
+                                  type: string
+                                  format: uuid
+                                name:
+                                  type: string
+                                  minLength: 1
+                                  maxLength: 100
+                                icon:
+                                  type: string
+                                  nullable: true
+                                  maxLength: 500
+                                type:
+                                  type: string
+                                  enum: *a2
+                              required:
+                                - id
+                                - name
+                                - icon
+                                - type
+                          required:
+                            - source
+                            - snippet
+                        read_at:
+                          type: string
+                          nullable: true
+                          format: date-time
+                        created_at:
+                          type: string
+                          format: date-time
+                      required:
+                        - id
+                        - kind
+                        - actor
+                        - ticket
+                        - comment_id
+                        - payload
+                        - read_at
+                        - created_at
+                  page:
+                    type: object
+                    properties:
+                      next_cursor:
+                        type: string
+                        nullable: true
+                      has_more:
+                        type: boolean
+                    required:
+                      - next_cursor
+                      - has_more
+                required:
+                  - items
+                  - page
+        "400":
+          description: bad request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "401":
+          description: unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "403":
+          description: forbidden
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "404":
+          description: not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "409":
+          description: conflict
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "422":
+          description: unprocessable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "500":
+          description: internal
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+  /v1/users/me/notifications/mark-read:
+    post:
+      tags:
+        - Users
+      summary: Mark a set of notifications (or all) as read
+      requestBody:
+        content:
+          application/json:
+            schema:
+              anyOf:
+                - type: object
+                  properties:
+                    ids:
+                      type: array
+                      items:
+                        type: string
+                        format: uuid
+                      minItems: 1
+                  required:
+                    - ids
+                - type: object
+                  properties:
+                    all:
+                      type: boolean
+                      enum:
+                        - true
+                  required:
+                    - all
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                    minimum: 0
+                required:
+                  - count
+        "400":
+          description: bad request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "401":
+          description: unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "403":
+          description: forbidden
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "404":
+          description: not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "409":
+          description: conflict
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "422":
+          description: unprocessable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "500":
+          description: internal
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+  /v1/users/me/notifications/unread-count:
+    get:
+      tags:
+        - Users
+      summary: Cheap unread-count for the topbar bell
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                    minimum: 0
+                required:
+                  - count
         "400":
           description: bad request
           content:
@@ -1792,7 +2675,7 @@ paths:
                           type: array
                           items:
                             type: string
-                            enum: &a3
+                            enum: &a7
                               - tickets:read
                               - tickets:write
                               - comments:write
@@ -2019,7 +2902,7 @@ paths:
                   type: array
                   items:
                     type: string
-                    enum: *a3
+                    enum: *a7
                   default:
                     - admin
               required:
@@ -2046,7 +2929,7 @@ paths:
                     type: array
                     items:
                       type: string
-                      enum: *a3
+                      enum: *a7
                   last_used_at:
                     type: string
                     nullable: true
@@ -6338,7 +7221,7 @@ paths:
                             - color
                         type:
                           type: string
-                          enum: *a5
+                          enum: *a3
                         title:
                           type: string
                           minLength: 1
@@ -6363,11 +7246,11 @@ paths:
                         resolution:
                           type: string
                           nullable: true
-                          enum: *a6
+                          enum: *a5
                         priority:
                           type: string
                           nullable: true
-                          enum: *a7
+                          enum: *a6
                         parent_id:
                           type: string
                           nullable: true
@@ -6677,7 +7560,7 @@ paths:
                   pattern: ^[A-Z][A-Z0-9]{1,9}$
                 type:
                   type: string
-                  enum: *a5
+                  enum: *a3
                 title:
                   type: string
                   minLength: 1
@@ -6690,7 +7573,7 @@ paths:
                   format: uuid
                 priority:
                   type: string
-                  enum: *a7
+                  enum: *a6
                 parent_id:
                   type: string
                   format: uuid
@@ -6755,7 +7638,7 @@ paths:
                       - color
                   type:
                     type: string
-                    enum: *a5
+                    enum: *a3
                   title:
                     type: string
                     minLength: 1
@@ -6780,11 +7663,11 @@ paths:
                   resolution:
                     type: string
                     nullable: true
-                    enum: *a6
+                    enum: *a5
                   priority:
                     type: string
                     nullable: true
-                    enum: *a7
+                    enum: *a6
                   parent_id:
                     type: string
                     nullable: true
@@ -7397,7 +8280,7 @@ paths:
                       - color
                   type:
                     type: string
-                    enum: *a5
+                    enum: *a3
                   title:
                     type: string
                     minLength: 1
@@ -7422,11 +8305,11 @@ paths:
                   resolution:
                     type: string
                     nullable: true
-                    enum: *a6
+                    enum: *a5
                   priority:
                     type: string
                     nullable: true
-                    enum: *a7
+                    enum: *a6
                   parent_id:
                     type: string
                     nullable: true
@@ -8015,7 +8898,7 @@ paths:
                   maxLength: 100000
                 priority:
                   type: string
-                  enum: *a7
+                  enum: *a6
                 parent_id:
                   type: string
                   format: uuid
@@ -8078,7 +8961,7 @@ paths:
                       - color
                   type:
                     type: string
-                    enum: *a5
+                    enum: *a3
                   title:
                     type: string
                     minLength: 1
@@ -8103,11 +8986,11 @@ paths:
                   resolution:
                     type: string
                     nullable: true
-                    enum: *a6
+                    enum: *a5
                   priority:
                     type: string
                     nullable: true
-                    enum: *a7
+                    enum: *a6
                   parent_id:
                     type: string
                     nullable: true
@@ -8875,7 +9758,7 @@ paths:
                   format: uuid
                 resolution:
                   type: string
-                  enum: *a6
+                  enum: *a5
                 comment:
                   type: string
                   maxLength: 50000
@@ -8925,7 +9808,7 @@ paths:
                       - color
                   type:
                     type: string
-                    enum: *a5
+                    enum: *a3
                   title:
                     type: string
                     minLength: 1
@@ -8950,11 +9833,11 @@ paths:
                   resolution:
                     type: string
                     nullable: true
-                    enum: *a6
+                    enum: *a5
                   priority:
                     type: string
                     nullable: true
-                    enum: *a7
+                    enum: *a6
                   parent_id:
                     type: string
                     nullable: true
@@ -9634,7 +10517,7 @@ paths:
                                 - color
                             type:
                               type: string
-                              enum: *a5
+                              enum: *a3
                             title:
                               type: string
                               minLength: 1
@@ -9659,11 +10542,11 @@ paths:
                             resolution:
                               type: string
                               nullable: true
-                              enum: *a6
+                              enum: *a5
                             priority:
                               type: string
                               nullable: true
-                              enum: *a7
+                              enum: *a6
                             parent_id:
                               type: string
                               nullable: true
@@ -9825,7 +10708,7 @@ paths:
                                 resolution:
                                   type: string
                                   nullable: true
-                                  enum: *a6
+                                  enum: *a5
                               required:
                                 - from
                                 - to
@@ -10094,7 +10977,7 @@ paths:
                             - color
                         type:
                           type: string
-                          enum: *a5
+                          enum: *a3
                         title:
                           type: string
                           minLength: 1
@@ -10119,11 +11002,11 @@ paths:
                         resolution:
                           type: string
                           nullable: true
-                          enum: *a6
+                          enum: *a5
                         priority:
                           type: string
                           nullable: true
-                          enum: *a7
+                          enum: *a6
                         parent_id:
                           type: string
                           nullable: true
@@ -12559,12 +13442,12 @@ paths:
                               type: array
                               items:
                                 type: string
-                                enum: *a5
+                                enum: *a3
                             priorities:
                               type: array
                               items:
                                 type: string
-                                enum: *a7
+                                enum: *a6
                             label_ids:
                               type: array
                               items:
@@ -12806,12 +13689,12 @@ paths:
                       type: array
                       items:
                         type: string
-                        enum: *a5
+                        enum: *a3
                     priorities:
                       type: array
                       items:
                         type: string
-                        enum: *a7
+                        enum: *a6
                     label_ids:
                       type: array
                       items:
@@ -12878,12 +13761,12 @@ paths:
                         type: array
                         items:
                           type: string
-                          enum: *a5
+                          enum: *a3
                       priorities:
                         type: array
                         items:
                           type: string
-                          enum: *a7
+                          enum: *a6
                       label_ids:
                         type: array
                         items:
@@ -13141,12 +14024,12 @@ paths:
                         type: array
                         items:
                           type: string
-                          enum: *a5
+                          enum: *a3
                       priorities:
                         type: array
                         items:
                           type: string
-                          enum: *a7
+                          enum: *a6
                       label_ids:
                         type: array
                         items:
@@ -13381,12 +14264,12 @@ paths:
                       type: array
                       items:
                         type: string
-                        enum: *a5
+                        enum: *a3
                     priorities:
                       type: array
                       items:
                         type: string
-                        enum: *a7
+                        enum: *a6
                     label_ids:
                       type: array
                       items:
@@ -13450,12 +14333,12 @@ paths:
                         type: array
                         items:
                           type: string
-                          enum: *a5
+                          enum: *a3
                       priorities:
                         type: array
                         items:
                           type: string
-                          enum: *a7
+                          enum: *a6
                       label_ids:
                         type: array
                         items:
@@ -13898,12 +14781,12 @@ paths:
                             type: array
                             items:
                               type: string
-                              enum: *a5
+                              enum: *a3
                           priorities:
                             type: array
                             items:
                               type: string
-                              enum: *a7
+                              enum: *a6
                           label_ids:
                             type: array
                             items:
@@ -13979,7 +14862,7 @@ paths:
                                   - color
                               type:
                                 type: string
-                                enum: *a5
+                                enum: *a3
                               title:
                                 type: string
                                 minLength: 1
@@ -14004,11 +14887,11 @@ paths:
                               resolution:
                                 type: string
                                 nullable: true
-                                enum: *a6
+                                enum: *a5
                               priority:
                                 type: string
                                 nullable: true
-                                enum: *a7
+                                enum: *a6
                               parent_id:
                                 type: string
                                 nullable: true
@@ -16133,7 +17016,7 @@ paths:
                                 - color
                             type:
                               type: string
-                              enum: *a5
+                              enum: *a3
                             title:
                               type: string
                               minLength: 1
@@ -16158,11 +17041,11 @@ paths:
                             resolution:
                               type: string
                               nullable: true
-                              enum: *a6
+                              enum: *a5
                             priority:
                               type: string
                               nullable: true
-                              enum: *a7
+                              enum: *a6
                             parent_id:
                               type: string
                               nullable: true
@@ -16324,7 +17207,7 @@ paths:
                                 resolution:
                                   type: string
                                   nullable: true
-                                  enum: *a6
+                                  enum: *a5
                               required:
                                 - from
                                 - to
@@ -17861,7 +18744,7 @@ paths:
                           pattern: ^[A-Z][A-Z0-9]{1,9}-[1-9][0-9]*$
                         type:
                           type: string
-                          enum: *a5
+                          enum: *a3
                         duration_ms:
                           type: integer
                           minimum: 0
@@ -18376,7 +19259,7 @@ paths:
                                 - color
                             type:
                               type: string
-                              enum: *a5
+                              enum: *a3
                             title:
                               type: string
                               minLength: 1
@@ -18401,11 +19284,11 @@ paths:
                             resolution:
                               type: string
                               nullable: true
-                              enum: *a6
+                              enum: *a5
                             priority:
                               type: string
                               nullable: true
-                              enum: *a7
+                              enum: *a6
                             parent_id:
                               type: string
                               nullable: true

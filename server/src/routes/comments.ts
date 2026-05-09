@@ -11,6 +11,7 @@ import { resolveTicket } from "../lib/lookups.js";
 import { buildPage, cursorOrderBy, cursorWhere, decodeCursor } from "../lib/pagination.js";
 import { writeEvent } from "../lib/events.js";
 import { loadTicketSummary } from "../lib/tickets.js";
+import { detectAndNotify, detectAndNotifyOnEdit } from "../lib/mentions.js";
 import { badRequest, notFound } from "../errors.js";
 
 const tag = "Comments";
@@ -135,6 +136,16 @@ export function mount(app: OpenAPIHono) {
         extras: { comment_id: created.id, comment_body: created.body },
       });
 
+      // @mention notifications. Self-mentions DO notify (intentional —
+      // matches the user's "@-myself to remember" workflow).
+      await detectAndNotify(tx as any, {
+        text: created.body,
+        actor: auth.user,
+        ticket_id: ticket.id,
+        comment_id: created.id,
+        source: "comment",
+      });
+
       return created;
     });
 
@@ -179,6 +190,17 @@ export function mount(app: OpenAPIHono) {
         ticket: summary,
         project_id: ticket.project_id,
         extras: { comment_id: u.id },
+      });
+
+      // Diff-aware notifications: only fire for users newly @mentioned in
+      // the edited body. Re-edits to the same set are no-ops.
+      await detectAndNotifyOnEdit(tx as any, {
+        oldText: existing.body,
+        newText: u.body,
+        actor: auth.user,
+        ticket_id: ticket.id,
+        comment_id: u.id,
+        source: "comment",
       });
 
       return u;

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import UserAvatar from "@/components/UserAvatar.vue";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -103,9 +103,6 @@ const deleteMutation = useMutation({
   onSettled: () => { deletingId.value = null; },
 });
 
-function initials(u: UserType) {
-  return u.name.split(/\s+/).map((p) => p[0]?.toUpperCase() ?? "").slice(0, 2).join("");
-}
 </script>
 
 <template>
@@ -130,10 +127,7 @@ function initials(u: UserType) {
         </div>
         <ul v-else-if="items.length > 0" class="divide-y">
           <li v-for="u in items" :key="u.id" class="flex items-center gap-3 p-3">
-            <Avatar class="h-7 w-7">
-              <AvatarImage v-if="u.icon" :src="u.icon" :alt="u.name" />
-              <AvatarFallback class="text-[10px]">{{ initials(u) }}</AvatarFallback>
-            </Avatar>
+            <UserAvatar :user="u" size="md" />
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2">
                 <span class="font-medium">{{ u.name }}</span>

@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { ref, computed, useTemplateRef, watch } from "vue";
-import { useMutation, useQueryClient } from "@tanstack/vue-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
 import { Pencil, Loader2 } from "lucide-vue-next";
 import { toast } from "vue-sonner";
 import { Button } from "@/components/ui/button";
 import Markdown from "@/components/markdown/Markdown.vue";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
-import type { Ticket } from "@switchyard/shared";
+import { useMentionAutocomplete } from "@/composables/useMentionAutocomplete";
+import MentionAutocomplete from "@/components/MentionAutocomplete.vue";
+import type { Ticket, UserRef } from "@switchyard/shared";
 
 const props = defineProps<{ ticket: Ticket }>();
 
@@ -15,6 +17,22 @@ const editing = ref(false);
 const draft = ref("");
 const textarea = useTemplateRef<HTMLTextAreaElement>("textarea");
 const qc = useQueryClient();
+
+// User list for @mention autocomplete. Same canonical queryKey as the
+// rest of the app so the cache is shared.
+const usersQuery = useQuery({
+  queryKey: queryKeys.users(),
+  enabled: computed(() => editing.value),
+  staleTime: 5 * 60 * 1000,
+  queryFn: async () => {
+    const { data, error } = await api.GET("/v1/users", { params: { query: { limit: 200 } } });
+    if (error) throw error;
+    return data;
+  },
+});
+const users = computed<UserRef[]>(() => usersQuery.data.value?.items ?? []);
+
+const mention = useMentionAutocomplete({ textareaRef: textarea, bodyRef: draft, users });
 
 watch(
   () => props.ticket.id,
@@ -57,6 +75,10 @@ function save() {
 }
 
 function onKeydown(e: KeyboardEvent) {
+  // Mention autocomplete claims arrow keys / Enter / Tab / Escape when
+  // its popover is open. Fall through to the editor's own shortcuts
+  // otherwise.
+  if (mention.onKeydown(e)) return;
   if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
     e.preventDefault();
     save();
@@ -77,14 +99,24 @@ function onKeydown(e: KeyboardEvent) {
     </div>
 
     <div v-if="editing" class="space-y-2">
-      <textarea
-        ref="textarea"
-        v-model="draft"
-        rows="8"
-        class="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono leading-relaxed focus:outline-none focus:ring-1 focus:ring-ring resize-y"
-        placeholder="Markdown supported. Ctrl+Enter to save, Esc to cancel."
-        @keydown="onKeydown"
-      />
+      <div class="relative">
+        <textarea
+          ref="textarea"
+          v-model="draft"
+          rows="8"
+          class="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono leading-relaxed focus:outline-none focus:ring-1 focus:ring-ring resize-y"
+          placeholder="Markdown supported. Ctrl+Enter to save, Esc to cancel."
+          @input="mention.onInput"
+          @keydown="onKeydown"
+          @blur="mention.onBlur"
+        />
+        <MentionAutocomplete
+          :open="mention.open.value"
+          :users="mention.filtered.value"
+          :selected-index="mention.selectedIndex.value"
+          @pick="mention.pick"
+        />
+      </div>
       <div class="flex items-center justify-end gap-2">
         <Button variant="ghost" size="sm" :disabled="saving" @click="cancel">Cancel</Button>
         <Button size="sm" :disabled="saving" @click="save">

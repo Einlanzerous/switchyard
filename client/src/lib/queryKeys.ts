@@ -54,6 +54,9 @@ export const queryKeys = {
   statsStale: () => ["sw", "stats", "stale"] as const,
 
   myMentions: () => ["sw", "users", "me", "mentions"] as const,
+  myNotifications: (params?: Record<string, unknown>) =>
+    ["sw", "users", "me", "notifications", params ?? {}] as const,
+  myUnreadCount: () => ["sw", "users", "me", "notifications", "unread-count"] as const,
 
   savedViews: () => ["sw", "views"] as const,
 };

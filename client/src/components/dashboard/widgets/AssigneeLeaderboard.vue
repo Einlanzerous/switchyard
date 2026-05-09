@@ -3,7 +3,7 @@
 // existing /v1/projects/:key/stats endpoint's `by_assignee` field.
 
 import { computed } from "vue";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import UserAvatar from "@/components/UserAvatar.vue";
 import { useProjectStats } from "@/composables/useProjectStats";
 
 const props = defineProps<{ projectKey: string }>();
@@ -13,10 +13,6 @@ const q = useProjectStats(projectKeyComp);
 
 const top = computed(() => (q.data.value?.by_assignee ?? []).slice(0, 6));
 const max = computed(() => top.value[0]?.count ?? 1);
-
-function initials(name: string): string {
-  return name.split(/\s+/).map((p) => p[0]?.toUpperCase() ?? "").slice(0, 2).join("");
-}
 </script>
 
 <template>
@@ -32,11 +28,7 @@ function initials(name: string): string {
         :key="row.user?.id ?? 'unassigned'"
         class="flex items-center gap-4 text-sm"
       >
-        <Avatar class="h-6 w-6 shrink-0">
-          <AvatarFallback class="text-[10px]">
-            {{ row.user ? initials(row.user.name) : "—" }}
-          </AvatarFallback>
-        </Avatar>
+        <UserAvatar :user="row.user" class="shrink-0" />
         <span class="truncate w-24 sm:w-32 shrink-0">{{ row.user?.name ?? "Unassigned" }}</span>
         <div class="flex-1 min-w-0 h-2 bg-muted rounded-full overflow-hidden mr-1">
           <div

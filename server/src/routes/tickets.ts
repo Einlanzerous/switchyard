@@ -19,6 +19,7 @@ import { resolveTicket, getProjectByKey, getStatusById, getUserById } from "../l
 import { buildPage, cursorOrderBy, cursorWhere, decodeCursor } from "../lib/pagination.js";
 import { writeEvent } from "../lib/events.js";
 import { loadTicketDetail, loadTicketSummary, allocateTicketNumber } from "../lib/tickets.js";
+import { detectAndNotify, detectAndNotifyOnEdit } from "../lib/mentions.js";
 import { badRequest, unprocessable } from "../errors.js";
 
 const tag = "Tickets";
@@ -303,6 +304,17 @@ export function mount(app: OpenAPIHono) {
         project_id: project.id,
       });
 
+      // Description-source @mention notifications. comment_id stays null.
+      if (t.description) {
+        await detectAndNotify(tx as any, {
+          text: t.description,
+          actor: auth.user,
+          ticket_id: t.id,
+          comment_id: null,
+          source: "description",
+        });
+      }
+
       return t;
     });
 
@@ -403,6 +415,19 @@ export function mount(app: OpenAPIHono) {
           actor: mapUserRef(auth.user),
           ticket: summary,
           project_id: existing.project_id,
+        });
+      }
+
+      // Description-source @mentions. Only notify users who appear in the
+      // new description but not the old one.
+      if (body.description !== undefined && body.description !== existing.description) {
+        await detectAndNotifyOnEdit(tx as any, {
+          oldText: existing.description,
+          newText: body.description ?? "",
+          actor: auth.user,
+          ticket_id: existing.id,
+          comment_id: null,
+          source: "description",
         });
       }
 

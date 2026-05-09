@@ -3,7 +3,7 @@ import { computed, ref, watch } from "vue";
 import { useMutation, useQueryClient } from "@tanstack/vue-query";
 import { Loader2 } from "lucide-vue-next";
 import { toast } from "vue-sonner";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import UserAvatar from "@/components/UserAvatar.vue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,9 +31,15 @@ watch(
   { immediate: true },
 );
 
-const initials = computed(() => {
-  const v = name.value || auth.me?.name || "";
-  return v.split(/\s+/).map((p) => p[0]?.toUpperCase() ?? "").slice(0, 2).join("");
+// Live preview of the avatar reflects the form fields, not the stored user
+// object — so users see what their changes will look like before saving.
+const preview = computed(() => {
+  if (!auth.me) return null;
+  return {
+    id: auth.me.id,
+    name: name.value || auth.me.name,
+    icon: icon.value || null,
+  };
 });
 
 const dirty = computed(() => {
@@ -86,10 +92,7 @@ const saveMutation = useMutation({
         </div>
         <div v-else class="space-y-4">
           <div class="flex items-center gap-3">
-            <Avatar class="h-12 w-12">
-              <AvatarImage v-if="icon" :src="icon" :alt="name" />
-              <AvatarFallback>{{ initials }}</AvatarFallback>
-            </Avatar>
+            <UserAvatar :user="preview" size="lg" class="!h-12 !w-12 !text-base" />
             <div class="text-xs text-muted-foreground font-mono">{{ auth.me.id }}</div>
           </div>
 
@@ -107,7 +110,7 @@ const saveMutation = useMutation({
               maxlength="500"
             />
             <p class="text-xs text-muted-foreground">
-              Optional. Falls back to initials when blank.
+              Optional. Falls back to your user-color initials when blank.
             </p>
           </div>
 

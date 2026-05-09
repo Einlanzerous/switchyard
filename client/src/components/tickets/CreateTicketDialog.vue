@@ -15,7 +15,9 @@ import {
 } from "@/components/ui/dialog";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
-import type { TicketType, Priority } from "@switchyard/shared";
+import { useMentionAutocomplete } from "@/composables/useMentionAutocomplete";
+import MentionAutocomplete from "@/components/MentionAutocomplete.vue";
+import type { TicketType, Priority, UserRef } from "@switchyard/shared";
 
 const props = defineProps<{
   open: boolean;
@@ -37,6 +39,27 @@ const type = ref<TicketType>("task");
 const priority = ref<Priority | "__none__">("__none__");
 const description = ref("");
 const titleInput = useTemplateRef<HTMLInputElement>("titleInput");
+const descTextarea = useTemplateRef<HTMLTextAreaElement>("descTextarea");
+
+// User list cached against the canonical key — likely already loaded by
+// FilterBar / BulkActionBar elsewhere in the session.
+const usersQuery = useQuery({
+  queryKey: queryKeys.users(),
+  enabled: computed(() => props.open),
+  staleTime: 5 * 60 * 1000,
+  queryFn: async () => {
+    const { data, error } = await api.GET("/v1/users", { params: { query: { limit: 200 } } });
+    if (error) throw error;
+    return data;
+  },
+});
+const users = computed<UserRef[]>(() => usersQuery.data.value?.items ?? []);
+
+const mention = useMentionAutocomplete({
+  textareaRef: descTextarea,
+  bodyRef: description,
+  users,
+});
 
 watch(() => props.open, (v) => {
   if (!v) return;
@@ -205,13 +228,25 @@ function onKeydown(e: KeyboardEvent) {
 
         <div class="space-y-1.5">
           <Label for="t-description">Description (markdown)</Label>
-          <textarea
-            id="t-description"
-            v-model="description"
-            rows="4"
-            class="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono leading-relaxed focus:outline-none focus:ring-1 focus:ring-ring resize-y"
-            placeholder="Optional. Markdown supported."
-          />
+          <div class="relative">
+            <textarea
+              id="t-description"
+              ref="descTextarea"
+              v-model="description"
+              rows="4"
+              class="w-full rounded-md border bg-background px-3 py-2 text-sm font-mono leading-relaxed focus:outline-none focus:ring-1 focus:ring-ring resize-y"
+              placeholder="Optional. Markdown supported."
+              @input="mention.onInput"
+              @keydown="(e) => { if (mention.onKeydown(e)) e.stopPropagation(); }"
+              @blur="mention.onBlur"
+            />
+            <MentionAutocomplete
+              :open="mention.open.value"
+              :users="mention.filtered.value"
+              :selected-index="mention.selectedIndex.value"
+              @pick="mention.pick"
+            />
+          </div>
         </div>
       </div>
 
