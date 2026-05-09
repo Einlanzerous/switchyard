@@ -1,138 +1,269 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from "vue";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
-import { Activity, Database, FolderOpen, Webhook, CheckCircle2, Circle } from "lucide-vue-next";
+// Personal at-a-glance landing page. Phase 3.1 design.
+//
+// Layout (12-col grid, collapses to single column on small screens):
+//   row 1 — KPI strip (4 cards): open / in-progress / closed-this-week / cycle time
+//   row 2 — what needs me: my open tickets (8) + @mentions (4)
+//   row 3 — what's happening: recent activity (8) + stale rollup (4)
+//   row 4 — how are we doing: throughput (6) + status donut (6)
+//
+// Each widget owns its own data fetching so a slow query can't blank the
+// whole dashboard. Skeleton state is per-widget.
+
+import { computed } from "vue";
+import { useQuery } from "@tanstack/vue-query";
+import { useRouter } from "vue-router";
+import { Inbox, Activity, AtSign, Clock, AlertCircle, BarChart2, PieChart } from "lucide-vue-next";
+import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/stores/auth";
+import { api } from "@/lib/api";
+import { queryKeys } from "@/lib/queryKeys";
+import { useThroughput, useStaleRollup, useMyMentions } from "@/composables/useDashboardData";
+import { formatDurationMs, formatDeltaPercent } from "@/lib/formatDuration";
+import KpiCard from "@/components/dashboard/KpiCard.vue";
+import DashboardWidget from "@/components/dashboard/DashboardWidget.vue";
+import ActivityFeed from "@/components/dashboard/widgets/ActivityFeed.vue";
+import StaleRollupWidget from "@/components/dashboard/widgets/StaleRollup.vue";
+import MentionsWidget from "@/components/dashboard/widgets/MentionsWidget.vue";
+import MyOpenTickets from "@/components/dashboard/widgets/MyOpenTickets.vue";
+import ThroughputChart from "@/components/dashboard/widgets/ThroughputChart.vue";
+import StatusDonut from "@/components/dashboard/widgets/StatusDonut.vue";
 
 const auth = useAuthStore();
+const router = useRouter();
 
-// Update `done: true` as each milestone ships. Keeps the roadmap card honest
-// without per-card edits.
-const milestones: Array<{ id: string; label: string; done: boolean }> = [
-  { id: "2.0", label: "Foundations", done: true },
-  { id: "2.1", label: "Auth flow", done: true },
-  { id: "2.2", label: "Tickets list", done: true },
-  { id: "2.3", label: "Ticket detail (drawer + page)", done: true },
-  { id: "2.4", label: "Kanban board", done: true },
-  { id: "2.5", label: "Cross-project boards + swimlanes", done: true },
-  { id: "2.6", label: "Settings", done: true },
-  { id: "2.7", label: "Polish (Ctrl+K, shortcuts, empty states)", done: true },
-];
+// ─── KPI feeds ───────────────────────────────────────────────────────────────
 
-// Defensive: older container builds (pre-1.6) returned `{ status, db }` instead
-// of the subsystems block. Treat both shapes uniformly so the dashboard renders
-// regardless of which build is running.
-type HealthReport = {
-  status: "ok" | "degraded";
-  subsystems?: {
-    db?: { ok: boolean; latency_ms: number | null };
-    uploads?: { ok: boolean; dir: string };
-    webhooks?: { queue_depth: number; warn: boolean };
-  };
-  // Pre-1.6 shape — kept so old containers still render usefully.
-  db?: boolean;
-};
-
-const health = ref<HealthReport | null>(null);
-const error = ref<string | null>(null);
-
-onMounted(async () => {
-  try {
-    const res = await fetch("/healthz");
-    health.value = await res.json();
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : String(e);
-  }
+// Aggregate totals/by_category across all projects via the bulk stats feed.
+const projectsStats = useQuery({
+  queryKey: queryKeys.statsProjects(),
+  staleTime: 60 * 1000,
+  queryFn: async () => {
+    const { data, error } = await api.GET("/v1/stats/projects");
+    if (error) throw error;
+    return data;
+  },
 });
 
-// Normalize across the old and new shapes.
-const db = computed(() => {
-  const sub = health.value?.subsystems?.db;
-  if (sub) return { ok: sub.ok, label: sub.ok ? `${sub.latency_ms}ms` : "down" };
-  if (typeof health.value?.db === "boolean") {
-    return { ok: health.value.db, label: health.value.db ? "ok" : "down" };
-  }
-  return null;
+const totals = computed(() => {
+  const items = projectsStats.data.value?.items ?? [];
+  return items.reduce(
+    (acc, r) => ({
+      open: acc.open + r.totals.open,
+      closed: acc.closed + r.totals.closed,
+      total: acc.total + r.totals.total,
+      in_progress: acc.in_progress + r.by_category.in_progress,
+    }),
+    { open: 0, closed: 0, total: 0, in_progress: 0 }
+  );
 });
-const uploads = computed(() => health.value?.subsystems?.uploads ?? null);
-const webhooks = computed(() => health.value?.subsystems?.webhooks ?? null);
+
+// Stale count — pulled from the stale rollup widget's underlying query so
+// we don't double-fetch.
+const staleQ = useStaleRollup();
+const staleTotal = computed(() =>
+  (staleQ.data.value?.items ?? []).reduce((a, r) => a + r.stale_count, 0)
+);
+
+// Throughput for the KPI sparkline + "closed this week" + delta. We pull
+// 24 weeks so we have a full prior-period window for the delta.
+const throughputParams = computed(() => {
+  const since = new Date();
+  since.setUTCDate(since.getUTCDate() - 24 * 7);
+  return { since: since.toISOString(), bucket: "week" as const };
+});
+const throughput24w = useThroughput(throughputParams);
+
+const closedThisWeek = computed(() => {
+  const points = throughput24w.data.value?.points ?? [];
+  return points.length > 0 ? points[points.length - 1]!.count : 0;
+});
+const closedPriorWeek = computed(() => {
+  const points = throughput24w.data.value?.points ?? [];
+  return points.length > 1 ? points[points.length - 2]!.count : 0;
+});
+const closedSpark = computed(() =>
+  (throughput24w.data.value?.points ?? []).slice(-12).map((p) => p.count)
+);
+
+// Median cycle time + prior-period delta. Two queries: current 12 weeks,
+// prior 12 weeks.
+const cycleNowParams = computed(() => {
+  const until = new Date();
+  const since = new Date(until.getTime() - 12 * 7 * 24 * 60 * 60 * 1000);
+  return { since: since.toISOString(), until: until.toISOString() };
+});
+const cyclePriorParams = computed(() => {
+  const until = new Date(Date.now() - 12 * 7 * 24 * 60 * 60 * 1000);
+  const since = new Date(until.getTime() - 12 * 7 * 24 * 60 * 60 * 1000);
+  return { since: since.toISOString(), until: until.toISOString() };
+});
+
+const cycleNow = useQuery({
+  queryKey: computed(() => queryKeys.statsCycleTime({ ...cycleNowParams.value, scope: "now" })),
+  staleTime: 60 * 1000,
+  queryFn: async () => {
+    const { data, error } = await api.GET("/v1/stats/cycle-time", {
+      params: { query: cycleNowParams.value as never },
+    });
+    if (error) throw error;
+    return data;
+  },
+});
+const cyclePrior = useQuery({
+  queryKey: computed(() => queryKeys.statsCycleTime({ ...cyclePriorParams.value, scope: "prior" })),
+  staleTime: 60 * 1000,
+  queryFn: async () => {
+    const { data, error } = await api.GET("/v1/stats/cycle-time", {
+      params: { query: cyclePriorParams.value as never },
+    });
+    if (error) throw error;
+    return data;
+  },
+});
+
+const cycleDelta = computed(() => {
+  const now = cycleNow.data.value?.median_ms ?? 0;
+  const prev = cyclePrior.data.value?.median_ms ?? 0;
+  return formatDeltaPercent(now, prev);
+});
+
+const mentionsQ = useMyMentions();
+const mentionsCount = computed(() => mentionsQ.data.value?.items?.length ?? 0);
 </script>
 
 <template>
-  <div class="container py-10 max-w-5xl">
-    <div class="mb-8">
-      <h1 class="text-3xl font-semibold tracking-tight">
-        Welcome{{ auth.me?.name ? `, ${auth.me.name}` : "" }}
-      </h1>
-      <p class="mt-1 text-sm text-muted-foreground">
-        Phase 2 scaffold — real views land milestone by milestone.
-      </p>
+  <div class="px-6 py-6 max-w-7xl mx-auto space-y-4">
+    <header class="flex items-end justify-between">
+      <div>
+        <h1 class="text-2xl font-semibold tracking-tight">
+          Welcome{{ auth.me?.name ? `, ${auth.me.name}` : "" }}
+        </h1>
+        <p class="mt-1 text-sm text-muted-foreground">
+          What's happening across switchyard at a glance.
+        </p>
+      </div>
+    </header>
+
+    <!-- Row 1: KPI strip ──────────────────────────────────────────────────── -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <KpiCard
+        label="Open tickets"
+        :value="totals.open"
+        :loading="projectsStats.isLoading.value"
+        :subline="totals.total ? `${totals.closed} closed of ${totals.total}` : undefined"
+      />
+      <KpiCard
+        label="In progress"
+        :value="totals.in_progress"
+        :loading="projectsStats.isLoading.value"
+        :warning="staleTotal > 0 ? `${staleTotal} stale` : null"
+      />
+      <KpiCard
+        label="Closed this week"
+        :value="closedThisWeek"
+        :loading="throughput24w.isLoading.value"
+        :spark="closedSpark"
+        :delta-percent="formatDeltaPercent(closedThisWeek, closedPriorWeek)"
+        delta-good-when="up"
+      />
+      <KpiCard
+        label="Median cycle time"
+        :value="formatDurationMs(cycleNow.data.value?.median_ms ?? 0)"
+        :loading="cycleNow.isLoading.value"
+        :delta-percent="cycleDelta"
+        delta-good-when="down"
+        :subline="cycleNow.data.value?.count ? `${cycleNow.data.value.count} closed` : undefined"
+      />
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <Card>
-        <CardHeader>
-          <CardTitle class="text-base flex items-center gap-2">
-            <Activity class="h-4 w-4" /> System health
-          </CardTitle>
-          <CardDescription>Live probe of /healthz subsystems.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div v-if="!health && !error" class="space-y-2">
-            <Skeleton class="h-4 w-32" />
-            <Skeleton class="h-4 w-44" />
-            <Skeleton class="h-4 w-28" />
-          </div>
-          <p v-else-if="error" class="text-sm text-destructive font-mono">{{ error }}</p>
-          <ul v-else-if="health" class="space-y-2 text-sm">
-            <li v-if="db" class="flex items-center gap-2">
-              <Database class="h-4 w-4 text-muted-foreground" />
-              <span class="flex-1">Database</span>
-              <Badge :variant="db.ok ? 'secondary' : 'destructive'">{{ db.label }}</Badge>
-            </li>
-            <li v-if="uploads" class="flex items-center gap-2">
-              <FolderOpen class="h-4 w-4 text-muted-foreground" />
-              <span class="flex-1">Uploads</span>
-              <Badge :variant="uploads.ok ? 'secondary' : 'destructive'">
-                {{ uploads.ok ? "writable" : "fail" }}
-              </Badge>
-            </li>
-            <li v-if="webhooks" class="flex items-center gap-2">
-              <Webhook class="h-4 w-4 text-muted-foreground" />
-              <span class="flex-1">Webhook queue</span>
-              <Badge :variant="webhooks.warn ? 'destructive' : 'secondary'">
-                {{ webhooks.queue_depth }} pending
-              </Badge>
-            </li>
-            <li v-if="!uploads && !webhooks" class="text-xs text-muted-foreground italic">
-              Older API shape — rebuild the container for the full subsystem report.
-            </li>
-          </ul>
-        </CardContent>
-      </Card>
+    <!-- Row 2: What needs me ─────────────────────────────────────────────── -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+      <DashboardWidget
+        title="My open tickets"
+        class="lg:col-span-8"
+        :padded="false"
+      >
+        <template #title-prefix>
+          <Inbox class="h-3.5 w-3.5 text-muted-foreground" />
+        </template>
+        <template #actions>
+          <Button
+            variant="ghost"
+            size="sm"
+            class="h-7 text-xs"
+            @click="router.push(`/tickets?assignee=${auth.me?.id}`)"
+          >
+            View all →
+          </Button>
+        </template>
+        <MyOpenTickets />
+      </DashboardWidget>
 
-      <Card>
-        <CardHeader>
-          <CardTitle class="text-base">Roadmap</CardTitle>
-          <CardDescription>Milestones for this phase.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ol class="space-y-1.5 text-sm">
-            <li
-              v-for="m in milestones"
-              :key="m.id"
-              class="flex items-center gap-2"
-              :class="m.done && 'text-muted-foreground'"
-            >
-              <CheckCircle2 v-if="m.done" class="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-              <Circle v-else class="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
-              <span :class="m.done && 'line-through'">{{ m.id }} {{ m.label }}</span>
-            </li>
-          </ol>
-        </CardContent>
-      </Card>
+      <DashboardWidget
+        title="Mentions"
+        class="lg:col-span-4"
+        :padded="false"
+      >
+        <template #title-prefix>
+          <AtSign class="h-3.5 w-3.5 text-muted-foreground" />
+        </template>
+        <template #title-suffix>
+          <span
+            v-if="mentionsCount > 0"
+            class="ml-1 text-[10px] font-medium tabular-nums text-muted-foreground"
+          >{{ mentionsCount }}</span>
+        </template>
+        <MentionsWidget />
+      </DashboardWidget>
     </div>
+
+    <!-- Row 3: Recent activity (full width) ──────────────────────────────── -->
+    <DashboardWidget title="Recent activity" :padded="false">
+      <template #title-prefix>
+        <Activity class="h-3.5 w-3.5 text-muted-foreground" />
+      </template>
+      <ActivityFeed :limit="20" />
+    </DashboardWidget>
+
+    <!-- Row 4: How are we doing ──────────────────────────────────────────── -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+      <DashboardWidget title="Throughput" class="lg:col-span-6">
+        <template #title-prefix>
+          <BarChart2 class="h-3.5 w-3.5 text-muted-foreground" />
+        </template>
+        <template #title-suffix>
+          <span class="ml-1 text-[10px] text-muted-foreground">closed/week, last 12</span>
+        </template>
+        <ThroughputChart :weeks="12" />
+      </DashboardWidget>
+
+      <DashboardWidget title="Status distribution" class="lg:col-span-6">
+        <template #title-prefix>
+          <PieChart class="h-3.5 w-3.5 text-muted-foreground" />
+        </template>
+        <StatusDonut />
+      </DashboardWidget>
+    </div>
+
+    <!-- Row 5 (conditional): stale work, only when there's something to see.
+         Full-width row at the bottom rather than a tall column upstairs.
+         The widget itself still reads from useStaleRollup so the data is
+         already in cache; we just gate the wrapper. -->
+    <DashboardWidget
+      v-if="staleTotal > 0"
+      title="Stale work"
+      :padded="false"
+    >
+      <template #title-prefix>
+        <Clock class="h-3.5 w-3.5 text-muted-foreground" />
+      </template>
+      <template #title-suffix>
+        <span class="ml-1 text-[10px] font-medium tabular-nums text-rose-600 dark:text-rose-500">
+          {{ staleTotal }}
+        </span>
+      </template>
+      <StaleRollupWidget />
+    </DashboardWidget>
   </div>
 </template>

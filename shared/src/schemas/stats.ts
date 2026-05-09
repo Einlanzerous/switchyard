@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { Iso8601, ProjectKey, TicketKey } from "./common.js";
+import { Uuid, Iso8601, TicketKey } from "./common.js";
 import { ProjectRef } from "./project.js";
 import { UserRef } from "./user.js";
-import { TicketType } from "./ticket.js";
+import { TicketType, TicketSummary } from "./ticket.js";
 import { Priority } from "./ticket.js";
 import { StatusCategory } from "./status.js";
 
@@ -131,6 +131,61 @@ export const CycleTimeStats = z.object({
   samples: z.array(CycleTimeSample).optional(),
 });
 export type CycleTimeStats = z.infer<typeof CycleTimeStats>;
+
+// ─── stale work rollup (homepage widget) ────────────────────────────────────
+//
+// One row per project that has at least one stale-in-progress ticket. When
+// stale_count == 1 we include the single ticket as `sample_ticket` so the UI
+// can show a ticket row directly; when stale_count >= 2 the UI rolls up to
+// "<Project> · N stale" and `sample_ticket` is null.
+
+export const StaleRollupRow = z.object({
+  project: ProjectRef,
+  stale_count: z.number().int().nonnegative(),
+  sample_ticket: TicketSummary.nullable(),
+});
+
+export const StaleRollup = z.object({
+  items: z.array(StaleRollupRow),
+});
+export type StaleRollup = z.infer<typeof StaleRollup>;
+
+// ─── @mentions feed (homepage widget) ───────────────────────────────────────
+//
+// v1 is a stateless live scan: the server greps recent comments and ticket
+// descriptions for `@<requesting-user-name>` and returns them. No
+// mark-as-read, no persistence — that's the 3.3 Notifications scope.
+
+export const MentionItem = z.object({
+  ticket: TicketSummary,
+  comment_id: Uuid.nullable(),       // null when the mention was in the ticket description itself
+  snippet: z.string(),               // ~120 chars of context around the @mention
+  mentioned_at: Iso8601,
+});
+export type MentionItem = z.infer<typeof MentionItem>;
+
+export const MentionList = z.object({
+  items: z.array(MentionItem),
+});
+export type MentionList = z.infer<typeof MentionList>;
+
+// ─── cumulative flow ────────────────────────────────────────────────────────
+//
+// One row per bucket-end timestamp; values are the count of tickets in each
+// status category as of that timestamp. Reconstructed by replaying
+// ticket.created / ticket.status_changed / ticket.deleted events; the
+// resulting series powers cumulative-flow diagrams and burndown charts.
+
+export const CumulativeFlowPoint = z.object({
+  end: Iso8601,
+  by_category: CategoryCounts,
+});
+
+export const CumulativeFlowStats = z.object({
+  bucket: StatsBucket,
+  points: z.array(CumulativeFlowPoint),
+});
+export type CumulativeFlowStats = z.infer<typeof CumulativeFlowStats>;
 
 // ─── shared query params for windowed stats ─────────────────────────────────
 //

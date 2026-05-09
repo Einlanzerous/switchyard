@@ -6,7 +6,10 @@ import TicketDetailView from "./views/TicketDetailView.vue";
 import ProjectBoardView from "./views/ProjectBoardView.vue";
 import BoardsListView from "./views/BoardsListView.vue";
 import BoardView from "./views/BoardView.vue";
+import BoardInsightsView from "./views/BoardInsightsView.vue";
 import ProjectsView from "./views/ProjectsView.vue";
+import ProjectInsightsView from "./views/ProjectInsightsView.vue";
+import HealthView from "./views/HealthView.vue";
 
 // Settings is a nested layout so each sub-section is its own route while
 // sharing the sidebar. /settings on its own redirects to the profile page.
@@ -39,8 +42,11 @@ export const router = createRouter({
     { path: "/tickets/:idOrKey", name: "ticket", component: TicketDetailView },
     { path: "/boards", name: "boards", component: BoardsListView },
     { path: "/boards/:id", name: "board", component: BoardView },
+    { path: "/boards/:id/insights", name: "board-insights", component: BoardInsightsView },
     { path: "/projects", name: "projects", component: ProjectsView },
     { path: "/projects/:key/board", name: "project-board", component: ProjectBoardView },
+    { path: "/projects/:key/insights", name: "project-insights", component: ProjectInsightsView },
+    { path: "/health", name: "health", component: HealthView },
 
     {
       path: "/settings",

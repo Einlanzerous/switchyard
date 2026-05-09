@@ -225,10 +225,11 @@ Goal: the "how much work is left, how much done over time" view.
 Locked breakdown:
 
 - **3.0 — Stats/aggregation backend.** `GET /v1/projects/:key/stats` (counts + by_category/priority/type/assignee + stale_in_progress + most_recent_activity), `GET /v1/stats/projects` (bulk feed for the directory), `GET /v1/stats/throughput` (closed-per-period over a window), `GET /v1/stats/cycle-time` (in_progress duration distribution; in_progress only — blocked excluded by design). Plus `system_settings` table + `GET/PATCH /v1/settings` for runtime config (default `stale_in_progress_days = 30`). All event-scan endpoints capped at 5000 events; 400 if exceeded. Side effect: ProjectsView ticket-count column lights up.
-- **3.0b — Cumulative flow.** `GET /v1/stats/cumulative-flow` for burndown + CFD charts. Split out because the per-bucket category replay over events is ~half the work of the other four combined.
-- **3.1 — Dashboards.** Chart lib: **Apache ECharts via vue-echarts** (may roll our own later for visual polish). Personal HomeView rewrite (my open, my mentions, stale, recent activity), per-project Insights tab, per-board Insights tab. Reusable `<DashboardWidget>` + `<Chart>` framework.
+- **3.0b — Cumulative flow.** `GET /v1/stats/cumulative-flow` for burndown + CFD charts. Split out because the per-bucket category replay over events is ~half the work of the other four combined. **CFD endpoint cap is 50,000 events** (vs. 5,000 for the other stats endpoints) since CFD inherently must scan project history, not just the window.
+- **3.1 — Dashboards.** Chart lib: **Apache ECharts via vue-echarts** (may roll our own later for visual polish). See "3.1 — Dashboards in detail" below for widget-level specs.
 - **3.2 — Power tools on tickets list.** Saved views (`saved_views` table, CRUD, palette integration) + bulk operations (multi-select, bulk-edit labels/assignee/status).
-- **3.3 — Polish & a11y.** Empty-state audit, skeleton-loader audit, keyboard-nav per-view (`j/k` on tickets list, `←/→` between board columns), aria audit, configurable Projects columns, command palette `=`-token autocomplete.
+- **3.3 — Notifications / @mentions.** Persistent notifications surface — `notifications` table, `mentioned_user_ids` extracted on comment/description write, dedicated unread/seen state, mark-as-read endpoint, dropdown in topbar, deeper integration with the homepage panel that 3.1 ships as a basic live-scan placeholder.
+- **3.4 — Polish & a11y.** Empty-state audit, skeleton-loader audit, keyboard-nav per-view (`j/k` on tickets list, `←/→` between board columns), aria audit, configurable Projects columns, command palette `=`-token autocomplete, configurable widget visibility on Insights tabs.
 
 Locked Phase 3 decisions:
 
@@ -240,6 +241,77 @@ Locked Phase 3 decisions:
 Deferred from Phase 3 → Phase 5:
 
 - **SSE / real-time updates.** Current 30s `refetchInterval` (shipped in 2.7) is acceptable for now. Revisit if "agent moved a ticket but my UI doesn't know" feels laggy in practice.
+
+### 3.1 — Dashboards in detail
+
+Three surfaces (personal HomeView + per-project Insights tab + per-board Insights tab) sit on top of one foundation: a small chart/widget framework. Build the foundation first, then the surfaces — the per-project tab reuses ~70% of the personal HomeView's widgets.
+
+**Foundation:**
+
+- `vue-echarts` + `echarts` (tree-shaken to: line, bar, pie, custom; canvas renderer).
+- `<Chart>` wrapper: theme reactive to `themeStore.mode` (CSS-variable colors), responsive resize observer, "no data" empty state, height prop.
+- `<DashboardWidget>` wrapper: title, optional `actions` slot (e.g. "View all →"), independent skeleton + error states so a flaky widget can't blank a whole dashboard.
+- `<KpiCard>` for the small-numbers strip: label, big value, optional delta badge ("+12 vs 7d", green/red), optional sparkline.
+
+**Personal HomeView — replaces current Phase tracker + health card:**
+
+Layout (12-column grid; collapses to 1-column under `md`):
+
+- **Row 1 — KPI strip (4 cards):**
+  1. Open tickets (total across non-archived projects)
+  2. In progress (count + "N stale" sub-line if `stale_in_progress > 0`)
+  3. Closed this week (with 12-week sparkline)
+  4. Median cycle time (formatted "3d 4h"; delta vs prior period)
+- **Row 2 — "What needs me":**
+  - **My open tickets (8 cols)** — `assignee=me AND status.category != 'closed'`. Compact rows: key, title, project, priority, status. Sortable. "View all →" deep-links to `/tickets?assignee=me`.
+  - **@mentions (4 cols)** — basic live-scan v1 in 3.1: regex `@username` over comment + ticket-description text from the last 30 days. Surfaces "you have N at-mentions" with the relevant ticket links. **No read/unread persistence in 3.1** — that's the 3.3 Notifications scope. Section ships now so layout is right and an empty-state is meaningful even before 3.3 lands.
+- **Row 3 — "What's happening":**
+  - **Recent activity (8 cols)** — last 20 events across all projects. Actor avatar + action verb + ticket key/title + relative timestamp. Click row → opens drawer (`?focus=KEY`). Backed by existing `/v1/events`.
+  - **Stale work (4 cols)** — rolls up at project level when ≥ 2 stale tickets in a project ("Switchyard · 17 stale", click → board filtered to in_progress); shows the single ticket row directly when only 1 stale. Driven by a new `GET /v1/stats/stale` endpoint that joins counts + a single sample ticket per project.
+- **Row 4 — "How are we doing":**
+  - **Throughput (6 cols)** — bar chart, closed/week, last 12 weeks, all projects.
+  - **Status distribution (6 cols)** — donut of current ticket counts by category, all non-archived projects.
+
+What moves out of the current Home:
+- Phase-milestone tracker is dropped (PHASES.md is canonical).
+- Health card becomes its own admin page — see "Health page" below.
+
+**Health page** (admin sidebar item, replaces the home-page card):
+
+- New top-level sidebar entry "Health" under the admin section.
+- v1 (3.1): re-renders the existing `/healthz` subsystems block (DB latency, uploads dir, webhooks queue depth) as a real page rather than a card.
+- Future-shape (out of 3.1 scope, but reserved): system health for the wider stack (Aperture pending-work widget for the construct-server install). Documented here so the page anticipates the layout.
+
+**Per-project Insights tab** (new sub-route on `ProjectBoardView`, tabs "Board" / "Insights"):
+
+- KPI strip scoped to the project (open / in_progress + stale / closed this week / median cycle).
+- Throughput chart (this project, weekly).
+- Status distribution donut.
+- Cycle time: median + per-type breakdown bar (task / bug / spike / epic).
+- Assignee leaderboard: top 5 by open-ticket count.
+
+**Per-board Insights tab** (new sub-route on `BoardView`, tabs "Board" / "Insights"):
+
+- KPI strip across the board's projects.
+- **Cumulative flow** stacked area (uses 3.0b endpoint).
+- Throughput aggregated across the board's projects.
+- Status distribution by project (stacked bar).
+
+**Both Insights tabs ship in 3.1.** User preference is per-board, but per-project is a small additional cost (mostly widget reuse with project scoping). Toggle / configurable widget visibility per-tab is 3.4 polish.
+
+**New backend additions for 3.1** (to be added when their consuming widget is built):
+
+- `GET /v1/stats/stale` — returns `{ items: [{ project: ProjectRef, stale_count: int, sample_ticket: TicketSummary | null }] }`. `sample_ticket` is populated when `stale_count == 1`, null when ≥ 2 (driving the project-rollup vs single-ticket display).
+- `GET /v1/users/me/mentions?since=ISO&limit=N` — live-scan endpoint, returns `{ items: [{ ticket: TicketRef, comment_id: Uuid|null, snippet: string, mentioned_at: ISO }] }`. Detection is regex `@<name>` matching the requesting user's name; case-insensitive. Stateless — no read/unread tracking, that's 3.3.
+
+**Order of build inside 3.1:**
+
+1. Foundation (chart + widget components, theme integration, KpiCard).
+2. Two new backend endpoints (`/v1/stats/stale`, `/v1/users/me/mentions`).
+3. Personal HomeView — biggest user-facing impact; all subsequent widgets reuse from here.
+4. Health page (small, mostly a re-skin of the existing card).
+5. Per-project Insights tab — mostly widget reuse + scoping.
+6. Per-board Insights tab — adds the CFD chart, otherwise mostly reuse.
 
 ## Phase 4 — Native automation rules
 

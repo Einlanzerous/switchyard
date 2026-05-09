@@ -1,21 +1,36 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { and, desc, eq, isNull, type SQL } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, inArray, isNull, or, type SQL } from "drizzle-orm";
 import {
   User, CreateUser, UpdateUser, Uuid,
   ApiToken, CreateApiToken, ApiTokenWithSecret, paginated, Pagination,
+  MentionList,
 } from "@switchyard/shared";
 import { db } from "../db.js";
 import * as schema from "../../drizzle/schema.js";
 import { requireAuth } from "../auth.js";
 import { idempotency } from "../lib/idempotency.js";
 import { errorResponses, okJson, createdJson, noContent, z, checkScope } from "./_helpers.js";
-import { mapUser, mapApiToken } from "../lib/mappers.js";
+import { mapUser, mapApiToken, mapTicketSummary } from "../lib/mappers.js";
 import { getUserById } from "../lib/lookups.js";
 import { buildPage, cursorOrderBy, cursorWhere, decodeCursor } from "../lib/pagination.js";
 import { generateApiToken } from "../lib/id.js";
 import { badRequest, catchUnique, notFound } from "../errors.js";
 
 const tag = "Users";
+
+// Trim the matching span out of the source text. We center on the first
+// match and keep ~120 characters around it.
+function snippet(source: string, re: RegExp): string {
+  const m = re.exec(source);
+  if (!m) return source.slice(0, 120);
+  const at = m.index;
+  const start = Math.max(0, at - 60);
+  const end = Math.min(source.length, at + (m[0]?.length ?? 0) + 60);
+  let s = source.slice(start, end).replace(/\s+/g, " ").trim();
+  if (start > 0) s = "…" + s;
+  if (end < source.length) s = s + "…";
+  return s;
+}
 
 const list = createRoute({
   method: "get", path: "/v1/users", tags: [tag], summary: "List users",
@@ -38,6 +53,19 @@ const get = createRoute({
 const me = createRoute({
   method: "get", path: "/v1/users/me", tags: [tag], summary: "Get the user owning the current token",
   responses: { ...okJson(User), ...errorResponses },
+});
+
+const myMentions = createRoute({
+  method: "get", path: "/v1/users/me/mentions", tags: [tag],
+  summary: "Live scan of @mentions in recent comments + ticket descriptions",
+  request: {
+    query: z.object({
+      // Optional ISO bound; defaults to 30 days ago.
+      since: z.string().datetime({ offset: true }).optional(),
+      limit: z.coerce.number().int().min(1).max(100).default(50),
+    }),
+  },
+  responses: { ...okJson(MentionList), ...errorResponses },
 });
 
 const update = createRoute({
@@ -100,6 +128,155 @@ export function mount(app: OpenAPIHono) {
   app.openapi(me, (async (c: any) => {
     const auth = c.get("auth");
     return c.json(mapUser(auth.user), 200);
+  }) as any);
+
+  // ─── /v1/users/me/mentions ──────────────────────────────────────────────
+  //
+  // Stateless live scan: regex-match `@<my-name>` over recent comments and
+  // ticket descriptions, then surface the touching ticket + a snippet. SQL
+  // ILIKE is the coarse filter (uses an index), and a JS word-boundary
+  // regex is the precise pass — that lets us avoid building user-controlled
+  // regex into the query and stays fast on small datasets.
+  //
+  // No persistence — read/unread state is the 3.3 Notifications scope. A
+  // ticket touched by multiple matching comments returns multiple items.
+
+  app.openapi(myMentions, (async (c: any) => {
+    const auth = c.get("auth");
+    const me = auth.user as typeof schema.users.$inferSelect;
+    const q = c.req.valid("query");
+    const sinceIso = q.since ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const limit = q.limit ?? 50;
+
+    const ilikePattern = `%@${me.name}%`;
+    // Word-boundary regex; case-insensitive. The escaped username can't
+    // smuggle regex specials because we wrap it in \w boundaries.
+    const escaped = me.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const wordRe = new RegExp(`(?:^|[^\\w])@${escaped}(?:$|[^\\w])`, "i");
+
+    const commentRows = await db
+      .select({ c: schema.comments })
+      .from(schema.comments)
+      .where(
+        and(
+          isNull(schema.comments.deleted_at),
+          gte(schema.comments.created_at, sinceIso),
+          ilike(schema.comments.body, ilikePattern)
+        )
+      )
+      .orderBy(desc(schema.comments.created_at))
+      .limit(limit * 2); // overfetch — JS regex pass throws out false ILIKE hits
+
+    const ticketDescRows = await db
+      .select({ t: schema.tickets })
+      .from(schema.tickets)
+      .where(
+        and(
+          isNull(schema.tickets.deleted_at),
+          gte(schema.tickets.updated_at, sinceIso),
+          ilike(schema.tickets.description, ilikePattern)
+        )
+      )
+      .orderBy(desc(schema.tickets.updated_at))
+      .limit(limit * 2);
+
+    type Hit = { ticketId: string; commentId: string | null; snippet: string; mentionedAt: string };
+    const hits: Hit[] = [];
+
+    for (const cr of commentRows) {
+      if (!wordRe.test(cr.c.body)) continue;
+      hits.push({
+        ticketId: cr.c.ticket_id,
+        commentId: cr.c.id,
+        snippet: snippet(cr.c.body, wordRe),
+        mentionedAt: cr.c.created_at,
+      });
+    }
+    for (const tr of ticketDescRows) {
+      if (!wordRe.test(tr.t.description)) continue;
+      // Mentions in the description don't have a comment_id; a description
+      // edit re-fires this signal because we key off updated_at. That's the
+      // intended behavior for v1 — mark-as-read in 3.3 will dedupe properly.
+      hits.push({
+        ticketId: tr.t.id,
+        commentId: null,
+        snippet: snippet(tr.t.description, wordRe),
+        mentionedAt: tr.t.updated_at,
+      });
+    }
+
+    if (hits.length === 0) return c.json({ items: [] }, 200);
+
+    // Sort newest first, cap at limit, then load the ticket-summary deps in
+    // batch.
+    hits.sort((a, b) => (a.mentionedAt < b.mentionedAt ? 1 : -1));
+    const capped = hits.slice(0, limit);
+    const ticketIds = [...new Set(capped.map((h) => h.ticketId))];
+
+    const ticketRows = await db
+      .select()
+      .from(schema.tickets)
+      .where(inArray(schema.tickets.id, ticketIds));
+    const ticketById = new Map(ticketRows.map((t) => [t.id, t]));
+
+    const projectIds = [...new Set(ticketRows.map((t) => t.project_id))];
+    const statusIds = [...new Set(ticketRows.map((t) => t.status_id))];
+    const userIds = [...new Set(
+      ticketRows.flatMap((t) => [t.assignee_id, t.reporter_id]).filter((x): x is string => !!x)
+    )];
+
+    const [projectRows, statusRows, userRows, labelRows] = await Promise.all([
+      projectIds.length > 0
+        ? db.select().from(schema.projects).where(inArray(schema.projects.id, projectIds))
+        : Promise.resolve([]),
+      statusIds.length > 0
+        ? db.select().from(schema.statuses).where(inArray(schema.statuses.id, statusIds))
+        : Promise.resolve([]),
+      userIds.length > 0
+        ? db.select().from(schema.users).where(inArray(schema.users.id, userIds))
+        : Promise.resolve([]),
+      ticketIds.length > 0
+        ? db
+            .select({ ticket_id: schema.ticketLabels.ticket_id, label: schema.labels })
+            .from(schema.ticketLabels)
+            .innerJoin(schema.labels, eq(schema.ticketLabels.label_id, schema.labels.id))
+            .where(inArray(schema.ticketLabels.ticket_id, ticketIds))
+        : Promise.resolve([]),
+    ]);
+
+    const projectById = new Map(projectRows.map((p) => [p.id, p]));
+    const statusById = new Map(statusRows.map((s) => [s.id, s]));
+    const userById = new Map(userRows.map((u) => [u.id, u]));
+    const labelsByTicket = new Map<string, typeof schema.labels.$inferSelect[]>();
+    for (const lr of labelRows) {
+      const list = labelsByTicket.get(lr.ticket_id) ?? [];
+      list.push(lr.label);
+      labelsByTicket.set(lr.ticket_id, list);
+    }
+
+    const items = capped
+      .map((h) => {
+        const t = ticketById.get(h.ticketId);
+        if (!t) return null;
+        const project = projectById.get(t.project_id);
+        const status = statusById.get(t.status_id);
+        const reporter = userById.get(t.reporter_id);
+        if (!project || !status || !reporter) return null;
+        const assignee = t.assignee_id ? userById.get(t.assignee_id) ?? null : null;
+        return {
+          ticket: mapTicketSummary(t, {
+            project, status, assignee, reporter,
+            labels: labelsByTicket.get(t.id) ?? [],
+            number: t.number,
+          }),
+          comment_id: h.commentId,
+          snippet: h.snippet,
+          mentioned_at: h.mentionedAt,
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null);
+
+    return c.json({ items }, 200);
   }) as any);
 
   app.openapi(get, (async (c: any) => {

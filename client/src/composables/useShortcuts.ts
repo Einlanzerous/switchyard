@@ -1,6 +1,6 @@
 // Global keyboard shortcuts for the app shell.
 //
-// Single-key shortcuts (`c`, `?`) and two-key sequences (`g t`, `g b`, …) are
+// Single-key shortcuts (`c`, `?`) and two-key sequences (`g t`, `g b`, `g h`) are
 // both supported. Sequences expire after 1s of inactivity. Shortcuts skip
 // when the user is typing in an input/textarea/contentEditable so we don't
 // hijack their composition.

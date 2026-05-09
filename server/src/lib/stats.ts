@@ -111,3 +111,123 @@ export function resolveWindow(input: { since?: string; until?: string }): { sinc
     : new Date(until.getTime() - 12 * 7 * 24 * 60 * 60 * 1000);
   return { since, until };
 }
+
+// ─── cumulative flow ───────────────────────────────────────────────────────
+//
+// A ticket's category at any timestamp T is determined by replaying its
+// timeline:
+//   - the ticket.created event sets the initial category
+//   - each ticket.status_changed event overwrites it
+//   - a ticket.deleted event removes the ticket from all subsequent buckets
+//
+// The CFD series counts, for each bucket boundary, how many tickets are
+// "alive" (created and not deleted) and what category each is in.
+
+export type TimelinePoint =
+  | { kind: "init"; at: number; category: string }
+  | { kind: "change"; at: number; category: string }
+  | { kind: "delete"; at: number };
+
+export type CategoryCountsLike = {
+  backlog: number; planning: number; in_progress: number;
+  blocked: number; closed: number;
+};
+
+const ZERO_COUNTS: CategoryCountsLike = {
+  backlog: 0, planning: 0, in_progress: 0, blocked: 0, closed: 0,
+};
+
+const VALID_CATEGORIES = new Set(["backlog", "planning", "in_progress", "blocked", "closed"]);
+
+// Walk a per-ticket timeline (sorted ascending by `at`) and return the
+// category at time T, or null if the ticket isn't alive at T (created
+// later, or deleted earlier).
+export function categoryAt(timeline: TimelinePoint[], t: number): string | null {
+  let category: string | null = null;
+  let alive = false;
+  for (const e of timeline) {
+    if (e.at > t) break;
+    if (e.kind === "init") { alive = true; category = e.category; }
+    else if (e.kind === "change") { category = e.category; }
+    else if (e.kind === "delete") { alive = false; category = null; }
+  }
+  return alive ? category : null;
+}
+
+// Build per-ticket sorted timelines from raw event payloads.
+export function buildTimelines(rows: Array<{
+  ticket_id: string | null;
+  event_type: string;
+  created_at: string;
+  payload: unknown;
+}>): Map<string, TimelinePoint[]> {
+  const out = new Map<string, TimelinePoint[]>();
+  for (const r of rows) {
+    if (!r.ticket_id) continue;
+    const at = Date.parse(r.created_at);
+    const p = (r.payload ?? {}) as {
+      ticket?: { status?: { category?: string } | null } | null;
+      changes?: { status?: { to?: { category?: string } | null } | null };
+    };
+    const list = out.get(r.ticket_id) ?? [];
+    if (r.event_type === "ticket.created") {
+      const cat = p.ticket?.status?.category;
+      if (cat && VALID_CATEGORIES.has(cat)) {
+        list.push({ kind: "init", at, category: cat });
+      }
+    } else if (r.event_type === "ticket.status_changed") {
+      const cat = p.changes?.status?.to?.category;
+      if (cat && VALID_CATEGORIES.has(cat)) {
+        list.push({ kind: "change", at, category: cat });
+      }
+    } else if (r.event_type === "ticket.deleted") {
+      list.push({ kind: "delete", at });
+    }
+    out.set(r.ticket_id, list);
+  }
+  for (const list of out.values()) list.sort((a, b) => a.at - b.at);
+  return out;
+}
+
+// Generate the bucket-end timestamps for [since, until] in `bucket` units.
+// Each entry is the LAST millisecond of the bucket — that's the timestamp we
+// evaluate ticket categories at, so a category change exactly at the close
+// of a bucket is included in that bucket.
+export function bucketEnds(since: Date, until: Date, bucket: "day" | "week"): number[] {
+  const stepMs = (bucket === "day" ? 1 : 7) * 24 * 60 * 60 * 1000;
+  // Snap `since` down to the start of its UTC day; weeks start on Monday
+  // (ISO 8601). Postgres' date_trunc('week', …) does the same so the
+  // throughput and CFD endpoints land on aligned boundaries.
+  const startMs = bucket === "day"
+    ? Date.UTC(since.getUTCFullYear(), since.getUTCMonth(), since.getUTCDate())
+    : startOfIsoWeekUtc(since).getTime();
+  const out: number[] = [];
+  for (let t = startMs; t <= until.getTime(); t += stepMs) {
+    out.push(t + stepMs - 1);
+  }
+  return out;
+}
+
+function startOfIsoWeekUtc(d: Date): Date {
+  // ISO weeks start Monday; getUTCDay returns 0 = Sunday.
+  const day = d.getUTCDay();
+  const diff = day === 0 ? -6 : 1 - day; // shift back to Monday
+  const monday = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + diff));
+  return monday;
+}
+
+export function computeCumulativeFlow(
+  timelines: Map<string, TimelinePoint[]>,
+  ends: number[]
+): Array<{ end: string; by_category: CategoryCountsLike }> {
+  const out: Array<{ end: string; by_category: CategoryCountsLike }> = [];
+  for (const t of ends) {
+    const counts: CategoryCountsLike = { ...ZERO_COUNTS };
+    for (const tl of timelines.values()) {
+      const cat = categoryAt(tl, t);
+      if (cat && cat in counts) counts[cat as keyof CategoryCountsLike]++;
+    }
+    out.push({ end: new Date(t).toISOString(), by_category: counts });
+  }
+  return out;
+}

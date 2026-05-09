@@ -13,6 +13,7 @@ import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { and, eq, gte, inArray, isNull, lte, sql, type SQL } from "drizzle-orm";
 import {
   ProjectStats, ProjectStatsList, ThroughputStats, CycleTimeStats,
+  CumulativeFlowStats, StaleRollup,
   ProjectKey, StatsBucket, StatsWindowQuery,
   type StatusCategory, type TicketType, type Priority,
 } from "@switchyard/shared";
@@ -21,11 +22,13 @@ import * as schema from "../../drizzle/schema.js";
 import { requireAuth } from "../auth.js";
 import { errorResponses, okJson, z } from "./_helpers.js";
 import { badRequest } from "../errors.js";
-import { mapProjectRef, mapUserRef } from "../lib/mappers.js";
+import { mapProjectRef, mapUserRef, mapTicketSummary } from "../lib/mappers.js";
 import { getProjectByKey } from "../lib/lookups.js";
 import { readSettings } from "./settings.js";
+import { alias } from "drizzle-orm/pg-core";
 import {
   buildCycleTimeSamples, summarizeCycleTime, resolveWindow,
+  buildTimelines, computeCumulativeFlow, bucketEnds,
   type StatusChangeRow, type ClosedTicketInfo,
 } from "../lib/stats.js";
 
@@ -35,6 +38,12 @@ const tag = "Stats";
 // dashboard load; if a real install hits this we should switch to a
 // pre-aggregated rollup table rather than raise the cap.
 const EVENT_SCAN_CAP = 5_000;
+
+// Cumulative-flow inherently needs more data than throughput/cycle-time —
+// we have to read every status change in project history (not just within
+// the window) to know each ticket's current category. Cap higher so users
+// with real history still get a chart; document escape hatch separately.
+const CFD_EVENT_SCAN_CAP = 50_000;
 
 // ─── route definitions ─────────────────────────────────────────────────────
 
@@ -71,6 +80,23 @@ const cycleTime = createRoute({
   summary: "Cycle-time distribution (in_progress duration only)",
   request: { query: StatsWindowQuery },
   responses: { ...okJson(CycleTimeStats), ...errorResponses },
+});
+
+const cumulativeFlow = createRoute({
+  method: "get",
+  path: "/v1/stats/cumulative-flow",
+  tags: [tag],
+  summary: "Per-bucket category counts for cumulative-flow / burndown",
+  request: { query: StatsWindowQuery },
+  responses: { ...okJson(CumulativeFlowStats), ...errorResponses },
+});
+
+const staleRollup = createRoute({
+  method: "get",
+  path: "/v1/stats/stale",
+  tags: [tag],
+  summary: "Per-project rollup of stale in-progress tickets",
+  responses: { ...okJson(StaleRollup), ...errorResponses },
 });
 
 // ─── small helpers ─────────────────────────────────────────────────────────
@@ -427,6 +453,158 @@ export function mount(app: OpenAPIHono) {
 
     const samples = buildCycleTimeSamples(closed, eventsByTicket);
     return c.json(summarizeCycleTime(samples), 200);
+  }) as any);
+
+  // ─── cumulative flow / burndown ──────────────────────────────────────────
+  //
+  // We pull every ticket.created / ticket.status_changed / ticket.deleted
+  // event ever recorded for projects in scope, not just the window — the
+  // category at the START of the window depends on transitions that
+  // happened before it. Bucket boundaries land at the end-of-day or
+  // end-of-week (UTC) so they line up with the throughput endpoint's
+  // date_trunc.
+
+  app.openapi(cumulativeFlow, (async (c: any) => {
+    const q = c.req.valid("query");
+    const bucket: StatsBucket = q.bucket ?? "week";
+    const { since, until } = resolveWindow(q);
+    const projectRows = await resolveProjects(q.project);
+    const projectIds = projectRows.map((p) => p.id);
+    if (q.project && projectIds.length === 0) {
+      return c.json({ bucket, points: [] }, 200);
+    }
+
+    const events = await db
+      .select({
+        ticket_id: schema.events.ticket_id,
+        event_type: schema.events.event_type,
+        created_at: schema.events.created_at,
+        payload: schema.events.payload,
+      })
+      .from(schema.events)
+      .where(
+        and(
+          inArray(schema.events.event_type, [
+            "ticket.created",
+            "ticket.status_changed",
+            "ticket.deleted",
+          ]),
+          lte(schema.events.created_at, until.toISOString()),
+          ...(projectIds.length > 0
+            ? [inArray(schema.events.project_id, projectIds)]
+            : [])
+        )
+      );
+
+    if (events.length > CFD_EVENT_SCAN_CAP) {
+      throw badRequest(
+        `cumulative-flow scan exceeds the ${CFD_EVENT_SCAN_CAP}-event cap (got ${events.length}). Narrow the project scope or shrink the window.`
+      );
+    }
+
+    const timelines = buildTimelines(events);
+    const ends = bucketEnds(since, until, bucket);
+    const points = computeCumulativeFlow(timelines, ends);
+    return c.json({ bucket, points }, 200);
+  }) as any);
+
+  // ─── stale rollup ────────────────────────────────────────────────────────
+  //
+  // Returns one row per project that has at least one stale-in-progress
+  // ticket. When stale_count == 1, sample_ticket carries the actual ticket
+  // so the homepage widget can render a row directly; ≥ 2 → null and the
+  // widget rolls up to "<Project> · N stale".
+  //
+  // Two passes:
+  //   1. SELECT all stale tickets (joined with project + status) — this is
+  //      the materialized set. Bound by the natural cap of in_progress
+  //      tickets in active projects.
+  //   2. Group by project; for projects with count == 1, build a TicketSummary
+  //      with assignee/reporter/labels.
+
+  app.openapi(staleRollup, (async (c: any) => {
+    const settings = await readSettings();
+    const cutoffIso = new Date(
+      Date.now() - settings.stale_in_progress_days * 24 * 60 * 60 * 1000
+    ).toISOString();
+
+    const assigneeAlias = alias(schema.users, "stale_assignee");
+    const reporterAlias = alias(schema.users, "stale_reporter");
+
+    const rows = await db
+      .select({
+        t: schema.tickets,
+        project: schema.projects,
+        status: schema.statuses,
+        assignee: assigneeAlias,
+        reporter: reporterAlias,
+      })
+      .from(schema.tickets)
+      .innerJoin(schema.projects, eq(schema.tickets.project_id, schema.projects.id))
+      .innerJoin(schema.statuses, eq(schema.tickets.status_id, schema.statuses.id))
+      .leftJoin(assigneeAlias, eq(schema.tickets.assignee_id, assigneeAlias.id))
+      .innerJoin(reporterAlias, eq(schema.tickets.reporter_id, reporterAlias.id))
+      .where(
+        and(
+          isNull(schema.tickets.deleted_at),
+          isNull(schema.projects.deleted_at),
+          isNull(schema.projects.archived_at),
+          eq(schema.statuses.category, "in_progress"),
+          lte(schema.tickets.updated_at, cutoffIso)
+        )
+      );
+
+    // Group by project, keeping all rows so we can pick a sample later.
+    const byProject = new Map<string, typeof rows>();
+    for (const r of rows) {
+      const list = byProject.get(r.project.id) ?? [];
+      list.push(r);
+      byProject.set(r.project.id, list);
+    }
+
+    // Labels only fetched for projects with exactly one stale ticket — they
+    // need a full TicketSummary. For multi-stale projects we just need the
+    // count.
+    const singleSampleIds = [...byProject.values()]
+      .filter((rs) => rs.length === 1)
+      .map((rs) => rs[0]!.t.id);
+
+    const labelsByTicket = new Map<string, typeof schema.labels.$inferSelect[]>();
+    if (singleSampleIds.length > 0) {
+      const labelRows = await db
+        .select({ ticket_id: schema.ticketLabels.ticket_id, label: schema.labels })
+        .from(schema.ticketLabels)
+        .innerJoin(schema.labels, eq(schema.ticketLabels.label_id, schema.labels.id))
+        .where(inArray(schema.ticketLabels.ticket_id, singleSampleIds));
+      for (const lr of labelRows) {
+        const list = labelsByTicket.get(lr.ticket_id) ?? [];
+        list.push(lr.label);
+        labelsByTicket.set(lr.ticket_id, list);
+      }
+    }
+
+    const items = [...byProject.entries()].map(([projectId, projRows]) => {
+      const proj = projRows[0]!.project;
+      void projectId;
+      const sample = projRows.length === 1
+        ? mapTicketSummary(projRows[0]!.t, {
+            project: proj,
+            status: projRows[0]!.status,
+            assignee: projRows[0]!.assignee,
+            reporter: projRows[0]!.reporter,
+            labels: labelsByTicket.get(projRows[0]!.t.id) ?? [],
+            number: projRows[0]!.t.number,
+          })
+        : null;
+      return {
+        project: mapProjectRef(proj),
+        stale_count: projRows.length,
+        sample_ticket: sample,
+      };
+    });
+    // Sort by stale_count desc so the worst offenders surface first.
+    items.sort((a, b) => b.stale_count - a.stale_count);
+    return c.json({ items }, 200);
   }) as any);
 
   // unused vars referenced for type-checking only

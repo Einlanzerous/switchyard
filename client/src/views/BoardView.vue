@@ -12,6 +12,7 @@ import {
 import BoardCell from "@/components/boards/BoardCell.vue";
 import SwimlaneSelector, { type SwimlaneBy } from "@/components/boards/SwimlaneSelector.vue";
 import EditBoardDialog from "@/components/boards/EditBoardDialog.vue";
+import InsightsTabs from "@/components/dashboard/InsightsTabs.vue";
 import { effectivePosition } from "@/lib/positions";
 import { useBoardDetail } from "@/composables/useBoards";
 import { useUiStore } from "@/stores/ui";
@@ -354,6 +355,12 @@ const errMessage = computed(() => {
         <Loader2
           v-if="transitionMutation.isPending.value"
           class="h-4 w-4 text-muted-foreground animate-spin"
+        />
+      </div>
+      <div class="px-4">
+        <InsightsTabs
+          :board-path="`/boards/${boardId}`"
+          :insights-path="`/boards/${boardId}/insights`"
         />
       </div>
     </div>

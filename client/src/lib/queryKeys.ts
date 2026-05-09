@@ -49,4 +49,9 @@ export const queryKeys = {
     ["sw", "stats", "throughput", params] as const,
   statsCycleTime: (params: Record<string, unknown>) =>
     ["sw", "stats", "cycle-time", params] as const,
+  statsCumulativeFlow: (params: Record<string, unknown>) =>
+    ["sw", "stats", "cumulative-flow", params] as const,
+  statsStale: () => ["sw", "stats", "stale"] as const,
+
+  myMentions: () => ["sw", "users", "me", "mentions"] as const,
 };

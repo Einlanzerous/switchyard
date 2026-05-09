@@ -10,6 +10,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import BoardColumn from "@/components/tickets/BoardColumn.vue";
+import InsightsTabs from "@/components/dashboard/InsightsTabs.vue";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
 import { useUiStore } from "@/stores/ui";
@@ -215,8 +216,6 @@ const errMessage = computed(() => {
         <div class="flex-1 min-w-0">
           <h1 class="font-semibold text-base flex items-center gap-2">
             <span class="font-mono text-muted-foreground">{{ projectKey }}</span>
-            <span class="text-muted-foreground/40">·</span>
-            <span>Board</span>
           </h1>
         </div>
         <Button variant="outline" size="sm" class="h-8" @click="viewAsList">
@@ -228,6 +227,12 @@ const errMessage = computed(() => {
         <Loader2
           v-if="transitionMutation.isPending.value"
           class="h-4 w-4 text-muted-foreground animate-spin"
+        />
+      </div>
+      <div class="px-4">
+        <InsightsTabs
+          :board-path="`/projects/${projectKey}/board`"
+          :insights-path="`/projects/${projectKey}/insights`"
         />
       </div>
     </div>

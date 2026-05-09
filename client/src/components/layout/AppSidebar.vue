@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { RouterLink, useRoute } from "vue-router";
 import { computed } from "vue";
-import { Inbox, LayoutDashboard, KanbanSquare, FolderKanban, Settings, Zap } from "lucide-vue-next";
+import { Inbox, LayoutDashboard, KanbanSquare, FolderKanban, Settings, Zap, HeartPulse } from "lucide-vue-next";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -14,6 +14,7 @@ const items: NavItem[] = [
   { to: "/projects", label: "Projects", icon: FolderKanban, group: "main" },
   { to: "/automations", label: "Automations", icon: Zap, group: "main" },
   { to: "/settings", label: "Settings", icon: Settings, group: "admin" },
+  { to: "/health", label: "Health", icon: HeartPulse, group: "admin" },
 ];
 
 const route = useRoute();
