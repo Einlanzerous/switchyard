@@ -11,7 +11,7 @@
 // + several async router pushes that make CI flaky, and the URL-driven
 // path is the same code we care about in production.
 
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 
 test.describe("bulk actions", () => {
   test.beforeEach(async ({ page }) => {
@@ -19,31 +19,43 @@ test.describe("bulk actions", () => {
     await expect(page.getByText(/^TEST-1$/)).toBeVisible({ timeout: 10_000 });
   });
 
+  // Scope assertions to the bulk-actions toolbar so we don't collide
+  // with the FilterBar's "Clear filters" button (which has the same
+  // visible text), and so the count text isn't matched as anchored —
+  // Vue's template renders `{{ count }} selected` with surrounding
+  // whitespace, so a non-anchored substring inside the toolbar is the
+  // most stable signal.
+  function bar(page: Page) {
+    return page.getByRole("toolbar", { name: /bulk actions/i });
+  }
+
   test("checkbox click shows the BulkActionBar with N selected", async ({ page }) => {
     // Click the wrapping cell, not the inner Checkbox — Playwright's
     // click on reka-ui's CheckboxRoot doesn't reliably bubble to our
     // wrapper's onClick, so tests target the data-testid'd cell.
     await page.getByTestId("select-cell-TEST-1").click();
 
-    // Floating bar at the bottom-center surfaces the count.
-    await expect(page.getByText(/^1 selected$/i)).toBeVisible({ timeout: 5_000 });
-    await expect(page.getByRole("button", { name: /^Assign$/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: /^Add label$/i })).toBeVisible();
+    await expect(bar(page)).toBeVisible({ timeout: 5_000 });
+    await expect(bar(page).getByText(/1 selected/i)).toBeVisible();
+    await expect(bar(page).getByRole("button", { name: /^Assign$/i })).toBeVisible();
+    await expect(bar(page).getByRole("button", { name: /^Add label$/i })).toBeVisible();
   });
 
   test("Clear button drops the selection + hides the BulkActionBar", async ({ page }) => {
     await page.getByTestId("select-cell-TEST-1").click();
-    await expect(page.getByText(/^1 selected$/i)).toBeVisible({ timeout: 5_000 });
+    await expect(bar(page)).toBeVisible({ timeout: 5_000 });
 
-    await page.getByRole("button", { name: /^Clear$/i }).click();
-    await expect(page.getByText(/^1 selected$/i)).toBeHidden();
+    // Important: scope to the toolbar — there's also a "Clear" button
+    // in the FilterBar (the Clear-all-filters one).
+    await bar(page).getByRole("button", { name: /^Clear$/ }).click();
+    await expect(bar(page)).toBeHidden();
   });
 
   test("Move to… opens the BulkTransitionModal with category buttons", async ({ page }) => {
     await page.getByTestId("select-cell-TEST-1").click();
-    await expect(page.getByText(/^1 selected$/i)).toBeVisible({ timeout: 5_000 });
+    await expect(bar(page)).toBeVisible({ timeout: 5_000 });
 
-    await page.getByRole("button", { name: /Move to/i }).click();
+    await bar(page).getByRole("button", { name: /Move to/i }).click();
 
     const dialog = page.getByRole("dialog", { name: /Move to status/i });
     await expect(dialog).toBeVisible();
