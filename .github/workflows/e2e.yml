@@ -71,18 +71,25 @@ jobs:
             ${{ runner.os }}-playwright-
 
       # Browser binaries only — system dependencies (libnss3, libatk1.0-0,
-      # etc.) are assumed to be pre-installed on the self-hosted host.
-      # Matches the legislator-lookup-tool-cc pattern: `npx playwright
-      # install` without `--with-deps`, since `--with-deps` tries to
-      # apt-get and the runner user typically can't sudo non-interactively.
+      # etc.) are pre-installed on the self-hosted host. Matches the
+      # legislator-lookup-tool-cc pattern: `playwright install` without
+      # `--with-deps`, since `--with-deps` tries to apt-get and the
+      # runner user typically can't sudo non-interactively.
+      #
+      # NOTE: `bunx --cwd client` doesn't work the way `bun --cwd client
+      # run` does — `bunx`/`bun x` reads its first arg as the package
+      # name, so `--cwd` becomes the "package" and bun complains. Set
+      # working-directory on the step instead.
       #
       # If you ever rebuild the runner host, install the system deps once:
-      #   sudo bunx playwright install-deps chromium firefox
+      #   sudo $(which bunx) playwright install-deps chromium firefox
       - name: Install Playwright browsers
-        run: bunx --cwd client playwright install chromium firefox
+        working-directory: client
+        run: bunx playwright install chromium firefox
 
       - name: Run Playwright
-        run: bun --cwd client run test:e2e
+        working-directory: client
+        run: bun run test:e2e
 
       - name: Upload Playwright report on failure
         if: failure()
