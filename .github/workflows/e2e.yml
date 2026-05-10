@@ -54,11 +54,20 @@ jobs:
       # Reset the test DB to a known state before each run. `db:migrate`
       # is idempotent so this is safe even when the DB already exists;
       # the seed adds canonical users + bootstrap token.
+      #
+      # NOTE: `bun --cwd <dir> run <script>` doesn't actually work the
+      # way it reads — bun's argument parser shows help instead of
+      # running the script, and exits 0, so the workflow silently
+      # advances past a no-op migrate. Use the step's
+      # `working-directory:` instead (same fix we did for the playwright
+      # step).
       - name: Migrate test DB
-        run: bun --cwd server run db:migrate
+        working-directory: server
+        run: bun run db:migrate
 
       - name: Seed E2E fixtures
-        run: bun --cwd server run seed:test-e2e
+        working-directory: server
+        run: bun run seed:test-e2e
 
       # Playwright manages its own browser binaries; cache them between
       # runs to skip the ~200MB download.

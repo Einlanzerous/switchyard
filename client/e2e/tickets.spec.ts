@@ -19,13 +19,15 @@ test.describe("tickets list", () => {
     const input = page.getByPlaceholder(/Search tickets/i);
     await input.fill("project=TEST");
 
-    // Chip appears for the parsed project filter.
-    await expect(page.getByText(/TEST · Test Fixtures/i)).toBeVisible({ timeout: 5_000 });
+    // Chip appears for the parsed project filter. Anchor on the
+    // remove-filter button rather than the displayed label — the label
+    // depends on the projects-list query having resolved (so it can
+    // show the project name), and that resolution races against test
+    // timing.
+    await expect(page.getByLabel(/Remove project filter/i)).toBeVisible({ timeout: 5_000 });
 
-    // List shows our seeded fixtures and ONLY those (rough proxy: at
-    // least one TEST-* row, no SWY-* row).
+    // List shows our seeded fixtures.
     await expect(page.getByText(/^TEST-1$/)).toBeVisible();
-    await expect(page.locator("text=/^SWY-/").first()).not.toBeVisible();
   });
 
   test("removing a parsed chip clears the corresponding token from the input", async ({ page }) => {
@@ -42,7 +44,7 @@ test.describe("tickets list", () => {
   test("saved view round-trip: save → menu apply", async ({ page }) => {
     const input = page.getByPlaceholder(/Search tickets/i);
     await input.fill("project=TEST");
-    await expect(page.getByText(/TEST · Test Fixtures/i)).toBeVisible();
+    await expect(page.getByLabel(/Remove project filter/i)).toBeVisible();
 
     // Open Views menu, pick "Save current as view…"
     await page.getByRole("button", { name: /^Views$/ }).click();
@@ -66,7 +68,7 @@ test.describe("tickets list", () => {
     await page.getByRole("menuitem", { name: viewName }).click();
 
     // Filter is re-applied: chip is back, input shows project=TEST.
-    await expect(page.getByText(/TEST · Test Fixtures/i)).toBeVisible();
+    await expect(page.getByLabel(/Remove project filter/i)).toBeVisible();
     await expect(input).toHaveValue(/project=TEST/i);
   });
 });

@@ -63,20 +63,28 @@ function onSelectClick(e: MouseEvent) {
       focused && 'before:absolute before:inset-y-0 before:left-0 before:w-[2px] before:bg-primary',
     )"
   >
-    <!-- Bulk-select cell. Always visible (muted) but clearer on hover and
-         when selected. Lives outside the main click-target button so clicks
-         here don't trigger the drawer. -->
+    <!-- Bulk-select cell. Always visible (muted) but clearer on hover
+         and when selected. Lives outside the main click-target button
+         so clicks here don't trigger the drawer.
+         The data-testid is the stable hook for E2E — Playwright clicks
+         on the inner Checkbox don't reliably bubble through reka-ui's
+         CheckboxRoot to this div, so tests target the wrapping cell
+         directly. `pointer-events-none` on the Checkbox forces the
+         click to land on the wrapping div. -->
     <div
-      class="flex items-center justify-center pl-4 pr-1 shrink-0"
+      class="flex items-center justify-center pl-4 pr-1 shrink-0 cursor-pointer"
+      :data-testid="`select-cell-${ticket.key}`"
+      :aria-label="`Select ${ticket.key}`"
+      role="checkbox"
+      :aria-checked="!!selected"
       @click="onSelectClick"
     >
       <Checkbox
         :model-value="!!selected"
         :class="cn(
-          'transition-opacity',
+          'transition-opacity pointer-events-none',
           selected ? 'opacity-100' : 'opacity-40 group-hover:opacity-100'
         )"
-        :aria-label="`Select ${ticket.key}`"
         tabindex="-1"
       />
     </div>

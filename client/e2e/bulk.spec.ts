@@ -17,7 +17,10 @@ test.describe("bulk actions", () => {
   });
 
   test("checkbox click shows the BulkActionBar with N selected", async ({ page }) => {
-    await page.getByLabel(/Select TEST-1/i).click();
+    // Click the wrapping cell, not the inner Checkbox — Playwright's
+    // click on reka-ui's CheckboxRoot doesn't reliably bubble to our
+    // wrapper's onClick, so tests target the data-testid'd cell.
+    await page.getByTestId("select-cell-TEST-1").click();
 
     // Floating bar at the bottom-center surfaces the count.
     await expect(page.getByText(/^1 selected$/i)).toBeVisible();
@@ -26,7 +29,7 @@ test.describe("bulk actions", () => {
   });
 
   test("Clear button drops the selection + hides the BulkActionBar", async ({ page }) => {
-    await page.getByLabel(/Select TEST-1/i).click();
+    await page.getByTestId("select-cell-TEST-1").click();
     await expect(page.getByText(/^1 selected$/i)).toBeVisible();
 
     await page.getByRole("button", { name: /^Clear$/i }).click();
@@ -34,7 +37,7 @@ test.describe("bulk actions", () => {
   });
 
   test("Move to… opens the BulkTransitionModal with category buttons", async ({ page }) => {
-    await page.getByLabel(/Select TEST-1/i).click();
+    await page.getByTestId("select-cell-TEST-1").click();
     await page.getByRole("button", { name: /Move to/i }).click();
 
     const dialog = page.getByRole("dialog", { name: /Move to status/i });
