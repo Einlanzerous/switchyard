@@ -29,10 +29,17 @@ test.describe("tickets list", () => {
 
   test("filter DSL: typing project=TEST in the search input populates the URL slot", async ({ page }) => {
     await page.goto("/tickets");
-    await page.getByPlaceholder(/Search tickets/i).fill("project=TEST");
+    const input = page.getByPlaceholder(/Search tickets/i);
+    // pressSequentially fires native input events char-by-char, which
+    // works around shadcn Input's `useVModel({ passive: true })` not
+    // reacting to .fill()'s programmatic value-set in headless mode.
+    // Also blur the input to flush any pending debounce.
+    await input.click();
+    await input.pressSequentially("project=TEST", { delay: 30 });
+    await input.blur();
 
-    // Allow the 250ms debounce + router push to settle. The chip is the
-    // most stable signal — its remove button gets a stable aria-label.
+    // 250ms debounce + router push. Chip's remove-button aria-label is
+    // the stable hook.
     await expect(page.getByLabel(/Remove project filter/i)).toBeVisible({ timeout: 10_000 });
     await expect(page).toHaveURL(/[?&]project=TEST/);
   });
