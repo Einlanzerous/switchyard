@@ -149,9 +149,30 @@ localText.value = rebuildLocalText();
 // clear, browser nav). We compare the rebuilt string to localText — if a
 // pending parse already produced this state, leave the input alone so we
 // don't wipe the user's caret position.
+//
+// IMPORTANT: do NOT include `users.value.length` in the dep array. The
+// users query resolves asynchronously after mount, and if it lands while
+// the user is mid-type (before the 250ms debounce fires applyParsed),
+// `rebuildLocalText()` returns "" from the still-empty filters and
+// clobbers what the user typed. The separate watcher below handles the
+// narrow "uuid → name" re-render once users do load.
 watch(
-  () => [filters.value.project, filters.value.assignee, filters.value.text, users.value.length] as const,
+  () => [filters.value.project, filters.value.assignee, filters.value.text] as const,
   () => {
+    const next = rebuildLocalText();
+    if (next !== localText.value) localText.value = next;
+  }
+);
+
+// When users finally load, re-render the assignee label only if filters
+// has an assignee that's a raw uuid (not "me"/"unassigned"/empty). Guarded
+// so an empty assignee — the common case while typing — doesn't trigger
+// a rebuild that would clobber typed text.
+watch(
+  () => users.value.length,
+  () => {
+    const f = filters.value;
+    if (!f.assignee || f.assignee === "unassigned" || f.assignee === "me") return;
     const next = rebuildLocalText();
     if (next !== localText.value) localText.value = next;
   }
