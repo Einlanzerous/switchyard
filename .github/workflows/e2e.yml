@@ -107,3 +107,16 @@ jobs:
           name: playwright-report
           path: client/playwright-report/
           retention-days: 7
+
+      # Trace + per-test screenshots / videos live under test-results/.
+      # These are gold for diagnosing CI-only flakes — uploaded
+      # separately so the report and the raw traces can be downloaded
+      # independently.
+      - name: Upload Playwright traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: client/test-results/
+          retention-days: 7
+          if-no-files-found: ignore

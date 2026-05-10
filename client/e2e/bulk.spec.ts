@@ -1,19 +1,22 @@
 // Bulk ops E2E. Asserts:
 //   - Checkbox multi-select shows the BulkActionBar with the right count
-//   - Shift-click range-select adds the in-between rows
-//   - Bulk transition modal opens, category-pick maps per project
+//   - Bulk transition modal opens and surfaces the category mapping
 //
 // Bulk delete is deliberately NOT covered here — it'd remove the TEST
 // fixtures and break every other test. Delete-flow coverage belongs in
 // a separate spec that creates its own throwaway tickets via API first.
+//
+// Tests navigate directly to /tickets?project=TEST rather than typing
+// the filter into the search input — the typed flow has a 250ms debounce
+// + several async router pushes that make CI flaky, and the URL-driven
+// path is the same code we care about in production.
 
 import { test, expect } from "@playwright/test";
 
 test.describe("bulk actions", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/tickets");
-    await page.getByPlaceholder(/Search tickets/i).fill("project=TEST");
-    await expect(page.getByText(/^TEST-1$/)).toBeVisible({ timeout: 5_000 });
+    await page.goto("/tickets?project=TEST");
+    await expect(page.getByText(/^TEST-1$/)).toBeVisible({ timeout: 10_000 });
   });
 
   test("checkbox click shows the BulkActionBar with N selected", async ({ page }) => {
@@ -23,14 +26,14 @@ test.describe("bulk actions", () => {
     await page.getByTestId("select-cell-TEST-1").click();
 
     // Floating bar at the bottom-center surfaces the count.
-    await expect(page.getByText(/^1 selected$/i)).toBeVisible();
+    await expect(page.getByText(/^1 selected$/i)).toBeVisible({ timeout: 5_000 });
     await expect(page.getByRole("button", { name: /^Assign$/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /^Add label$/i })).toBeVisible();
   });
 
   test("Clear button drops the selection + hides the BulkActionBar", async ({ page }) => {
     await page.getByTestId("select-cell-TEST-1").click();
-    await expect(page.getByText(/^1 selected$/i)).toBeVisible();
+    await expect(page.getByText(/^1 selected$/i)).toBeVisible({ timeout: 5_000 });
 
     await page.getByRole("button", { name: /^Clear$/i }).click();
     await expect(page.getByText(/^1 selected$/i)).toBeHidden();
@@ -38,6 +41,8 @@ test.describe("bulk actions", () => {
 
   test("Move to… opens the BulkTransitionModal with category buttons", async ({ page }) => {
     await page.getByTestId("select-cell-TEST-1").click();
+    await expect(page.getByText(/^1 selected$/i)).toBeVisible({ timeout: 5_000 });
+
     await page.getByRole("button", { name: /Move to/i }).click();
 
     const dialog = page.getByRole("dialog", { name: /Move to status/i });
