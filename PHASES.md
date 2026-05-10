@@ -111,9 +111,9 @@ Out of scope (deferred to later phases):
 - Charts / dashboards (Phase 3)
 - Native automation rules (Phase 4)
 
-## Phase 2 — Frontend
+## Phase 2 — Frontend ✅
 
-Goal: the user can do everything via the UI that they'd otherwise do via curl. Linear-density + ClickUp/Monday color richness; skeleton loaders; drawer ticket detail with deep-linkable URLs.
+**Shipped.** All 8 milestones (2.0–2.7). The user can do everything via the UI that they'd otherwise do via curl. Linear-density + ClickUp/Monday color richness; skeleton loaders; drawer ticket detail with deep-linkable URLs.
 
 ### Locked decisions for Phase 2
 
@@ -127,7 +127,7 @@ Goal: the user can do everything via the UI that they'd otherwise do via curl. L
 - **Ticket detail:** right-side drawer (Sheet) with deep-linkable URL — `/tickets?focus=SWY-47` keeps the list rendered behind the drawer.
 - **Empty / loading:** skeleton loaders everywhere; no spinners.
 
-### Milestone 2.0 — Foundations
+### Milestone 2.0 — Foundations ✅
 
 - Materialize `client/src/lib/api.types.ts` via `bun run api:gen`.
 - Install shadcn-vue components for the shell (button, input, label, card, avatar, dropdown-menu, separator, scroll-area, sonner, sheet, skeleton).
@@ -137,14 +137,14 @@ Goal: the user can do everything via the UI that they'd otherwise do via curl. L
 - TanStack Query setup: client config, key conventions (`['users','me']`, `['projects']`, `['tickets', filters]`, `['ticket', idOrKey]`, `['boards']`, `['board', id, 'columns']`).
 - Top-level error boundary that surfaces API error envelopes via Sonner.
 
-### Milestone 2.1 — Auth flow
+### Milestone 2.1 — Auth flow ✅
 
 - `/login` view: token textarea, validates against `GET /v1/users/me`. On success, stores in localStorage (already wired by the `api.ts` middleware) and redirects to `/`.
 - `useAuthStore` derives the logged-in user from `useQuery(['users','me'])`.
 - Route guard: redirect unauthenticated to `/login`. Logout clears storage and invalidates queries.
 - Topbar shows the user's avatar + dropdown (theme toggle, settings, logout).
 
-### Milestone 2.2 — Tickets list
+### Milestone 2.2 — Tickets list ✅
 
 - `/tickets` route. URL drives filter state (`?project=FLOW&status=in_progress`).
 - Filter bar: chips for status-category / type / priority; comboboxes for project / label / assignee; text search (debounced 250ms).
@@ -152,7 +152,7 @@ Goal: the user can do everything via the UI that they'd otherwise do via curl. L
 - Cursor pagination via `useInfiniteQuery`; "Load more" sentinel triggers `fetchNextPage`.
 - Click row → drawer opens with ticket detail (2.3) and `?focus=KEY-N` query param appended.
 
-### Milestone 2.3 — Ticket detail (drawer + page)
+### Milestone 2.3 — Ticket detail (drawer + page) ✅
 
 - Right-side `Sheet` drawer with tabs: Description / Comments / Files / Activity.
 - Description: markdown render via markdown-it with DOMPurify; edit via inline textarea + save.
@@ -162,7 +162,7 @@ Goal: the user can do everything via the UI that they'd otherwise do via curl. L
 - Header actions: status transition button (opens menu of allowed transitions; presents resolution selector when target is closed); priority dropdown; assignee picker.
 - Standalone `/tickets/:idOrKey` route renders the same drawer over a blank background for direct deep-link access.
 
-### Milestone 2.4 — Kanban board (single-project)
+### Milestone 2.4 — Kanban board (single-project) ✅
 
 - `/projects/:key/board` route.
 - Columns by canonical category (Backlog / Planning / In Progress / Blocked / Closed). Display-name aliases shown in column header.
@@ -170,7 +170,7 @@ Goal: the user can do everything via the UI that they'd otherwise do via curl. L
 - pragmatic-drag-and-drop: drag → `POST /v1/tickets/{id}/transition`. On drop into closed column, prompt for resolution. Optimistic update with rollback on error.
 - Per-column virtualization for projects with hundreds of tickets in one column.
 
-### Milestone 2.5 — Cross-project boards + swimlanes
+### Milestone 2.5 — Cross-project boards + swimlanes ✅
 
 - `/boards` list + `/boards/new` (multi-project select via combobox).
 - `/boards/:id` view: kanban with optional **swimlanes** (group rows by project / assignee / epic / type).
@@ -178,7 +178,7 @@ Goal: the user can do everything via the UI that they'd otherwise do via curl. L
 - Saved filters per board (types, priorities, label_ids, assignee_ids).
 - Cross-project drag is allowed when target column resolves to a status the receiving project actually has; otherwise rejected with a toast.
 
-### Milestone 2.6 — Settings
+### Milestone 2.6 — Settings ✅
 
 - `/settings/profile` — me, avatar (URL field for now), display name.
 - `/settings/tokens` — list / create / revoke own tokens.
@@ -187,7 +187,7 @@ Goal: the user can do everything via the UI that they'd otherwise do via curl. L
 - `/settings/labels` — global label catalog (a single shared list across all projects). CRUD with name + color picker.
 - `/settings/webhooks` — subscriptions + delivery log. Redeliver button on failed deliveries. Show secret on creation banner.
 
-### Milestone 2.7 — Polish
+### Milestone 2.7 — Polish ✅
 
 - Command palette (Ctrl+K): jump to ticket by key, quick-create ticket, switch project, recent boards.
 - Keyboard shortcuts: `g t` → tickets, `g b` → boards, `c` → new ticket, `?` → shortcut sheet.
@@ -224,23 +224,23 @@ Goal: the "how much work is left, how much done over time" view.
 
 Locked breakdown:
 
-- **3.0 — Stats/aggregation backend.** `GET /v1/projects/:key/stats` (counts + by_category/priority/type/assignee + stale_in_progress + most_recent_activity), `GET /v1/stats/projects` (bulk feed for the directory), `GET /v1/stats/throughput` (closed-per-period over a window), `GET /v1/stats/cycle-time` (in_progress duration distribution; in_progress only — blocked excluded by design). Plus `system_settings` table + `GET/PATCH /v1/settings` for runtime config (default `stale_in_progress_days = 30`). All event-scan endpoints capped at 5000 events; 400 if exceeded. Side effect: ProjectsView ticket-count column lights up.
-- **3.0b — Cumulative flow.** `GET /v1/stats/cumulative-flow` for burndown + CFD charts. Split out because the per-bucket category replay over events is ~half the work of the other four combined. **CFD endpoint cap is 50,000 events** (vs. 5,000 for the other stats endpoints) since CFD inherently must scan project history, not just the window.
-- **3.1 — Dashboards.** Chart lib: **Apache ECharts via vue-echarts** (may roll our own later for visual polish). See "3.1 — Dashboards in detail" below for widget-level specs.
-- **3.2 — Power tools on tickets list.** Saved views (`saved_views` table, CRUD, palette integration) + bulk operations (multi-select, bulk-edit labels/assignee/status).
-- **3.3 — Notifications / @mentions.** Persistent notifications surface — `notifications` table, `mentioned_user_ids` extracted on comment/description write, dedicated unread/seen state, mark-as-read endpoint, dropdown in topbar, deeper integration with the homepage panel that 3.1 ships as a basic live-scan placeholder.
-- **3.4 — Polish & a11y.** Empty-state audit, skeleton-loader audit, keyboard-nav per-view (arrows primary, `j/k` alternate, `x`/`Shift+x` for bulk-select), ARIA audit, deprecated endpoint cleanup. **Configurable Projects columns**, **configurable Insights widget visibility**, and **command-palette `=`-token autocomplete** were deferred to Phase 5 — see "Deferred → Phase 5" below.
+- **3.0 — Stats/aggregation backend ✅.** `GET /v1/projects/:key/stats` (counts + by_category/priority/type/assignee + stale_in_progress + most_recent_activity), `GET /v1/stats/projects` (bulk feed for the directory), `GET /v1/stats/throughput` (closed-per-period over a window), `GET /v1/stats/cycle-time` (in_progress duration distribution; in_progress only — blocked excluded by design). Plus `system_settings` table + `GET/PATCH /v1/settings` for runtime config (default `stale_in_progress_days = 30`). All event-scan endpoints capped at 5000 events; 400 if exceeded. Side effect: ProjectsView ticket-count column lights up.
+- **3.0b — Cumulative flow ✅.** `GET /v1/stats/cumulative-flow` for burndown + CFD charts. Split out because the per-bucket category replay over events is ~half the work of the other four combined. **CFD endpoint cap is 50,000 events** (vs. 5,000 for the other stats endpoints) since CFD inherently must scan project history, not just the window.
+- **3.1 — Dashboards ✅.** Chart lib: **Apache ECharts via vue-echarts** (may roll our own later for visual polish). See "3.1 — Dashboards in detail" below for widget-level specs.
+- **3.2 — Power tools on tickets list ✅.** Saved views (`saved_views` table, CRUD, palette integration) + bulk operations (multi-select, bulk-edit labels/assignee/status).
+- **3.3 — Notifications / @mentions ✅.** Persistent notifications surface — `notifications` table, `mentioned_user_ids` extracted on comment/description write, dedicated unread/seen state, mark-as-read endpoint, dropdown in topbar, deeper integration with the homepage panel that 3.1 ships as a basic live-scan placeholder.
+- **3.4 — Polish & a11y ✅.** Empty-state audit, skeleton-loader audit, keyboard-nav per-view (arrows primary, `j/k` alternate, `x`/`Shift+x` for bulk-select), ARIA audit, deprecated endpoint cleanup. **Configurable Projects columns**, **configurable Insights widget visibility**, and **command-palette `=`-token autocomplete** were deferred to Phase 5 — see "Deferred → Phase 5" below.
 - **3.6 — Power-user shortcut adoption (optional).** Tracking ticket only — no code work. Once 3.4 ships keyboard nav with both arrow keys (default) and `j`/`k`/`x`/`e` (Linear/Gmail-style alternates), this milestone is a personal note to incrementally adopt the alternate bindings in daily use. Closing it = "I've internalized the shortcuts" rather than a build deliverable.
-- **3.7 — Container split: backend + frontend (NEW).** Refactor away from the locked single-container shape into the aperture pattern: `backend/Dockerfile` (Hono+Bun, no static serve), `frontend/Dockerfile` (built Vue assets behind nginx/Caddy with a `/v1/*` proxy), root `docker-compose.yaml` glueing them with a `depends_on: backend (healthy)` constraint. Concretely:
-  - `Dockerfile` at repo root → split into `server/Dockerfile` + `client/Dockerfile`
-  - Drop Hono's `serveStatic` middleware; backend becomes API-only on its own port
-  - Frontend nginx config proxies `/v1/*` and `/healthz` to the backend service
-  - `docker-compose.yaml` at root with `backend` + `frontend` services, ports 4002 / 4000 (or whatever construct-server reserves)
-  - Update `compose-changes/` snippets in the wider stack to mount both services
-  - **Why the change**: separating concerns lets the frontend be served by a CDN-friendly static server (gzip, immutable cache headers) while the backend stays small. Also matches the rest of the homelab pipeline so the build/release flow is uniform.
-  - Locked decision in PHASES.md "Container shape" table needs updating once this lands.
+- **3.7 — Container split: backend + frontend (no reverse proxy).** Refactor the single-container deploy into two: `server/Dockerfile` (Hono+Bun, API only) and `client/Dockerfile` (built Vue assets + a tiny Bun static server with SPA fallback that also passthroughs `/v1/*` and `/healthz` to the backend). Concretely:
+  - Root `Dockerfile` → split into `server/Dockerfile` + `client/Dockerfile`
+  - Drop Hono's `serveStatic` middleware + the `notFound` SPA fallback; backend becomes API-only on its own port
+  - New `client/serve.ts` (~50 LOC): static + SPA fallback + `/v1/*` `/healthz` passthrough via Bun's `fetch`
+  - Root `docker-compose.yaml` with `switchyard` (backend) + `switchyard-frontend`, `depends_on: switchyard (healthy)`. Frontend exposes `${SWITCHYARD_PORT:-4002}:4002`; backend stays internal on `construct_net`
+  - Update `compose-changes/README.md` to document the two-service merge into construct-server's stack
+  - **Why no nginx/Caddy**: switchyard is tailnet-only, single human + agents. Gzip / immutable cache headers and "CDN-friendly" static serving don't justify a third moving part. A ~50-line Bun script handles static + SPA fallback + same-origin passthrough so the browser never needs CORS and no env-var injection is required. Backend keeps the service name `switchyard` so existing agent URLs (`http://switchyard:4002/v1/...` on `construct_net`) continue to work.
+  - Locked decision in PHASES.md "Container shape" table updated to reflect the two-container shape.
 
-- **3.5 — Playwright E2E.** Pattern mirrors `Einlanzerous/legislator-lookup-tool-cc`: `playwright.config.ts` at the client root with `chromium` + `firefox` projects, `e2e/` directory, `webServer` block that boots `bun run dev` at `http://localhost:5173`, HTML reporter, trace on first retry. Phases:
+- **3.5 — Playwright E2E ✅.** Pattern mirrors `Einlanzerous/legislator-lookup-tool-cc`: `playwright.config.ts` at the client root with `chromium` + `firefox` projects, `e2e/` directory, `webServer` block that boots `bun run dev` at `http://localhost:5173`, HTML reporter, trace on first retry. Phases:
   - **3.5.0 Scaffolding** — install `@playwright/test`, generate `playwright.config.ts` adapted for our `bun run dev` + bearer-token auth, add `client/e2e/` and `client/scripts/` for any seed helpers. `client/package.json` gets `test:e2e: "playwright test"` + `test:e2e:ui: "playwright test --ui"`. `.gitignore` skips `playwright-report/`, `test-results/`, `client/playwright/.auth/`.
   - **3.5.1 Auth fixture** — a setup project that hits `POST /v1/users/{magos}/tokens` with the bootstrap token, stores the resulting bearer in `playwright/.auth/admin.json` via `localStorage` injection, and reuses across all subsequent tests. Mirrors the auth-state pattern Playwright recommends.
   - **3.5.2 Smoke tests** — `e2e/smoke.spec.ts`: app boots, login flow, sidebar nav between Home / Tickets / Boards / Projects / Automations / Settings / Health renders without errors. Should run in <30s and gate every PR.
@@ -372,7 +372,7 @@ These were settled during planning. Don't relitigate without naming the *why* li
 |---|---|---|
 | Backend lang | Hono on Bun | Type-share with frontend via Zod; Bun's memory profile is closer to Go than Node-Express; the user already runs n8n so the runtime isn't foreign. |
 | Frontend lang | Vue 3 (not React) | User preference, stated explicitly. Default for all switchyard frontend work. |
-| Container shape | Single container | Hono serves API + Vue static. No CORS, no nginx, simpler deploy. |
+| Container shape | Two containers (backend API + frontend static-with-passthrough) | Independent rebuild + concern separation. Frontend is a tiny Bun server that serves the Vue bundle + SPA fallback and passthroughs `/v1/*` and `/healthz` to the backend, so the browser stays same-origin and no nginx/Caddy is needed. Tailnet-only deploy means CDN-style static serving isn't a goal. |
 | Status categories | `backlog\|planning\|in_progress\|blocked\|closed` | Planning is first-class because the imperium-loop pipeline treats plan-generation and build-time as separate phases — collapsing them poisons cycle-time charts. Default project seed includes 4 of 5 statuses; planning is opt-in. |
 | Resolution | Separate field, required when `category=closed` | Splits "work complete" (`done`) from "shipped" (`released`) from "abandoned" (`cancelled`) without exploding categories. |
 | Transitions | Optional whitelist table | Zero rows = any-to-any. Any rows = whitelist enforced. Lets agents be guard-railed without forcing every project to define a workflow. |
