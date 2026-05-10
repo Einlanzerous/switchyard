@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.0](https://github.com/Einlanzerous/switchyard/compare/v1.2.1...v2.0.0) (2026-05-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* publish containers
+
+### Features
+
+* publish containers ([4861d37](https://github.com/Einlanzerous/switchyard/commit/4861d3753e8563f1e4e5650bf4ca7b253ebdf4dd))
+
 ## [1.2.1](https://github.com/Einlanzerous/switchyard/compare/v1.2.0...v1.2.1) (2026-05-10)
 
 
