@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/Einlanzerous/switchyard/compare/v1.2.0...v1.2.1) (2026-05-10)
+
+
+### Bug Fixes
+
+* test cleanup, viewport fix on many views ([3573b12](https://github.com/Einlanzerous/switchyard/commit/3573b12eff6754ba2264976a264521c64e992524))
+
 ## [1.2.0](https://github.com/Einlanzerous/switchyard/compare/v1.1.0...v1.2.0) (2026-05-10)
 
 
