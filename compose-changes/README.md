@@ -4,11 +4,12 @@ Runbook for how switchyard plugs into the existing `~/construct-server` Docker s
 
 ## Where switchyard lives in the stack
 
-- **Image:** built locally from `~/projects/switchyard/Dockerfile` (multi-stage Bun + Vue), not pulled from a registry.
-- **Network:** `construct_net` only, alongside `postgres`, `n8n`, `servo-signal`, etc.
+- **Images:** two locally-built images, `switchyard` (API, Hono + Bun) from `server/Dockerfile` and `switchyard-frontend` (Vue static + tiny Bun passthrough) from `client/Dockerfile`. Neither is pulled from a registry.
+- **Network:** both on `construct_net` only, alongside `postgres`, `n8n`, `servo-signal`, etc.
+- **Host port:** only `switchyard-frontend` exposes a host port (`${SWITCHYARD_PORT:-4002}:4002`). The frontend serves the Vue bundle and passthroughs `/v1/*` and `/healthz` to the backend so the browser stays same-origin. The backend is reachable only on `construct_net` (service DNS `switchyard:4002`) — agents continue to use the same URL they used pre-split.
 - **Database:** dedicated `switchyard` database on the shared Postgres 16 instance, owned by `switchyard_user`. A second `switchyard_test` database (same role) backs the integration test suite.
-- **Storage:** named volume `switchyard_uploads` mounted at `/data/uploads` for attachment files. Postgres only stores `storage_path`.
-- **Watchtower:** **opted out** via `com.centurylinklabs.watchtower.enable=false`. Updates happen via explicit `docker compose up -d --build switchyard`, not the Monday-04:00 rolling restart that's suspected of dropping Vikunja's DB password on a previous service.
+- **Storage:** named volume `switchyard_uploads` mounted at `/data/uploads` on the **backend** for attachment files. Postgres only stores `storage_path`.
+- **Watchtower:** **opted out** on both services via `com.centurylinklabs.watchtower.enable=false`. Updates happen via explicit `docker compose up -d --build switchyard switchyard-frontend`, not the Monday-04:00 rolling restart that's suspected of dropping Vikunja's DB password on a previous service.
 
 ## Database provisioning
 
@@ -46,20 +47,18 @@ SWITCHYARD_PUBLIC_URL=http://localhost:4002
 SWITCHYARD_BOOTSTRAP_TOKEN=
 ```
 
-## Compose service
+## Compose services
 
-The service block in `~/construct-server/docker-compose.yml`:
+Two service blocks in `~/construct-server/docker-compose.yml` — backend + frontend. Backend keeps the service name `switchyard` so existing agent URLs continue to resolve:
 
 ```yaml
   # --- TASK MANAGEMENT (switchyard — Vikunja replacement) ---
   switchyard:
     build:
       context: ../projects/switchyard
-      dockerfile: Dockerfile
+      dockerfile: server/Dockerfile
     container_name: switchyard
     restart: unless-stopped
-    ports:
-      - "${SWITCHYARD_PORT:-4002}:4002"
     environment:
       - PORT=4002
       - DATABASE_URL=postgres://switchyard_user:${SWITCHYARD_DB_PASSWORD}@postgres:5432/switchyard?sslmode=disable
@@ -70,13 +69,40 @@ The service block in `~/construct-server/docker-compose.yml`:
       - switchyard_uploads:/data/uploads
     networks:
       - construct_net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:4002/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     depends_on:
       - postgres
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+
+  switchyard-frontend:
+    build:
+      context: ../projects/switchyard
+      dockerfile: client/Dockerfile
+    container_name: switchyard-frontend
+    restart: unless-stopped
+    ports:
+      - "${SWITCHYARD_PORT:-4002}:4002"
+    environment:
+      - PORT=4002
+      - BACKEND_URL=http://switchyard:4002
+    networks:
+      - construct_net
+    depends_on:
+      switchyard:
+        condition: service_healthy
     labels:
       - "com.centurylinklabs.watchtower.enable=false"
 ```
 
 …with `switchyard_uploads:` declared in the bottom-of-file `volumes:` block.
+
+Note: only the frontend exposes a host port. The backend's port is reachable only inside `construct_net` (e.g., `http://switchyard:4002` from `n8n`, `servo-signal`, etc.). If you ever need direct backend access from the host (debugging via `curl`), `docker exec` into a sibling container or temporarily add a port mapping.
 
 ## How switchyard differs from `cook_book` (the closest sibling)
 
@@ -95,11 +121,11 @@ The watchtower opt-out is the deliberate divergence. switchyard exits non-zero o
 
 ```bash
 # From ~/construct-server, after the env vars and service block are in place:
-make network                                  # idempotent
-docker compose up -d --build switchyard       # builds image, starts container
-docker logs -f switchyard                     # watch migrations + seed + dispatcher start
+make network                                                                       # idempotent
+docker compose up -d --build switchyard switchyard-frontend                        # builds both images, starts both
+docker logs -f switchyard                                                          # watch migrations + seed + dispatcher start
 
-# Expected log sequence:
+# Expected backend log sequence:
 #   [migrate] running drizzle migrations
 #   [migrate] applying triggers.sql
 #   [migrate] running seed
@@ -107,10 +133,16 @@ docker logs -f switchyard                     # watch migrations + seed + dispat
 #   ═══ switchyard bootstrap token ═══   (one-shot banner if BOOTSTRAP_TOKEN env unset)
 #   [dispatcher] started
 #   [switchyard] listening on :4002
+#
+# Frontend log:
+#   [switchyard-frontend] listening on :4002 (backend: http://switchyard:4002)
 
-# Smoke test:
+# Smoke test (hits the frontend, which passthroughs /healthz to the backend):
 curl http://localhost:4002/healthz
 # {"status":"ok","subsystems":{"db":{...},"uploads":{...},"webhooks":{...}}}
+
+# Confirm static serving:
+curl -s http://localhost:4002/ | head -c 200    # should return index.html
 ```
 
 If `BOOTSTRAP_TOKEN` was unset and `api_tokens` was empty on first boot, the bootstrap token is also written to `/data/uploads/.bootstrap-token` inside the container — read it once with `docker exec switchyard cat /data/uploads/.bootstrap-token`, then mint real per-agent tokens via `POST /v1/users/{id}/tokens` and revoke the bootstrap.
@@ -119,10 +151,10 @@ If `BOOTSTRAP_TOKEN` was unset and `api_tokens` was empty on first boot, the boo
 
 ```bash
 cd ~/projects/switchyard && git pull
-cd ~/construct-server && docker compose up -d --build switchyard
+cd ~/construct-server && docker compose up -d --build switchyard switchyard-frontend
 ```
 
-Migrations are applied on every container start (idempotent). The seed routine is also idempotent — re-running it after canonical-user changes adds new agents without duplicating existing ones.
+Migrations are applied on every backend container start (idempotent). The seed routine is also idempotent — re-running it after canonical-user changes adds new agents without duplicating existing ones. Frontend-only changes (new bundle) only need `--build switchyard-frontend`.
 
 ## Imperium-Loop migration (separate project)
 

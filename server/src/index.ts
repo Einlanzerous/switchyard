@@ -1,5 +1,4 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { serveStatic } from "hono/bun";
 import { cors } from "hono/cors";
 import { env } from "./env.js";
 import { assertDatabaseReachable, shutdownDatabase } from "./db.js";
@@ -41,29 +40,14 @@ app.doc("/v1/openapi.json", {
 
 mountRoutes(app);
 
-// Static client. Two layers:
-//   1. Try to serve hashed assets (JS/CSS chunks) from client-dist. If the file
-//      doesn't exist, serveStatic calls next() and we fall through to notFound.
-//   2. notFound handles two cases distinctly: API requests get a JSON 404 (so
-//      agent retries see a structured error), everything else gets index.html
-//      (the SPA shell handles client-side routing from there).
-//
-// The previous dual-serveStatic pattern always served index.html for any path,
-// which could mask API responses depending on middleware-vs-route ordering.
-app.use("/*", serveStatic({ root: "./client-dist" }));
-
+// API-only — the static client lives in a sibling container that passthroughs
+// /v1/* and /healthz here. Any unknown path is a JSON 404.
 app.notFound((c) => {
   const path = new URL(c.req.url).pathname;
-  if (path.startsWith("/v1") || path === "/healthz" || path.startsWith("/api")) {
-    return c.json(
-      { error: { code: "not_found" as const, message: `${c.req.method} ${path} not found` } },
-      404
-    );
-  }
-  // SPA shell — Vue Router takes over from here.
-  return new Response(Bun.file("./client-dist/index.html"), {
-    headers: { "Content-Type": "text/html; charset=utf-8" },
-  });
+  return c.json(
+    { error: { code: "not_found" as const, message: `${c.req.method} ${path} not found` } },
+    404
+  );
 });
 
 console.log(`[switchyard] listening on :${env.PORT}`);
