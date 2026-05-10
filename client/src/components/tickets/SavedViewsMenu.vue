@@ -65,7 +65,7 @@ function isOwn(view: SavedView): boolean {
         <Bookmark class="h-3.5 w-3.5 mr-1.5" /> Views
       </Button>
     </DropdownMenuTrigger>
-    <DropdownMenuContent align="end" class="w-64">
+    <DropdownMenuContent align="end" class="w-64 max-h-[60vh] overflow-y-auto">
       <DropdownMenuLabel class="flex items-center justify-between">
         <span class="text-xs uppercase tracking-wider text-muted-foreground">Saved views</span>
       </DropdownMenuLabel>

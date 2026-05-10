@@ -163,6 +163,21 @@ async function seedTickets(
   }
 }
 
+async function pruneStaleE2eSavedViews(testUser: typeof schema.users.$inferSelect) {
+  // Postgres has no native row TTL, so we evaluate one lazily here:
+  // every fixture run, drop any `e2e %` saved views older than an hour
+  // that test-user has accumulated from prior round-trip tests. The
+  // hour buffer keeps a concurrent run's just-saved view safe.
+  const result = await db.execute<{ count: number }>(
+    sql`DELETE FROM saved_views
+        WHERE owner_id = ${testUser.id}
+          AND name LIKE 'e2e %'
+          AND created_at < now() - interval '1 hour'` as any
+  );
+  const deleted = (result as any).count ?? (result as any).rowCount ?? 0;
+  if (deleted > 0) console.log(`[test-seed] pruned ${deleted} stale e2e saved views`);
+}
+
 async function main() {
   // Reporter falls back to magos so audit trails attribute "system"
   // seeded rows to a real account. test-user is the assignee where
@@ -180,6 +195,7 @@ async function main() {
   const testUser = await ensureTestUser();
   const project = await ensureProject(magos);
   await seedTickets(project, magos, testUser);
+  await pruneStaleE2eSavedViews(testUser);
 
   console.log("[test-seed] done");
 }
