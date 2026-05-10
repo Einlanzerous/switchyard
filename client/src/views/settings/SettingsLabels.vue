@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
-import { Plus, Loader2, Trash2, Pencil } from "lucide-vue-next";
+import { Plus, Loader2, Trash2, Pencil, Tag } from "lucide-vue-next";
 import { toast } from "vue-sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import LabelChip from "@/components/tickets/LabelChip.vue";
+import EmptyState from "@/components/EmptyState.vue";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
 import type { Label as LabelType } from "@switchyard/shared";
@@ -136,7 +137,13 @@ const canSave = computed(() => draftName.value.trim().length > 0 && validHex.val
           <li v-for="lbl in items" :key="lbl.id" class="flex items-center gap-3 p-3">
             <LabelChip :label="lbl" />
             <div class="flex-1 font-mono text-xs text-muted-foreground">{{ lbl.color }}</div>
-            <Button variant="ghost" size="sm" class="text-muted-foreground" @click="openEdit(lbl)">
+            <Button
+              variant="ghost"
+              size="sm"
+              class="text-muted-foreground"
+              :aria-label="`Edit label ${lbl.name}`"
+              @click="openEdit(lbl)"
+            >
               <Pencil class="h-3.5 w-3.5" />
             </Button>
             <Button
@@ -144,6 +151,7 @@ const canSave = computed(() => draftName.value.trim().length > 0 && validHex.val
               size="sm"
               class="text-muted-foreground hover:text-destructive"
               :disabled="deletingId === lbl.id"
+              :aria-label="`Delete label ${lbl.name}`"
               @click="deleteMutation.mutate(lbl.id)"
             >
               <Loader2 v-if="deletingId === lbl.id" class="h-3.5 w-3.5 animate-spin" />
@@ -151,9 +159,18 @@ const canSave = computed(() => draftName.value.trim().length > 0 && validHex.val
             </Button>
           </li>
         </ul>
-        <p v-else class="p-6 text-sm text-muted-foreground text-center italic">
-          No labels yet — use "New label" to add the first one.
-        </p>
+        <EmptyState
+          v-else
+          :icon="Tag"
+          title="No labels yet"
+          description="Labels are workspace-global; create one to start tagging tickets."
+        >
+          <template #action>
+            <Button size="sm" @click="openCreate">
+              <Plus class="h-3.5 w-3.5 mr-1.5" /> New label
+            </Button>
+          </template>
+        </EmptyState>
       </CardContent>
     </Card>
 

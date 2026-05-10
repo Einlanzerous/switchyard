@@ -229,7 +229,8 @@ Locked breakdown:
 - **3.1 — Dashboards.** Chart lib: **Apache ECharts via vue-echarts** (may roll our own later for visual polish). See "3.1 — Dashboards in detail" below for widget-level specs.
 - **3.2 — Power tools on tickets list.** Saved views (`saved_views` table, CRUD, palette integration) + bulk operations (multi-select, bulk-edit labels/assignee/status).
 - **3.3 — Notifications / @mentions.** Persistent notifications surface — `notifications` table, `mentioned_user_ids` extracted on comment/description write, dedicated unread/seen state, mark-as-read endpoint, dropdown in topbar, deeper integration with the homepage panel that 3.1 ships as a basic live-scan placeholder.
-- **3.4 — Polish & a11y.** Empty-state audit, skeleton-loader audit, keyboard-nav per-view (`j/k` on tickets list, `←/→` between board columns), aria audit, configurable Projects columns, command palette `=`-token autocomplete, configurable widget visibility on Insights tabs.
+- **3.4 — Polish & a11y.** Empty-state audit, skeleton-loader audit, keyboard-nav per-view (arrows primary, `j/k` alternate, `x`/`Shift+x` for bulk-select), ARIA audit, deprecated endpoint cleanup. **Configurable Projects columns**, **configurable Insights widget visibility**, and **command-palette `=`-token autocomplete** were deferred to Phase 5 — see "Deferred → Phase 5" below.
+- **3.6 — Power-user shortcut adoption (optional).** Tracking ticket only — no code work. Once 3.4 ships keyboard nav with both arrow keys (default) and `j`/`k`/`x`/`e` (Linear/Gmail-style alternates), this milestone is a personal note to incrementally adopt the alternate bindings in daily use. Closing it = "I've internalized the shortcuts" rather than a build deliverable.
 - **3.5 — Playwright E2E.** Pattern mirrors `Einlanzerous/legislator-lookup-tool-cc`: `playwright.config.ts` at the client root with `chromium` + `firefox` projects, `e2e/` directory, `webServer` block that boots `bun run dev` at `http://localhost:5173`, HTML reporter, trace on first retry. Phases:
   - **3.5.0 Scaffolding** — install `@playwright/test`, generate `playwright.config.ts` adapted for our `bun run dev` + bearer-token auth, add `client/e2e/` and `client/scripts/` for any seed helpers. `client/package.json` gets `test:e2e: "playwright test"` + `test:e2e:ui: "playwright test --ui"`. `.gitignore` skips `playwright-report/`, `test-results/`, `client/playwright/.auth/`.
   - **3.5.1 Auth fixture** — a setup project that hits `POST /v1/users/{magos}/tokens` with the bootstrap token, stores the resulting bearer in `playwright/.auth/admin.json` via `localStorage` injection, and reuses across all subsequent tests. Mirrors the auth-state pattern Playwright recommends.
@@ -252,6 +253,11 @@ Locked Phase 3 decisions:
 Deferred from Phase 3 → Phase 5:
 
 - **SSE / real-time updates.** Current 30s `refetchInterval` (shipped in 2.7) is acceptable for now. Revisit if "agent moved a ticket but my UI doesn't know" feels laggy in practice.
+- **Configurable Projects columns** (Linear-style popover for toggling visible columns on the Projects directory). Originally scoped to 3.4; deferred because the default columns (key / name / open count / archived) cover the common case well enough.
+- **Configurable Insights widget visibility** (per-tab "Customize" popover on the per-project + per-board Insights tabs). Same Linear-style popover primitive as the columns one — promote these together if the absence is felt.
+- **Command-palette `=`-token autocomplete** (suggest project keys / user names inline when the caret sits right after `project=` or `assignee=`). Light implementation; defer until typing full names becomes annoying.
+
+Cross-project board (`/boards/:id`) keyboard navigation is also pending — single-project board nav shipped in 3.4, but the swimlane variant has a 2-D grid that needs different focus tracking. Promote to Phase 5 if/when needed.
 
 ### 3.1 — Dashboards in detail
 

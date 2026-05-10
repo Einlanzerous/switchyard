@@ -35,3 +35,18 @@ export const api = createClient<paths>({ baseUrl: "/" });
 api.use(authMiddleware);
 
 export type Api = typeof api;
+
+// Tiny guard for queryFn / mutationFn callers. openapi-fetch normally
+// returns either { data, error: undefined } or { data: undefined, error };
+// in rare failure modes (network drop mid-stream, body parse failure on a
+// 5xx HTML page) BOTH come back undefined. Without this guard the queryFn
+// silently `return undefined`, which TanStack Query rejects with
+// "Query data cannot be undefined" — useless for diagnosing the real
+// failure. Routing all empty results through here gives us a clear throw.
+export function unwrap<T>(result: { data?: T; error?: unknown }): T {
+  if (result.error !== undefined) throw result.error;
+  if (result.data === undefined) {
+    throw new Error("empty response from API");
+  }
+  return result.data;
+}

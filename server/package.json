@@ -13,6 +13,7 @@
     "db:test:setup": "bun scripts/db-test-setup.ts",
     "dev:seed-sample": "bun scripts/dev-seed-sample.ts",
     "seed:swy": "bun scripts/seed-switchyard-project.ts",
+    "seed:test-e2e": "bun scripts/seed-test-fixtures.ts",
     "openapi:gen": "DATABASE_URL=postgres://codegen@localhost:5432/codegen bun src/lib/openapi-gen.ts",
     "test": "bun test",
     "test:unit": "bun test test/lib/pagination.test.ts test/lib/hmac.test.ts",

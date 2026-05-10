@@ -19,6 +19,8 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import StatusBadge from "@/components/tickets/StatusBadge.vue";
+import EmptyState from "@/components/EmptyState.vue";
+import { Layers } from "lucide-vue-next";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
 import type { Status, StatusCategory } from "@switchyard/shared";
@@ -231,9 +233,12 @@ watch(statuses, (list) => {
             </Button>
           </li>
         </ul>
-        <p v-else class="p-6 text-sm text-muted-foreground italic text-center">
-          No statuses configured.
-        </p>
+        <EmptyState
+          v-else
+          :icon="Layers"
+          title="No statuses configured"
+          description="A project needs at least one status before tickets can move through it."
+        />
       </CardContent>
     </Card>
 

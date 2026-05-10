@@ -32,6 +32,10 @@ const props = defineProps<{
   option: any;
   height?: string;
   empty?: boolean;
+  // Loading takes precedence over empty so widgets don't flash "No data
+  // yet" during the initial fetch (which would always be true when
+  // points=[] is the unloaded state).
+  loading?: boolean;
 }>();
 
 const theme = useThemeStore();
@@ -112,7 +116,13 @@ watch(() => theme.mode, () => themeRev.value++);
 <template>
   <div class="relative w-full" :style="{ height: props.height ?? '240px' }">
     <div
-      v-if="props.empty"
+      v-if="props.loading"
+      class="absolute inset-0 flex items-center justify-center"
+    >
+      <div class="h-2/3 w-full rounded-md bg-muted/30 animate-pulse" />
+    </div>
+    <div
+      v-else-if="props.empty"
       class="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground italic"
     >
       No data yet.

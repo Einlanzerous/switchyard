@@ -9,6 +9,11 @@ import { cn } from "@/lib/utils";
 const props = defineProps<{
   column: Col;
   draggingTicketId: string | null;
+  // Optional: ticket id that has keyboard-focus inside this column. Used
+  // by the parent board view to drive arrow-key navigation. Cards
+  // compare their own id against this and render the focus stripe
+  // accordingly.
+  focusedTicketId?: string | null;
 }>();
 
 // `drop` fires when the destination has been resolved. The parent gets
@@ -31,8 +36,16 @@ const dropEl = useTemplateRef<HTMLElement>("dropEl");
 const isOver = ref(false);
 
 // Compute a position based on which card was hit and which edge.
-// Wrapper for the cleaner downstream emit.
-function emitDropForCard(sourceTicketId: string, targetTicketId: string, edge: "top" | "bottom") {
+// Wrapper for the cleaner downstream emit. `sourceCategory` is supplied by
+// the dragging card's drag-source data — without it we can't distinguish
+// a cross-column drop-onto-a-card from a same-column reorder, and the
+// handler upstream silently degrades to PATCHing position only.
+function emitDropForCard(
+  sourceTicketId: string,
+  sourceCategory: Col["category"],
+  targetTicketId: string,
+  edge: "top" | "bottom"
+) {
   const idx = props.column.tickets.findIndex((t) => t.id === targetTicketId);
   if (idx < 0) return;
   const target = props.column.tickets[idx]!;
@@ -41,22 +54,13 @@ function emitDropForCard(sourceTicketId: string, targetTicketId: string, edge: "
   const after = edge === "top" ? target : props.column.tickets[idx + 1] ?? null;
   const position = positionBetween(before, after);
 
-  const source = findSourceCategory(sourceTicketId);
   emit("drop", {
     ticketId: sourceTicketId,
-    fromCategory: source ?? props.column.category,
+    fromCategory: sourceCategory,
     toCategory: props.column.category,
     toStatusId: props.column.dropTargetStatusId,
     position,
   });
-}
-
-// We don't have a global ticket index — derive the source category from the
-// sibling cards we know about. The caller's column has the answer if the drop
-// is within-column; cross-column is handled in the column-level onDrop below
-// using the dnd source.data we record there.
-function findSourceCategory(_id: string): Col["category"] | null {
-  return null;
 }
 
 let cleanup: (() => void) | null = null;
@@ -107,8 +111,16 @@ onBeforeUnmount(() => {
   cleanup = null;
 });
 
-function onCardDrop(targetTicketId: string, payload: { sourceTicketId: string; edge: "top" | "bottom" }) {
-  emitDropForCard(payload.sourceTicketId, targetTicketId, payload.edge);
+function onCardDrop(
+  targetTicketId: string,
+  payload: { sourceTicketId: string; sourceCategory: string; edge: "top" | "bottom" }
+) {
+  emitDropForCard(
+    payload.sourceTicketId,
+    payload.sourceCategory as Col["category"],
+    targetTicketId,
+    payload.edge
+  );
 }
 </script>
 
@@ -135,6 +147,7 @@ function onCardDrop(targetTicketId: string, payload: { sourceTicketId: string; e
         :key="t.id"
         :ticket="t"
         :dragging="draggingTicketId === t.id"
+        :focused="focusedTicketId === t.id"
         @open="(k) => $emit('open', k)"
         @drop="(p) => onCardDrop(t.id, p)"
       />

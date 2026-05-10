@@ -1,0 +1,85 @@
+name: E2E
+
+# Runs the Playwright suite against a fresh dev server. Same trigger
+# rules as CI — push to main + every PR — but in a separate workflow so
+# E2E flakes don't block lockfile/typecheck CI and vice versa.
+#
+# Designed for the user's self-hosted runner (homelab). The runner has
+# direct access to the dev Postgres (the same one /5173 dev hits), and
+# we use a separate test DB so a failing run doesn't poison dev data.
+# To run on GitHub-hosted runners instead, add a postgres service
+# container under `services:` and point DATABASE_URL at it.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  e2e:
+    # Self-hosted by default — change to `ubuntu-latest` if you wire up a
+    # service container or migrate to GitHub-hosted runners.
+    runs-on: self-hosted
+    timeout-minutes: 20
+
+    env:
+      # Separate test DB, same Postgres instance as dev. The DB name
+      # (`switchyard_test`) must exist on the host's Postgres before this
+      # workflow runs — provision once with:
+      #   psql -c 'CREATE DATABASE switchyard_test OWNER switchyard_user;'
+      DATABASE_URL: ${{ secrets.E2E_DATABASE_URL }}
+
+      # Long-lived admin token on the test DB. Mint once with the
+      # bootstrap flow and store as a repo secret. The auth.setup project
+      # uses this to mint a per-test-user token at runtime.
+      BOOTSTRAP_TOKEN: ${{ secrets.E2E_BOOTSTRAP_TOKEN }}
+
+      # Optional: skip the bootstrap-token flow entirely by providing a
+      # pre-minted test-user token. Faster, no /tokens write needed.
+      E2E_TEST_USER_TOKEN: ${{ secrets.E2E_TEST_USER_TOKEN }}
+
+      CI: "true"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install deps
+        run: bun install --frozen-lockfile
+
+      # Reset the test DB to a known state before each run. `db:migrate`
+      # is idempotent so this is safe even when the DB already exists;
+      # the seed adds canonical users + bootstrap token.
+      - name: Migrate test DB
+        run: bun --cwd server run db:migrate
+
+      - name: Seed E2E fixtures
+        run: bun --cwd server run seed:test-e2e
+
+      # Playwright manages its own browser binaries; cache them between
+      # runs to skip the ~200MB download.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('client/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Install Playwright browsers
+        run: bunx --cwd client playwright install --with-deps chromium firefox
+
+      - name: Run Playwright
+        run: bun --cwd client run test:e2e
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: client/playwright-report/
+          retention-days: 7

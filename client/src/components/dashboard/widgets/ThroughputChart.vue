@@ -59,5 +59,10 @@ defineExpose({ isEmpty });
 </script>
 
 <template>
-  <Chart :option="option" :empty="isEmpty" height="220px" />
+  <Chart
+    :option="option"
+    :empty="isEmpty"
+    :loading="q.isLoading.value"
+    height="220px"
+  />
 </template>

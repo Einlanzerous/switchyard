@@ -24,18 +24,6 @@ export function useStaleRollup() {
   });
 }
 
-export function useMyMentions() {
-  return useQuery({
-    queryKey: queryKeys.myMentions(),
-    staleTime: STALE_60S,
-    queryFn: async () => {
-      const { data, error } = await api.GET("/v1/users/me/mentions");
-      if (error) throw error;
-      return data;
-    },
-  });
-}
-
 export function useThroughput(params: ComputedRef<{
   project?: string;
   since?: string;

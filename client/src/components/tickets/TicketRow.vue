@@ -12,8 +12,14 @@ import type { TicketSummary } from "@switchyard/shared";
 
 const props = defineProps<{
   ticket: TicketSummary;
+  // True when the URL `?focus=KEY` matches this row (drawer is open on it).
   active?: boolean;
+  // True when this row is the bulk-select target (checkbox checked).
   selected?: boolean;
+  // True when keyboard nav has parked on this row. Renders a left-edge
+  // accent so users tracking the list with arrow keys / j-k can see where
+  // they are without it looking the same as the drawer-open state.
+  focused?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -48,10 +54,13 @@ function onSelectClick(e: MouseEvent) {
 <template>
   <div
     :class="cn(
-      'flex h-12 w-full items-center gap-3 pr-4 text-left text-sm border-b border-border/60 transition-colors group',
+      'relative flex h-12 w-full items-center gap-3 pr-4 text-left text-sm border-b border-border/60 transition-colors group',
       'hover:bg-accent/50',
       active && 'bg-accent/70',
       selected && 'bg-primary/5',
+      // Focus accent: 2px primary stripe on the left edge. Drawn via
+      // before-pseudo so it doesn't push content rightward.
+      focused && 'before:absolute before:inset-y-0 before:left-0 before:w-[2px] before:bg-primary',
     )"
   >
     <!-- Bulk-select cell. Always visible (muted) but clearer on hover and
@@ -72,9 +81,15 @@ function onSelectClick(e: MouseEvent) {
       />
     </div>
 
+    <!--
+      Focus styles intentionally only outline-none — the wrapper above
+      already paints the row-wide background based on `active` and
+      `selected`, so adding a darker focus:bg-accent here would make the
+      button cell light up hotter than the checkbox cell next to it.
+    -->
     <button
       type="button"
-      class="flex flex-1 min-w-0 items-center gap-3 h-full text-left focus:outline-none focus:bg-accent"
+      class="flex flex-1 min-w-0 items-center gap-3 h-full text-left focus:outline-none"
       @click="emit('open', ticket.key)"
     >
       <span class="font-mono text-xs text-muted-foreground w-20 shrink-0 truncate">{{ ticket.key }}</span>

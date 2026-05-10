@@ -3,7 +3,7 @@ import { computed, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
 import {
-  ArrowLeft, Loader2, RefreshCw, CheckCircle2, XCircle, Clock, AlertCircle,
+  ArrowLeft, Loader2, RefreshCw, CheckCircle2, XCircle, Clock, AlertCircle, Inbox,
 } from "lucide-vue-next";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "vue-sonner";
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import EmptyState from "@/components/EmptyState.vue";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
 import type { WebhookDeliveryStatus } from "@switchyard/shared";
@@ -158,9 +159,13 @@ function relative(iso: string | null): string {
             </Button>
           </li>
         </ul>
-        <p v-else class="p-6 text-sm text-muted-foreground italic text-center">
-          No deliveries yet for this subscription.
-        </p>
+        <EmptyState
+          v-else
+          :icon="Inbox"
+          title="No deliveries yet"
+          description="Outbound calls will appear here once the subscription fires."
+          size="sm"
+        />
       </CardContent>
     </Card>
   </div>

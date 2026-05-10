@@ -21,8 +21,14 @@ const props = defineProps<{
 const emit = defineEmits<{
   open: [key: string];
   // Fires when another card is dropped onto THIS card's hit zone. The parent
-  // column uses (ticketId, edge) to decide where to insert.
-  drop: [payload: { sourceTicketId: string; edge: "top" | "bottom" }];
+  // column needs `sourceCategory` to detect cross-column moves — without
+  // it, drop-onto-a-card collapses to a same-column reorder even when the
+  // source came from a different column.
+  drop: [payload: {
+    sourceTicketId: string;
+    sourceCategory: string;
+    edge: "top" | "bottom";
+  }];
 }>();
 
 const cardEl = useTemplateRef<HTMLElement>("cardEl");
@@ -71,10 +77,12 @@ onMounted(() => {
       onDrop: ({ source, self }) => {
         const edge = extractClosestEdge(self.data);
         const sourceTicketId = source.data.ticketId as string | undefined;
+        const sourceCategory = source.data.currentCategory as string | undefined;
         dropEdge.value = null;
-        if (!sourceTicketId || !edge) return;
+        if (!sourceTicketId || !edge || !sourceCategory) return;
         emit("drop", {
           sourceTicketId,
+          sourceCategory,
           edge: edge === "top" ? "top" : "bottom",
         });
       },

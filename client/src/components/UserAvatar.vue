@@ -9,6 +9,7 @@
 import { computed } from "vue";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { avatarColorFor } from "@/lib/avatarColor";
+import { computeInitials } from "@/lib/initials";
 
 type UserLike = {
   id?: string;
@@ -22,15 +23,7 @@ const props = defineProps<{
   title?: string;
 }>();
 
-const initials = computed(() => {
-  const name = props.user?.name ?? "";
-  if (!name) return "—";
-  return name
-    .split(/\s+/)
-    .map((p) => p[0]?.toUpperCase() ?? "")
-    .slice(0, 2)
-    .join("") || "—";
-});
+const initials = computed(() => computeInitials(props.user?.name));
 
 const color = computed(() => {
   if (!props.user) return "#6b7280";
@@ -63,9 +56,15 @@ const ariaTitle = computed(() => props.title ?? props.user?.name ?? undefined);
       bg-secondary shows through as a ring. These classes make the
       colored chip fill the whole circle, Jira-style.
     -->
+    <!--
+      `leading-none` is load-bearing — without it, the line-box's default
+      leading pads the bottom of capital letters (M / N especially) and
+      shifts them low even though they're flex-centered. Tracking-wide
+      keeps two-letter pairs from looking cramped.
+    -->
     <AvatarFallback
       :style="{ backgroundColor: color, color: '#fff' }"
-      class="flex h-full w-full items-center justify-center font-medium"
+      class="flex h-full w-full items-center justify-center font-medium leading-none tracking-wide"
     >
       {{ initials }}
     </AvatarFallback>

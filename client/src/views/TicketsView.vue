@@ -147,6 +147,94 @@ const errMessage = computed(() => {
   if (!e) return null;
   return (e as { error?: { message?: string } }).error?.message ?? "Failed to load tickets";
 });
+
+// ─── keyboard nav (3.4 C) ───────────────────────────────────────────────────
+//
+// Per-view bindings layered on top of the global ones. The global handler
+// in AppShell skips when the user is typing in an input; we re-do that
+// check here too because window-level keydown can fire while the FilterBar
+// search input has focus.
+//
+// Bindings (active on the tickets list):
+//   ArrowDown / j   — next row
+//   ArrowUp   / k   — previous row
+//   Enter           — open the focused row in the drawer
+//   x               — toggle bulk selection on the focused row
+//   Shift+x         — extend bulk selection from the previous anchor
+//   Esc             — clear focus + selection (keyboard-first dismiss)
+
+const keyboardFocusIdx = ref<number>(-1);
+
+function isTypingTarget(t: EventTarget | null): boolean {
+  if (!t || !(t instanceof HTMLElement)) return false;
+  if (t.isContentEditable) return true;
+  const tag = t.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+}
+
+function moveFocus(delta: number) {
+  const len = items.value.length;
+  if (len === 0) return;
+  if (keyboardFocusIdx.value === -1) {
+    keyboardFocusIdx.value = delta > 0 ? 0 : len - 1;
+  } else {
+    keyboardFocusIdx.value = Math.max(0, Math.min(len - 1, keyboardFocusIdx.value + delta));
+  }
+  // Bring the focused row into view; vue-virtual exposes scrollToIndex.
+  rowVirtualizer.value.scrollToIndex(keyboardFocusIdx.value, { align: "auto" });
+}
+
+function onListKeydown(e: KeyboardEvent) {
+  if (isTypingTarget(e.target)) return;
+  // Stay out of the way when modifier keys are involved (Ctrl+K, etc.).
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+  switch (e.key) {
+    case "ArrowDown":
+    case "j":
+      e.preventDefault();
+      moveFocus(1);
+      return;
+    case "ArrowUp":
+    case "k":
+      e.preventDefault();
+      moveFocus(-1);
+      return;
+    case "Enter": {
+      const t = items.value[keyboardFocusIdx.value];
+      if (t) {
+        e.preventDefault();
+        openTicket(t.key);
+      }
+      return;
+    }
+    case "x":
+    case "X": {
+      const t = items.value[keyboardFocusIdx.value];
+      if (!t) return;
+      e.preventDefault();
+      toggleSelect(t.key, e.shiftKey);
+      return;
+    }
+    case "Escape":
+      // Drawer's own Esc handling is on the Sheet; we only handle this
+      // when no drawer is open (focusedKey is null). Otherwise Escape
+      // stays a drawer-close.
+      if (!focusedKey.value && (someSelected.value || keyboardFocusIdx.value !== -1)) {
+        e.preventDefault();
+        keyboardFocusIdx.value = -1;
+        clearSelection();
+      }
+      return;
+  }
+}
+
+onMounted(() => window.addEventListener("keydown", onListKeydown));
+onBeforeUnmount(() => window.removeEventListener("keydown", onListKeydown));
+
+// Filter changes invalidate the focused index — rows reshuffle and the old
+// position no longer points at the same ticket.
+watch(() => filters.value, () => { keyboardFocusIdx.value = -1; });
 </script>
 
 <template>
@@ -215,6 +303,7 @@ const errMessage = computed(() => {
             :ticket="items[vi.index]!"
             :active="items[vi.index]?.key === focusedKey"
             :selected="selected.has(items[vi.index]!.key)"
+            :focused="vi.index === keyboardFocusIdx"
             @open="openTicket"
             @toggle-select="toggleSelect"
           />

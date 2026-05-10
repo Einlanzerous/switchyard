@@ -123,6 +123,17 @@ const PHASES: Phase[] = [
       { title: "Phase 3.3 · Notifications / @mentions persistence", started_days_ago: 0, closed_days_ago: null, status: "backlog" },
       { title: "Phase 3.4 · Polish & a11y", started_days_ago: 0, closed_days_ago: null, status: "backlog" },
       {
+        title: "Phase 3.6 · Adopt power-user shortcuts (optional)",
+        started_days_ago: 0,
+        closed_days_ago: null,
+        status: "backlog",
+        description:
+          "Personal-habit ticket, not a build task. 3.4 ships arrow keys as the primary "
+          + "keyboard navigation, with Linear/Gmail-style alternates (j/k for up/down, x for "
+          + "select, e for edit description). This ticket tracks intentional adoption of those "
+          + "alternates in daily use. Close it once they feel natural.",
+      },
+      {
         title: "Phase 3.5 · Playwright E2E",
         started_days_ago: 0,
         closed_days_ago: null,

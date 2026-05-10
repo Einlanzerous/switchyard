@@ -37,10 +37,28 @@ const groups: Group[] = [
     ],
   },
   {
+    label: "Tickets list",
+    items: [
+      { keys: ["↓"], description: "Next ticket  (also j)" },
+      { keys: ["↑"], description: "Previous ticket  (also k)" },
+      { keys: ["Enter"], description: "Open focused ticket" },
+      { keys: ["x"], description: "Toggle selection on focused ticket" },
+      { keys: ["Shift", "x"], description: "Extend selection from anchor" },
+    ],
+  },
+  {
+    label: "Project board",
+    items: [
+      { keys: ["←", "→"], description: "Move between columns" },
+      { keys: ["↑", "↓"], description: "Move between cards in column  (also j / k)" },
+      { keys: ["Enter"], description: "Open focused card" },
+    ],
+  },
+  {
     label: "Forms",
     items: [
       { keys: ["Ctrl", "Enter"], description: "Submit (in editors and composers)" },
-      { keys: ["Esc"], description: "Cancel / close" },
+      { keys: ["Esc"], description: "Cancel / close / clear keyboard focus" },
     ],
   },
 ];

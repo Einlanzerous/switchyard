@@ -123,6 +123,11 @@ const isEmpty = computed(() => !q.data.value || q.data.value.count === 0);
         </div>
       </div>
     </div>
-    <Chart :option="option" :empty="isEmpty" height="180px" />
+    <Chart
+      :option="option"
+      :empty="isEmpty"
+      :loading="q.isLoading.value"
+      height="180px"
+    />
   </div>
 </template>

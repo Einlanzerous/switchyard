@@ -28,23 +28,31 @@ function logout() {
 </script>
 
 <template>
-  <header class="flex h-14 items-center gap-3 border-b px-4">
-    <div class="flex-1 max-w-2xl">
+  <!--
+    Three-column flex: left spacer · centered search · right-justified
+    actions. Centering plus a slightly taller search bar (h-11 vs h-8 on
+    page-level FilterBars) keeps the topbar from looking like a mirror
+    image of the sub-page search inputs sitting directly underneath it.
+  -->
+  <header class="flex h-16 items-center gap-3 border-b px-4">
+    <div class="flex-1" aria-hidden="true" />
+
+    <div class="w-full max-w-2xl">
       <button
         type="button"
-        class="relative w-full h-9 rounded-md border border-transparent bg-muted/50 hover:bg-muted text-left text-sm text-muted-foreground pl-9 pr-16 transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        class="relative w-full h-11 rounded-md border border-transparent bg-muted/50 hover:bg-muted text-left text-sm text-muted-foreground px-3 transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-ring flex items-center gap-2"
         aria-label="Open command palette"
         @click="ui.openPalette()"
       >
-        <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" />
-        Search tickets, projects, boards…
-        <kbd class="absolute right-2 top-1/2 -translate-y-1/2 hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border bg-background px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+        <kbd class="hidden sm:inline-flex h-6 select-none items-center gap-1 rounded border bg-background px-1.5 font-mono text-[10px] font-medium text-muted-foreground shrink-0">
           Ctrl+K
         </kbd>
+        <Search class="h-4 w-4 shrink-0" />
+        <span class="truncate">Search tickets, projects, boards…</span>
       </button>
     </div>
 
-    <div class="ml-auto flex items-center gap-2">
+    <div class="flex-1 flex items-center justify-end gap-2">
       <NotificationsBell v-if="auth.isAuthenticated" />
 
       <Button

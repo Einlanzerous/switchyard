@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
+import EmptyState from "@/components/EmptyState.vue";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -232,9 +233,18 @@ const canSave = computed(() => draftUrl.value.trim().length > 0 && draftEvents.v
             </Button>
           </li>
         </ul>
-        <p v-else class="p-6 text-sm text-muted-foreground text-center italic">
-          No webhooks yet.
-        </p>
+        <EmptyState
+          v-else
+          :icon="Webhook"
+          title="No webhooks yet"
+          description="Subscribe an external endpoint to ticket / comment / status events."
+        >
+          <template #action>
+            <Button size="sm" @click="openCreate">
+              <Plus class="h-3.5 w-3.5 mr-1.5" /> New webhook
+            </Button>
+          </template>
+        </EmptyState>
       </CardContent>
     </Card>
 

@@ -150,24 +150,9 @@ export const StaleRollup = z.object({
 });
 export type StaleRollup = z.infer<typeof StaleRollup>;
 
-// ─── @mentions feed (homepage widget) ───────────────────────────────────────
-//
-// v1 is a stateless live scan: the server greps recent comments and ticket
-// descriptions for `@<requesting-user-name>` and returns them. No
-// mark-as-read, no persistence — that's the 3.3 Notifications scope.
-
-export const MentionItem = z.object({
-  ticket: TicketSummary,
-  comment_id: Uuid.nullable(),       // null when the mention was in the ticket description itself
-  snippet: z.string(),               // ~120 chars of context around the @mention
-  mentioned_at: Iso8601,
-});
-export type MentionItem = z.infer<typeof MentionItem>;
-
-export const MentionList = z.object({
-  items: z.array(MentionItem),
-});
-export type MentionList = z.infer<typeof MentionList>;
+// MentionList / MentionItem schemas existed for the 3.1 live-scan and were
+// dropped in 3.4 along with /v1/users/me/mentions. Use the persistent
+// notifications schema (`shared/src/schemas/notification.ts`) instead.
 
 // ─── cumulative flow ────────────────────────────────────────────────────────
 //

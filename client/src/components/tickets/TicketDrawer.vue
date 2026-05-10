@@ -90,6 +90,7 @@ const titleTicket = computed(() => headTicket.data.value);
           size="icon"
           class="h-7 w-7 shrink-0"
           title="Open in full page"
+          aria-label="Open ticket in full page"
           @click="openFullPage"
         >
           <ExternalLink class="h-3.5 w-3.5" />

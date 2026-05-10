@@ -1,14 +1,11 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useMutation, useQueryClient } from "@tanstack/vue-query";
 import { ArrowLeft, List, Loader2, AlertCircle, Inbox, Plus } from "lucide-vue-next";
 import { toast } from "vue-sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
 import BoardColumn from "@/components/tickets/BoardColumn.vue";
 import InsightsTabs from "@/components/dashboard/InsightsTabs.vue";
 import { api } from "@/lib/api";
@@ -34,16 +31,6 @@ const { columns, isLoading, error, refetch } = useProjectBoard(projectKey);
 
 // Tracks which ticket is mid-drop so cards can dim during the operation.
 const inflightTicketId = ref<string | null>(null);
-
-// When a drop targets the closed column we hold the move pending until the
-// user picks a resolution. Cancelling clears it without firing.
-const pendingClose = ref<null | {
-  ticketId: string;
-  fromCategory: Col["category"];
-  toStatusId: string;
-  position: number;
-}>(null);
-const resolution = ref<Resolution>("done");
 
 type TicketsResponse = { items: TicketSummary[]; page: { next_cursor: string | null; has_more: boolean } };
 
@@ -152,44 +139,138 @@ function handleDrop(payload: {
     });
     return;
   }
-  if (payload.toCategory === "closed") {
-    pendingClose.value = {
-      ticketId: payload.ticketId,
-      fromCategory: payload.fromCategory,
-      toStatusId: payload.toStatusId,
-      position: payload.position,
-    };
-    resolution.value = "done";
-    return;
-  }
+  // Drag-to-closed auto-uses `done` — that's the overwhelming common case
+  // and prompting every time is friction. To pick `released` or `cancelled`
+  // instead, edit the resolution from the drawer after the fact, or use
+  // the bulk transition modal where batch-resolution is the explicit point.
   transitionMutation.mutate({
     ticketId: payload.ticketId,
     toStatusId: payload.toStatusId,
     position: payload.position,
+    resolution: payload.toCategory === "closed" ? "done" : undefined,
   });
 }
-
-function confirmClose() {
-  if (!pendingClose.value) return;
-  transitionMutation.mutate({
-    ticketId: pendingClose.value.ticketId,
-    toStatusId: pendingClose.value.toStatusId,
-    position: pendingClose.value.position,
-    resolution: resolution.value,
-  });
-  pendingClose.value = null;
-}
-
-const closeOpen = computed({
-  get: () => pendingClose.value !== null,
-  set: (v: boolean) => { if (!v) pendingClose.value = null; },
-});
 
 // ─── ticket open (drawer) ────────────────────────────────────────────────────
 
 function openTicket(key: string) {
   router.push({ query: { ...route.query, focus: key } });
 }
+
+// ─── keyboard nav (3.4 C) ───────────────────────────────────────────────────
+//
+// Two-axis movement on the board:
+//   ←/→  switch columns (skipping any that are empty after a wraparound
+//        check — we still let the user park on an empty column so they
+//        can press `c` to create into it; arrow nav ignores them only
+//        when there are no cards at all to focus).
+//   ↑/↓  move within the current column.
+//   Enter  open the focused card in the drawer.
+//   Esc    drop keyboard focus (does not close the drawer if open).
+//
+// Position is tracked as (columnIndex, ticketIndex) into the live
+// `columns` array. When the underlying data changes (drag-and-drop, an
+// agent moves a card, etc.), we clamp the indices back into range.
+
+const focusedColIdx = ref<number>(-1);
+const focusedTicketIdx = ref<number>(0);
+
+function isTypingTarget(t: EventTarget | null): boolean {
+  if (!t || !(t instanceof HTMLElement)) return false;
+  if (t.isContentEditable) return true;
+  const tag = t.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+}
+
+const focusedTicketId = computed<string | null>(() => {
+  const c = columns.value[focusedColIdx.value];
+  if (!c) return null;
+  return c.tickets[focusedTicketIdx.value]?.id ?? null;
+});
+
+function moveColumn(delta: number) {
+  const total = columns.value.length;
+  if (total === 0) return;
+  let next = focusedColIdx.value === -1
+    ? (delta > 0 ? 0 : total - 1)
+    : Math.max(0, Math.min(total - 1, focusedColIdx.value + delta));
+  focusedColIdx.value = next;
+  // Clamp the ticket index to the new column's length.
+  const len = columns.value[next]?.tickets.length ?? 0;
+  focusedTicketIdx.value = Math.max(0, Math.min(len - 1, focusedTicketIdx.value));
+}
+
+function moveTicket(delta: number) {
+  if (focusedColIdx.value === -1) {
+    // Pressing up/down with no column focused → park on the first
+    // non-empty column.
+    const firstWithTickets = columns.value.findIndex((c) => c.tickets.length > 0);
+    if (firstWithTickets === -1) return;
+    focusedColIdx.value = firstWithTickets;
+    focusedTicketIdx.value = 0;
+    return;
+  }
+  const col = columns.value[focusedColIdx.value];
+  if (!col || col.tickets.length === 0) return;
+  focusedTicketIdx.value = Math.max(0, Math.min(col.tickets.length - 1, focusedTicketIdx.value + delta));
+}
+
+function onBoardKeydown(e: KeyboardEvent) {
+  if (isTypingTarget(e.target)) return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+  switch (e.key) {
+    case "ArrowLeft":
+      e.preventDefault();
+      moveColumn(-1);
+      return;
+    case "ArrowRight":
+      e.preventDefault();
+      moveColumn(1);
+      return;
+    case "ArrowUp":
+    case "k":
+      e.preventDefault();
+      moveTicket(-1);
+      return;
+    case "ArrowDown":
+    case "j":
+      e.preventDefault();
+      moveTicket(1);
+      return;
+    case "Enter": {
+      const id = focusedTicketId.value;
+      if (!id) return;
+      const t = columns.value[focusedColIdx.value]?.tickets[focusedTicketIdx.value];
+      if (!t) return;
+      e.preventDefault();
+      openTicket(t.key);
+      return;
+    }
+    case "Escape":
+      // Don't fight the drawer's own Esc when it's open.
+      if (route.query.focus) return;
+      if (focusedColIdx.value !== -1) {
+        e.preventDefault();
+        focusedColIdx.value = -1;
+      }
+      return;
+  }
+}
+
+onMounted(() => window.addEventListener("keydown", onBoardKeydown));
+onBeforeUnmount(() => window.removeEventListener("keydown", onBoardKeydown));
+
+// Re-clamp the focused position when the underlying columns shape changes
+// (status added/removed, ticket dragged elsewhere, etc.).
+watch(columns, (cols) => {
+  if (focusedColIdx.value >= cols.length) {
+    focusedColIdx.value = -1;
+    return;
+  }
+  const len = cols[focusedColIdx.value]?.tickets.length ?? 0;
+  focusedTicketIdx.value = Math.max(0, Math.min(len - 1, focusedTicketIdx.value));
+});
 
 // ─── nav back to list ────────────────────────────────────────────────────────
 
@@ -265,52 +346,16 @@ const errMessage = computed(() => {
     <div v-else class="flex-1 overflow-x-auto p-4">
       <div class="flex gap-3 h-full">
         <BoardColumn
-          v-for="col in columns"
+          v-for="(col, idx) in columns"
           :key="col.category"
           :column="col"
           :dragging-ticket-id="inflightTicketId"
+          :focused-ticket-id="idx === focusedColIdx ? focusedTicketId : null"
           @open="openTicket"
           @drop="handleDrop"
         />
       </div>
     </div>
 
-    <!-- Resolution prompt for closed-column drops -->
-    <Dialog :open="closeOpen" @update:open="closeOpen = $event">
-      <DialogContent class="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Closing — pick a resolution</DialogTitle>
-          <DialogDescription>
-            Required when entering a Closed status.
-          </DialogDescription>
-        </DialogHeader>
-        <div class="grid grid-cols-3 gap-1.5">
-          <button
-            v-for="r in (['done','released','cancelled'] as const)"
-            :key="r"
-            type="button"
-            :class="[
-              'rounded-md border px-2 py-2 text-sm font-medium capitalize transition-colors',
-              resolution === r
-                ? 'bg-primary text-primary-foreground border-primary'
-                : 'bg-background text-muted-foreground hover:bg-accent hover:text-foreground border-border',
-            ]"
-            @click="resolution = r"
-          >
-            {{ r }}
-          </button>
-        </div>
-        <DialogFooter>
-          <Button variant="ghost" @click="pendingClose = null">Cancel</Button>
-          <Button @click="confirmClose">
-            <Loader2
-              v-if="transitionMutation.isPending.value"
-              class="h-3.5 w-3.5 mr-1.5 animate-spin"
-            />
-            Close ticket
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   </div>
 </template>

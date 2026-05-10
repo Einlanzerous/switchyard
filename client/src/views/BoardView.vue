@@ -6,9 +6,6 @@ import { ArrowLeft, AlertCircle, Inbox, Loader2, Pencil, Plus } from "lucide-vue
 import { toast } from "vue-sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
 import BoardCell from "@/components/boards/BoardCell.vue";
 import SwimlaneSelector, { type SwimlaneBy } from "@/components/boards/SwimlaneSelector.vue";
 import EditBoardDialog from "@/components/boards/EditBoardDialog.vue";
@@ -134,15 +131,6 @@ type ColumnsResponse = {
 };
 
 const inflightTicketId = ref<string | null>(null);
-
-// Pending closed-category drop awaiting a resolution choice.
-const pendingClose = ref<null | {
-  ticketId: string;
-  toStatusId: string;
-  toCategory: StatusCategory;
-  position: number;
-}>(null);
-const resolution = ref<Resolution>("done");
 
 const transitionMutation = useMutation({
   mutationFn: async (input: {
@@ -289,30 +277,20 @@ function handleDrop(ticketId: string, toCategory: StatusCategory, position: numb
     return;
   }
 
-  if (toCategory === "closed") {
-    pendingClose.value = { ticketId, toStatusId: targetStatus.id, toCategory, position };
-    resolution.value = "done";
-    return;
-  }
-
-  transitionMutation.mutate({ ticketId, toStatusId: targetStatus.id, position });
-}
-
-function confirmClose() {
-  if (!pendingClose.value) return;
+  // Drag-to-closed defaults to `resolution: done` — same convention as the
+  // single-project board. Bulk transition modal handles the explicit-pick
+  // case for batch ops.
   transitionMutation.mutate({
-    ticketId: pendingClose.value.ticketId,
-    toStatusId: pendingClose.value.toStatusId,
-    position: pendingClose.value.position,
-    resolution: resolution.value,
+    ticketId,
+    toStatusId: targetStatus.id,
+    position,
+    resolution: toCategory === "closed" ? "done" : undefined,
   });
-  pendingClose.value = null;
 }
 
-const closeOpen = computed({
-  get: () => pendingClose.value !== null,
-  set: (v: boolean) => { if (!v) pendingClose.value = null; },
-});
+// closeOpen / pendingClose / confirmClose removed in 3.4 polish — drag-to-
+// closed now auto-uses `done` resolution. Bulk transition modal handles
+// the explicit-pick case for batch ops.
 
 function openTicket(key: string) {
   router.push({ query: { ...route.query, focus: key } });
@@ -427,40 +405,6 @@ const errMessage = computed(() => {
         </template>
       </div>
     </div>
-
-    <!-- Resolution prompt for closed-column drops -->
-    <Dialog :open="closeOpen" @update:open="closeOpen = $event">
-      <DialogContent class="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Closing — pick a resolution</DialogTitle>
-          <DialogDescription>Required when entering a Closed status.</DialogDescription>
-        </DialogHeader>
-        <div class="grid grid-cols-3 gap-1.5">
-          <button
-            v-for="r in (['done','released','cancelled'] as const)"
-            :key="r"
-            type="button"
-            :class="[
-              'rounded-md border px-2 py-2 text-sm font-medium capitalize transition-colors',
-              resolution === r
-                ? 'bg-primary text-primary-foreground border-primary'
-                : 'bg-background text-muted-foreground hover:bg-accent hover:text-foreground border-border',
-            ]"
-            @click="resolution = r"
-          >{{ r }}</button>
-        </div>
-        <DialogFooter>
-          <Button variant="ghost" @click="pendingClose = null">Cancel</Button>
-          <Button @click="confirmClose">
-            <Loader2
-              v-if="transitionMutation.isPending.value"
-              class="h-3.5 w-3.5 mr-1.5 animate-spin"
-            />
-            Close ticket
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
 
     <EditBoardDialog v-if="board" v-model:open="showEdit" :board="board" />
   </div>

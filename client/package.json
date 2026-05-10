@@ -7,7 +7,10 @@
     "dev": "vite --host",
     "build": "(cd ../shared && bun run build) && vue-tsc -b && vite build",
     "preview": "vite preview",
-    "api:gen": "bunx openapi-typescript ../openapi.yaml -o ./src/lib/api.types.ts"
+    "api:gen": "bunx openapi-typescript ../openapi.yaml -o ./src/lib/api.types.ts",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:smoke": "playwright test --project=chromium e2e/smoke.spec.ts"
   },
   "dependencies": {
     "@atlaskit/pragmatic-drag-and-drop": "^1.8.1",
@@ -36,6 +39,7 @@
     "vue-sonner": "^2.0.9"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@tailwindcss/typography": "^0.5.19",
     "@types/bun": "^1.1.14",
     "@types/dompurify": "^3.0.5",

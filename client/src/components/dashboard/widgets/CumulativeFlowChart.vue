@@ -72,5 +72,10 @@ function formatBucketLabel(iso: string, _bucket: "day" | "week"): string {
 </script>
 
 <template>
-  <Chart :option="option" :empty="isEmpty" height="280px" />
+  <Chart
+    :option="option"
+    :empty="isEmpty"
+    :loading="q.isLoading.value"
+    height="280px"
+  />
 </template>

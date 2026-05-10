@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { computed } from "vue";
 import { useMutation, useQueryClient } from "@tanstack/vue-query";
 import { ChevronDown, Loader2, ArrowRight } from "lucide-vue-next";
 import { toast } from "vue-sonner";
@@ -8,7 +8,6 @@ import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import StatusBadge from "./StatusBadge.vue";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
@@ -21,13 +20,10 @@ const props = defineProps<{
 
 const qc = useQueryClient();
 
-// When the user picks a closed-category status, we open a small popover to
-// select the resolution. Until then, target stays null.
-const pendingTarget = ref<Status | null>(null);
-const resolution = ref<Resolution>("done");
-
-const isClosing = computed(() => pendingTarget.value?.category === "closed");
-
+// Closed-category transitions auto-use `done` resolution — same convention
+// as drag-to-closed on the board. Picking `released` or `cancelled` is
+// expected via the bulk transition modal (multi-ticket explicit case) or
+// a future per-ticket resolution editor in the drawer body.
 const transitionMutation = useMutation({
   mutationFn: async (input: { status_id: string; resolution?: Resolution }) => {
     const { data, error } = await api.POST("/v1/tickets/{idOrKey}/transition", {
@@ -37,30 +33,25 @@ const transitionMutation = useMutation({
     if (error) throw error;
     return data;
   },
-  onSuccess: (_data, vars) => {
+  onSuccess: () => {
     qc.invalidateQueries({ queryKey: queryKeys.ticket(props.ticket.key) });
     qc.invalidateQueries({ queryKey: queryKeys.ticketEvents(props.ticket.key) });
     qc.invalidateQueries({ queryKey: ["sw", "tickets"] });
-    pendingTarget.value = null;
-    void vars;
+    qc.invalidateQueries({ queryKey: ["sw", "projects"] });
+    qc.invalidateQueries({ queryKey: ["sw", "boards"] });
+    qc.invalidateQueries({ queryKey: ["sw", "stats"] });
     toast.success("Status changed");
+  },
+  onError: (err) => {
+    const msg = (err as { error?: { message?: string } })?.error?.message ?? "Transition failed";
+    toast.error(msg);
   },
 });
 
 function pick(status: Status) {
-  if (status.category === "closed") {
-    pendingTarget.value = status;
-    resolution.value = "done";
-  } else {
-    transitionMutation.mutate({ status_id: status.id });
-  }
-}
-
-function confirmClose() {
-  if (!pendingTarget.value) return;
   transitionMutation.mutate({
-    status_id: pendingTarget.value.id,
-    resolution: resolution.value,
+    status_id: status.id,
+    resolution: status.category === "closed" ? "done" : undefined,
   });
 }
 
@@ -104,45 +95,5 @@ const submitting = computed(() => transitionMutation.isPending.value);
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
-
-    <!-- Resolution popover only mounts while a closed-category target is pending. -->
-    <Popover :open="isClosing" @update:open="(v) => { if (!v) pendingTarget = null; }">
-      <PopoverTrigger as-child>
-        <span class="hidden" />
-      </PopoverTrigger>
-      <PopoverContent class="w-72 space-y-3" align="end">
-        <div class="space-y-1">
-          <h4 class="text-sm font-semibold">Closing — pick a resolution</h4>
-          <p class="text-xs text-muted-foreground">
-            Required when entering a Closed status.
-          </p>
-        </div>
-        <div class="grid grid-cols-3 gap-1">
-          <button
-            v-for="r in (['done','released','cancelled'] as const)"
-            :key="r"
-            type="button"
-            :class="[
-              'rounded-md border px-2 py-1.5 text-xs font-medium capitalize transition-colors',
-              resolution === r
-                ? 'bg-primary text-primary-foreground border-primary'
-                : 'bg-background text-muted-foreground hover:bg-accent hover:text-foreground border-border',
-            ]"
-            @click="resolution = r"
-          >
-            {{ r }}
-          </button>
-        </div>
-        <div class="flex justify-end gap-2 pt-1 border-t">
-          <Button variant="ghost" size="sm" :disabled="submitting" @click="pendingTarget = null">
-            Cancel
-          </Button>
-          <Button size="sm" :disabled="submitting" @click="confirmClose">
-            <Loader2 v-if="submitting" class="h-3.5 w-3.5 mr-1.5 animate-spin" />
-            Close ticket
-          </Button>
-        </div>
-      </PopoverContent>
-    </Popover>
   </div>
 </template>

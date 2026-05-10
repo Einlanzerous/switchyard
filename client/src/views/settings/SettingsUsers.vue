@@ -138,7 +138,13 @@ const deleteMutation = useMutation({
                 {{ u.type }}
               </div>
             </div>
-            <Button variant="ghost" size="sm" class="text-muted-foreground" @click="openEdit(u)">
+            <Button
+              variant="ghost"
+              size="sm"
+              class="text-muted-foreground"
+              :aria-label="`Edit user ${u.name}`"
+              @click="openEdit(u)"
+            >
               <Pencil class="h-3.5 w-3.5" />
             </Button>
             <Button
@@ -147,6 +153,7 @@ const deleteMutation = useMutation({
               class="text-muted-foreground hover:text-destructive"
               :disabled="deletingId === u.id || u.id === auth.me?.id"
               :title="u.id === auth.me?.id ? 'You can\'t delete yourself' : 'Delete user'"
+              :aria-label="`Delete user ${u.name}`"
               @click="deleteMutation.mutate(u.id)"
             >
               <Loader2 v-if="deletingId === u.id" class="h-3.5 w-3.5 animate-spin" />
