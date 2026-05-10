@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.2.0](https://github.com/Einlanzerous/switchyard/compare/v1.1.0...v1.2.0) (2026-05-10)
+
+
+### Features
+
+* Phase 3.3 wrap status: ([0dd9ca3](https://github.com/Einlanzerous/switchyard/commit/0dd9ca3ff0e9a18e0ad8d7079bf38d3efe9851c1))
+* playwright tests ([c2a3894](https://github.com/Einlanzerous/switchyard/commit/c2a389424e49177f142172803188f3df96fdd45f))
+* Project insights, user dashboard ([8c85565](https://github.com/Einlanzerous/switchyard/commit/8c85565af605c7e764ad67ed43282c9aaf467d16))
+* Saved views, bulk operations ([b5731a7](https://github.com/Einlanzerous/switchyard/commit/b5731a7df67047f2fb878ec244bb2a94a42857dd))
+
+
+### Bug Fixes
+
+* Actual test fix, and add local test run bits to gitignore ([ddfa47b](https://github.com/Einlanzerous/switchyard/commit/ddfa47ba34c7c8202bee14a4372aaa14c2a47abe))
+* additional runner fixes ([ea5c2ef](https://github.com/Einlanzerous/switchyard/commit/ea5c2ef971da5a39ed097f88ec89981ea87dc4c0))
+* avatar default color fills the icon now ([f8cdf70](https://github.com/Einlanzerous/switchyard/commit/f8cdf70e11d6c8d03ad9414abc0f3faaee9cdbc2))
+* e2e playwright install ([2f66200](https://github.com/Einlanzerous/switchyard/commit/2f6620086ff191c6286a74cdaefea32712db9418))
+* ensure failed tests upload artifacts for debugging tests, fix some small issues with current tests ([97ae748](https://github.com/Einlanzerous/switchyard/commit/97ae74881670510ba7d10aa317c60d201690ec58))
+* seed db issues during e2e ([751a94d](https://github.com/Einlanzerous/switchyard/commit/751a94dfc4d30c2c6b474f52fcc3e5d7aa301f12))
+* tests found a real bug around user query race condition ([af22ed1](https://github.com/Einlanzerous/switchyard/commit/af22ed125a4566edeb10d38c648031edc9ee2093))
+* Update test selector to be more reliable ([c20544c](https://github.com/Einlanzerous/switchyard/commit/c20544c545614754049f2cf38439b36f327e0dec))
+* Update test selector to be more reliable ([72dcd6f](https://github.com/Einlanzerous/switchyard/commit/72dcd6f5494de1395fac006c2ce11bb705c08710))
+
 ## [1.1.0](https://github.com/Einlanzerous/switchyard/compare/v1.0.0...v1.1.0) (2026-05-09)
 
 
