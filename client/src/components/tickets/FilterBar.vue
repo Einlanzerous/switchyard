@@ -14,7 +14,7 @@ import { useAuthStore } from "@/stores/auth";
 import { parseSearchQuery, stringifySearchQuery } from "@/lib/searchDsl";
 import ChipGroup from "./ChipGroup.vue";
 
-const { filters, set, toggle, clear, isAnySet } = useTicketFilters();
+const { filters, set, toggle, clear, replaceAll, isAnySet } = useTicketFilters();
 const auth = useAuthStore();
 
 // ─── data sources ────────────────────────────────────────────────────────────
@@ -111,11 +111,12 @@ function applyParsed() {
   if (next.text === filters.value.text
     && JSON.stringify(next.project) === JSON.stringify(filters.value.project)
     && next.assignee === filters.value.assignee) return;
-  // Multi-set in one go — write directly via `set` per key, since the
-  // composable already merges through writeQuery.
-  set("text", next.text);
-  set("project", next.project);
-  set("assignee", next.assignee);
+  // Single router push. Calling `set` per key here would race: each
+  // call reads `filters.value` (a computed off route.query), but
+  // router.replace doesn't sync route.query in the same tick — so the
+  // 2nd and 3rd calls would spread STALE filters.value and clobber the
+  // earlier writes. `replaceAll` writes all keys in one router push.
+  replaceAll(next);
 }
 
 watch(localText, () => {
@@ -149,30 +150,9 @@ localText.value = rebuildLocalText();
 // clear, browser nav). We compare the rebuilt string to localText — if a
 // pending parse already produced this state, leave the input alone so we
 // don't wipe the user's caret position.
-//
-// IMPORTANT: do NOT include `users.value.length` in the dep array. The
-// users query resolves asynchronously after mount, and if it lands while
-// the user is mid-type (before the 250ms debounce fires applyParsed),
-// `rebuildLocalText()` returns "" from the still-empty filters and
-// clobbers what the user typed. The separate watcher below handles the
-// narrow "uuid → name" re-render once users do load.
 watch(
-  () => [filters.value.project, filters.value.assignee, filters.value.text] as const,
+  () => [filters.value.project, filters.value.assignee, filters.value.text, users.value.length] as const,
   () => {
-    const next = rebuildLocalText();
-    if (next !== localText.value) localText.value = next;
-  }
-);
-
-// When users finally load, re-render the assignee label only if filters
-// has an assignee that's a raw uuid (not "me"/"unassigned"/empty). Guarded
-// so an empty assignee — the common case while typing — doesn't trigger
-// a rebuild that would clobber typed text.
-watch(
-  () => users.value.length,
-  () => {
-    const f = filters.value;
-    if (!f.assignee || f.assignee === "unassigned" || f.assignee === "me") return;
     const next = rebuildLocalText();
     if (next !== localText.value) localText.value = next;
   }

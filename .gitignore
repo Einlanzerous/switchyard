@@ -18,6 +18,14 @@ shared/dist/
 # Tests
 coverage/
 
+# Playwright local artifacts. None of these should ever be committed —
+# the report is regenerated each run, the test-results dir holds traces
+# / screenshots / videos for the most recent run, and the .auth dir
+# holds a bearer token that grants admin access to the test backend.
+client/playwright-report/
+client/test-results/
+client/playwright/.auth/
+
 # Editor / OS
 .vscode/
 .idea/
