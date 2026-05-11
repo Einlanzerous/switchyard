@@ -2,14 +2,82 @@
 
 <img src="client/src/assets/switchyard_logo_large_unboxed_concept.png" alt="Switchyard" width="300" />
 
-Self-hosted ticketing / project-management system. API-first, agent-first. Replaces Vikunja in the Imperium-Loop pipeline.
+Self-hosted ticketing / project-management system. **API-first, agent-first** — every mutation the UI exposes is equally available via the REST API, making the same codebase useful to both a human clicking through a dashboard and an autonomous agent driving CI or workflow automation.
+
+The human sees a UI. The agents see a clean, typed, idempotent HTTP API with cursor pagination, HMAC-signed webhooks, and structured error envelopes. Both are first-class citizens.
+
+![Switchyard dashboard](.github/images/sy_home_page.png)
 
 ## Stack
 
 - **Server:** Hono on Bun, Drizzle ORM, Zod schemas (single source of truth for validation + OpenAPI + shared types).
 - **Client:** Vue 3 + Vite + TypeScript + Tailwind + shadcn-vue + Pinia + TanStack Query.
 - **Database:** PostgreSQL 16 (shared instance on `construct_net`).
-- **Deploy:** Single container — Hono serves the API at `/v1/*` and the built Vue client at `/`.
+- **Deploy:** Two containers — Hono serves the API at `/v1/*`; a Bun static server handles the built Vue client and passthroughs `/v1/*` and `/healthz` to the backend.
+
+## What's shipped
+
+Phases 1–3 are complete. See [`PHASES.md`](./PHASES.md) for the full plan and architectural decisions.
+
+### Phase 1 — Backend API
+
+Full CRUD on every resource: projects, statuses, transitions, labels, users, tokens, tickets, comments, attachments, boards, and webhooks. Cursor pagination on every list endpoint. Idempotency keys on every mutation (24h TTL). HMAC-signed outbound webhooks with exponential backoff, delivery log, and redeliver endpoint. Event sourcing — every mutation writes to `events` and enqueues webhook deliveries in the same transaction. Structured JSON access logs; `/healthz` subsystem report; graceful 10s drain on shutdown.
+
+Notable rules enforced server-side:
+- `/transition` is the only path to change ticket status — `PATCH` explicitly omits `status_id`.
+- Transitions table is an optional whitelist: zero rows = any-to-any; any rows = enforcement.
+- `resolution` is required when the target status category is `closed`.
+- Epic-close guard refuses to close an epic with open child tickets.
+
+### Phase 2 — Frontend
+
+Full UI parity with the API. Everything you can do via `curl`, you can do in the browser.
+
+**Ticket list** — virtualized table with URL-driven filter state, DSL search (`project=FLOW assignee=me status=in_progress,blocked`), saved views, and multi-select bulk operations.
+
+![Ticket list with filter DSL and bulk select](.github/images/sy_ticket_list.png)
+
+**Kanban board** — drag-and-drop via `pragmatic-drag-and-drop`; per-column virtualization; drop-to-closed column prompts for resolution. Single-project boards at `/projects/:key/board` and saved cross-project boards with optional swimlanes (group by project / assignee / epic / type).
+
+![Cross-project Combo Board](.github/images/sy_combo_board.png)
+
+**Settings** — profile, API tokens, global label catalog, project statuses + transitions, webhook subscriptions + delivery logs.
+
+![Settings — global label catalog](.github/images/sy_settings_labels.png)
+
+**Webhooks** — HMAC-signed POST subscriptions wired to your external pipeline. Delivery log and redeliver on failure.
+
+![Automations — webhook subscriptions](.github/images/sy_webhooks.png)
+
+**Actor model** — humans and agents share the same `users` table; every API token is owned by a named user so audit trails are clean and attributable.
+
+![Users — humans and agents side by side](.github/images/sy_users_human_agents.png)
+
+Keyboard shortcuts (`g t` tickets, `g b` boards, `c` new ticket, `?` shortcut sheet), command palette (`Ctrl+K`), light/dark theme toggle, skeleton loaders on every surface.
+
+### Phase 3 — Dashboards, power tools, and notifications
+
+**Personal dashboard** — KPI strip (open tickets / in-progress + stale count / closed this week with sparkline / median cycle time), throughput bar chart, status-distribution donut, recent activity feed, @mention panel.
+
+**Per-project Insights tab** — throughput (weekly, last 12 weeks), status distribution donut, cycle time (median + P90 + P95 + per-type breakdown), assignee leaderboard.
+
+![Per-project Insights tab](.github/images/sy_project_insights.png)
+
+**Per-board Insights tab** — cumulative flow stacked area chart, throughput aggregated across the board's projects, status-by-project breakdown bar.
+
+![Board Insights — cumulative flow chart (light mode)](.github/images/sy_home_page_lightmode.png)
+
+**Saved views** — named filters with project/user/global scope; accessible via the Views menu or the command palette.
+
+**Bulk operations** — multi-select via checkbox + shift-click range; bulk assign, relabel, and transition with confirmation toasts.
+
+**Notifications** — persistent @mention detection on comments and descriptions; unread badge in topbar; mark-as-read; notification dropdown.
+
+**Playwright E2E** — smoke, filter DSL + saved views, bulk ops, board drag, and dashboard tests; GitHub Actions workflow with HTML artifact upload on failure.
+
+**Health page** — live `/healthz` subsystem probe surfaced in the admin sidebar: DB latency, uploads writability, webhook queue depth.
+
+![Health page — DB, uploads, and webhook queue](.github/images/sy_health.png)
 
 ## Layout
 
@@ -19,7 +87,8 @@ switchyard/
 ├── client/             Vue 3 frontend
 ├── shared/             Zod schemas + derived TS types (consumed by both)
 ├── compose-changes/    Proposed diffs for ~/construct-server
-├── Dockerfile          Multi-stage build
+├── server/Dockerfile   Backend image (API only)
+├── client/Dockerfile   Frontend image (static + SPA fallback + /v1/* passthrough)
 └── openapi.yaml        Generated from server route definitions
 ```
 
@@ -43,25 +112,11 @@ Tests:
 bun --cwd server run db:test:setup
 bun --cwd server run test:unit         # pure helpers (pagination, hmac)
 bun --cwd server run test:integration  # seed + webhook end-to-end (needs DATABASE_URL_TEST)
+
+# E2E (Playwright, requires dev server running):
+bun --cwd client run test:e2e
+bun --cwd client run test:e2e:ui       # interactive Playwright UI
 ```
-
-## Status
-
-**Phase 1 (Backend MVP) is shipped.** All 7 milestones (foundations / read API / admin mutations / tickets+comments+attachments / webhooks / board mutations / polish) plus a correctness+DRY closeout pass. The cogitation engine in `~/imperium-loop/` can be retargeted at switchyard once `tools/cogitation-patch/` learns the new URL/payload shape. See [`PHASES.md`](./PHASES.md) for the full plan and architectural decisions.
-
-What works today:
-
-- Full CRUD on projects, statuses, transitions, labels, users, tokens, tickets, comments, attachments, boards, webhooks.
-- Ticket detail with embedded comments + flattened all-attachments. Cursor pagination on every list endpoint.
-- `/v1/tickets/{id}/transition` with transitions-table whitelist + epic-close guard.
-- Multipart attachment upload with magic-byte mime sniffing, per-kind size caps, path-traversal guard, token-guarded streamed download.
-- Outbound webhooks: HMAC-signed POSTs, exponential backoff, abandon after 5 attempts, redelivery API, end-to-end integration test.
-- Idempotency keys on all POST/PATCH/DELETE (24h TTL).
-- `/healthz` reports DB latency / uploads writability / webhook queue depth.
-- Structured JSON access logs with `X-Request-ID` echo.
-- Graceful shutdown drains the dispatcher within a 10s deadline.
-
-Phase 2 (frontend) is next.
 
 ## How agents use this API
 
@@ -165,7 +220,8 @@ Every response carries an `X-Request-ID` header. Agents that log API calls shoul
 
 - Reads `DATABASE_URL` once at startup; if Postgres is unreachable, the process exits non-zero so Docker reports the failure cleanly (no silent restart-loop into a broken state).
 - Watchtower is opted out via `com.centurylinklabs.watchtower.enable=false` — updates happen via deploys, not surprise restarts.
-- Attachment files live in a named volume mounted at `/data/uploads`; database stores `storage_path` only.
+- Attachment files live in a named volume mounted at `/data/uploads`; the database stores `storage_path` only.
+- Frontend container exposes port `4002` externally; backend stays internal on `construct_net`. Existing agent URLs (`http://switchyard:4002/v1/...`) continue to work unchanged.
 
 ## Webhook payload shape
 
