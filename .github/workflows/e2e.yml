@@ -9,6 +9,12 @@ name: E2E
 # we use a separate test DB so a failing run doesn't poison dev data.
 # To run on GitHub-hosted runners instead, add a postgres service
 # container under `services:` and point DATABASE_URL at it.
+#
+# Backend boot: the suite spins up its own switchyard backend from
+# source on a non-prod port (4003), wired to switchyard_test, and points
+# the Vite dev server's API proxy at it (VITE_API_PROXY_TARGET). This
+# keeps the test data fully isolated from the deployed :4002 backend,
+# which reads the prod `switchyard` DB.
 
 on:
   push:
@@ -37,6 +43,10 @@ jobs:
       # Optional: skip the bootstrap-token flow entirely by providing a
       # pre-minted test-user token. Faster, no /tokens write needed.
       E2E_TEST_USER_TOKEN: ${{ secrets.E2E_TEST_USER_TOKEN }}
+
+      # Port the test backend listens on. Must not collide with the
+      # deployed :4002 backend on the same host.
+      E2E_BACKEND_PORT: "4003"
 
       CI: "true"
 
@@ -69,6 +79,36 @@ jobs:
         working-directory: server
         run: bun run seed:test-e2e
 
+      # Boot a switchyard backend from current source against
+      # switchyard_test on E2E_BACKEND_PORT. This is what Playwright
+      # actually talks to (via the Vite proxy override below), giving
+      # the suite a hermetic, prod-isolated environment.
+      #
+      # The PID is captured so the cleanup step can always reap it.
+      # Logs go to /tmp/e2e-backend.log; we dump them on failure for
+      # debugging.
+      - name: Start test backend
+        working-directory: server
+        env:
+          PORT: ${{ env.E2E_BACKEND_PORT }}
+          PUBLIC_URL: http://localhost:${{ env.E2E_BACKEND_PORT }}
+          UPLOAD_DIR: /tmp/e2e-uploads
+          NODE_ENV: production
+        run: |
+          mkdir -p /tmp/e2e-uploads
+          bun src/index.ts > /tmp/e2e-backend.log 2>&1 &
+          echo $! > /tmp/e2e-backend.pid
+          for i in $(seq 1 30); do
+            if curl -fsS "http://localhost:${E2E_BACKEND_PORT}/healthz" > /dev/null 2>&1; then
+              echo "[e2e] backend ready on :${E2E_BACKEND_PORT}"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "[e2e] backend failed to start within 30s"
+          cat /tmp/e2e-backend.log || true
+          exit 1
+
       # Playwright manages its own browser binaries; cache them between
       # runs to skip the ~200MB download.
       - name: Cache Playwright browsers
@@ -96,9 +136,28 @@ jobs:
         working-directory: client
         run: bunx playwright install chromium firefox
 
+      # VITE_API_PROXY_TARGET makes the Vite dev server (started by the
+      # `webServer` block in playwright.config.ts) proxy /v1 and /healthz
+      # at the test backend instead of the deployed :4002 one.
       - name: Run Playwright
         working-directory: client
+        env:
+          VITE_API_PROXY_TARGET: http://localhost:${{ env.E2E_BACKEND_PORT }}
         run: bun run test:e2e
+
+      - name: Stop test backend
+        if: always()
+        run: |
+          if [ -f /tmp/e2e-backend.pid ]; then
+            kill "$(cat /tmp/e2e-backend.pid)" 2>/dev/null || true
+            rm -f /tmp/e2e-backend.pid
+          fi
+
+      - name: Dump test backend log on failure
+        if: failure()
+        run: |
+          echo "=== /tmp/e2e-backend.log ==="
+          cat /tmp/e2e-backend.log || true
 
       - name: Upload Playwright report on failure
         if: failure()
