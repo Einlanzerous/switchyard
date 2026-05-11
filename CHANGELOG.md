@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.0](https://github.com/Einlanzerous/switchyard/compare/v2.2.0...v2.3.0) (2026-05-11)
+
+
+### Features
+
+* Logo + theme recolor ([cef203a](https://github.com/Einlanzerous/switchyard/commit/cef203acff5f0dcf91e6c4b425d62bfcac0cf42f))
+
 ## [2.2.0](https://github.com/Einlanzerous/switchyard/compare/v2.1.0...v2.2.0) (2026-05-11)
 
 
