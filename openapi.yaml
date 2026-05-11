@@ -2295,6 +2295,7 @@ paths:
                               - webhooks:manage
                               - projects:manage
                               - users:manage
+                              - rules:manage
                               - admin
                         last_used_at:
                           type: string
@@ -20064,6 +20065,2705 @@ paths:
       responses:
         "204":
           description: no content
+        "400":
+          description: bad request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "401":
+          description: unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "403":
+          description: forbidden
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "404":
+          description: not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "409":
+          description: conflict
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "422":
+          description: unprocessable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "500":
+          description: internal
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+  /v1/rules:
+    get:
+      tags:
+        - Rules
+      summary: List rules
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+          required: false
+          name: cursor
+          in: query
+        - schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+          required: false
+          name: limit
+          in: query
+        - schema:
+            type: string
+          required: false
+          name: project
+          in: query
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        project_id:
+                          type: string
+                          format: uuid
+                        name:
+                          type: string
+                          minLength: 1
+                          maxLength: 200
+                        enabled:
+                          type: boolean
+                        trigger_event_types:
+                          type: array
+                          items:
+                            type: string
+                            enum: *a10
+                          minItems: 1
+                        conditions:
+                          anyOf:
+                            - type: object
+                              properties: {}
+                              additionalProperties: false
+                            - type: object
+                              properties:
+                                all:
+                                  type: array
+                                  items:
+                                    anyOf:
+                                      - type: object
+                                        properties:
+                                          field:
+                                            type: string
+                                            minLength: 1
+                                            maxLength: 200
+                                          op:
+                                            type: string
+                                            enum: &a18
+                                              - eq
+                                              - ne
+                                              - in
+                                              - not_in
+                                              - contains
+                                              - is_null
+                                              - is_not_null
+                                          value:
+                                            nullable: true
+                                        required:
+                                          - field
+                                          - op
+                                      - type: object
+                                        properties:
+                                          any:
+                                            type: array
+                                            items:
+                                              type: object
+                                              properties:
+                                                field:
+                                                  type: string
+                                                  minLength: 1
+                                                  maxLength: 200
+                                                op:
+                                                  type: string
+                                                  enum: *a18
+                                                value:
+                                                  nullable: true
+                                              required:
+                                                - field
+                                                - op
+                                            minItems: 1
+                                        required:
+                                          - any
+                                  minItems: 1
+                              required:
+                                - all
+                            - type: object
+                              properties:
+                                any:
+                                  type: array
+                                  items:
+                                    anyOf:
+                                      - type: object
+                                        properties:
+                                          field:
+                                            type: string
+                                            minLength: 1
+                                            maxLength: 200
+                                          op:
+                                            type: string
+                                            enum: *a18
+                                          value:
+                                            nullable: true
+                                        required:
+                                          - field
+                                          - op
+                                      - type: object
+                                        properties:
+                                          all:
+                                            type: array
+                                            items:
+                                              type: object
+                                              properties:
+                                                field:
+                                                  type: string
+                                                  minLength: 1
+                                                  maxLength: 200
+                                                op:
+                                                  type: string
+                                                  enum: *a18
+                                                value:
+                                                  nullable: true
+                                              required:
+                                                - field
+                                                - op
+                                            minItems: 1
+                                        required:
+                                          - all
+                                  minItems: 1
+                              required:
+                                - any
+                        actions:
+                          type: array
+                          items:
+                            oneOf:
+                              - type: object
+                                properties:
+                                  type:
+                                    type: string
+                                    enum:
+                                      - set_field
+                                  field:
+                                    anyOf:
+                                      - type: string
+                                        enum:
+                                          - priority
+                                      - type: string
+                                        enum:
+                                          - due_date
+                                      - type: string
+                                        enum:
+                                          - parent_id
+                                      - type: string
+                                        pattern: ^metadata\.[A-Za-z0-9_.-]+$
+                                  value:
+                                    anyOf:
+                                      - type: string
+                                      - type: number
+                                      - type: boolean
+                                      - nullable: true
+                                      - type: object
+                                        additionalProperties:
+                                          nullable: true
+                                      - nullable: true
+                                required:
+                                  - type
+                                  - field
+                                  - value
+                              - type: object
+                                properties:
+                                  type:
+                                    type: string
+                                    enum:
+                                      - add_label
+                                  label:
+                                    type: string
+                                    minLength: 1
+                                    maxLength: 50
+                                  color:
+                                    type: string
+                                    pattern: ^#[0-9a-fA-F]{6}$
+                                required:
+                                  - type
+                                  - label
+                              - type: object
+                                properties:
+                                  type:
+                                    type: string
+                                    enum:
+                                      - comment
+                                  body:
+                                    type: string
+                                    minLength: 1
+                                    maxLength: 50000
+                                required:
+                                  - type
+                                  - body
+                          minItems: 1
+                          maxItems: 10
+                        last_fired_at:
+                          type: string
+                          nullable: true
+                          format: date-time
+                        created_at:
+                          type: string
+                          format: date-time
+                        updated_at:
+                          type: string
+                          format: date-time
+                      required:
+                        - id
+                        - project_id
+                        - name
+                        - enabled
+                        - trigger_event_types
+                        - conditions
+                        - actions
+                        - last_fired_at
+                        - created_at
+                        - updated_at
+                  page:
+                    type: object
+                    properties:
+                      next_cursor:
+                        type: string
+                        nullable: true
+                      has_more:
+                        type: boolean
+                    required:
+                      - next_cursor
+                      - has_more
+                required:
+                  - items
+                  - page
+        "400":
+          description: bad request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "401":
+          description: unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "403":
+          description: forbidden
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "404":
+          description: not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "409":
+          description: conflict
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "422":
+          description: unprocessable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "500":
+          description: internal
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+    post:
+      tags:
+        - Rules
+      summary: Create a rule
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 128
+          required: false
+          name: idempotency-key
+          in: header
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                project_id:
+                  type: string
+                  format: uuid
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+                enabled:
+                  type: boolean
+                  default: true
+                trigger_event_types:
+                  type: array
+                  items:
+                    type: string
+                    enum: *a10
+                  minItems: 1
+                conditions:
+                  anyOf:
+                    - type: object
+                      properties: {}
+                      additionalProperties: false
+                    - type: object
+                      properties:
+                        all:
+                          type: array
+                          items:
+                            anyOf:
+                              - type: object
+                                properties:
+                                  field:
+                                    type: string
+                                    minLength: 1
+                                    maxLength: 200
+                                  op:
+                                    type: string
+                                    enum: *a18
+                                  value:
+                                    nullable: true
+                                required:
+                                  - field
+                                  - op
+                              - type: object
+                                properties:
+                                  any:
+                                    type: array
+                                    items:
+                                      type: object
+                                      properties:
+                                        field:
+                                          type: string
+                                          minLength: 1
+                                          maxLength: 200
+                                        op:
+                                          type: string
+                                          enum: *a18
+                                        value:
+                                          nullable: true
+                                      required:
+                                        - field
+                                        - op
+                                    minItems: 1
+                                required:
+                                  - any
+                          minItems: 1
+                      required:
+                        - all
+                    - type: object
+                      properties:
+                        any:
+                          type: array
+                          items:
+                            anyOf:
+                              - type: object
+                                properties:
+                                  field:
+                                    type: string
+                                    minLength: 1
+                                    maxLength: 200
+                                  op:
+                                    type: string
+                                    enum: *a18
+                                  value:
+                                    nullable: true
+                                required:
+                                  - field
+                                  - op
+                              - type: object
+                                properties:
+                                  all:
+                                    type: array
+                                    items:
+                                      type: object
+                                      properties:
+                                        field:
+                                          type: string
+                                          minLength: 1
+                                          maxLength: 200
+                                        op:
+                                          type: string
+                                          enum: *a18
+                                        value:
+                                          nullable: true
+                                      required:
+                                        - field
+                                        - op
+                                    minItems: 1
+                                required:
+                                  - all
+                          minItems: 1
+                      required:
+                        - any
+                  default: {}
+                actions:
+                  type: array
+                  items:
+                    oneOf:
+                      - type: object
+                        properties:
+                          type:
+                            type: string
+                            enum:
+                              - set_field
+                          field:
+                            anyOf:
+                              - type: string
+                                enum:
+                                  - priority
+                              - type: string
+                                enum:
+                                  - due_date
+                              - type: string
+                                enum:
+                                  - parent_id
+                              - type: string
+                                pattern: ^metadata\.[A-Za-z0-9_.-]+$
+                          value:
+                            anyOf:
+                              - type: string
+                              - type: number
+                              - type: boolean
+                              - nullable: true
+                              - type: object
+                                additionalProperties:
+                                  nullable: true
+                              - nullable: true
+                        required:
+                          - type
+                          - field
+                          - value
+                      - type: object
+                        properties:
+                          type:
+                            type: string
+                            enum:
+                              - add_label
+                          label:
+                            type: string
+                            minLength: 1
+                            maxLength: 50
+                          color:
+                            type: string
+                            pattern: ^#[0-9a-fA-F]{6}$
+                        required:
+                          - type
+                          - label
+                      - type: object
+                        properties:
+                          type:
+                            type: string
+                            enum:
+                              - comment
+                          body:
+                            type: string
+                            minLength: 1
+                            maxLength: 50000
+                        required:
+                          - type
+                          - body
+                  minItems: 1
+                  maxItems: 10
+              required:
+                - project_id
+                - name
+                - trigger_event_types
+                - actions
+      responses:
+        "201":
+          description: created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  project_id:
+                    type: string
+                    format: uuid
+                  name:
+                    type: string
+                    minLength: 1
+                    maxLength: 200
+                  enabled:
+                    type: boolean
+                  trigger_event_types:
+                    type: array
+                    items:
+                      type: string
+                      enum: *a10
+                    minItems: 1
+                  conditions:
+                    anyOf:
+                      - type: object
+                        properties: {}
+                        additionalProperties: false
+                      - type: object
+                        properties:
+                          all:
+                            type: array
+                            items:
+                              anyOf:
+                                - type: object
+                                  properties:
+                                    field:
+                                      type: string
+                                      minLength: 1
+                                      maxLength: 200
+                                    op:
+                                      type: string
+                                      enum: *a18
+                                    value:
+                                      nullable: true
+                                  required:
+                                    - field
+                                    - op
+                                - type: object
+                                  properties:
+                                    any:
+                                      type: array
+                                      items:
+                                        type: object
+                                        properties:
+                                          field:
+                                            type: string
+                                            minLength: 1
+                                            maxLength: 200
+                                          op:
+                                            type: string
+                                            enum: *a18
+                                          value:
+                                            nullable: true
+                                        required:
+                                          - field
+                                          - op
+                                      minItems: 1
+                                  required:
+                                    - any
+                            minItems: 1
+                        required:
+                          - all
+                      - type: object
+                        properties:
+                          any:
+                            type: array
+                            items:
+                              anyOf:
+                                - type: object
+                                  properties:
+                                    field:
+                                      type: string
+                                      minLength: 1
+                                      maxLength: 200
+                                    op:
+                                      type: string
+                                      enum: *a18
+                                    value:
+                                      nullable: true
+                                  required:
+                                    - field
+                                    - op
+                                - type: object
+                                  properties:
+                                    all:
+                                      type: array
+                                      items:
+                                        type: object
+                                        properties:
+                                          field:
+                                            type: string
+                                            minLength: 1
+                                            maxLength: 200
+                                          op:
+                                            type: string
+                                            enum: *a18
+                                          value:
+                                            nullable: true
+                                        required:
+                                          - field
+                                          - op
+                                      minItems: 1
+                                  required:
+                                    - all
+                            minItems: 1
+                        required:
+                          - any
+                  actions:
+                    type: array
+                    items:
+                      oneOf:
+                        - type: object
+                          properties:
+                            type:
+                              type: string
+                              enum:
+                                - set_field
+                            field:
+                              anyOf:
+                                - type: string
+                                  enum:
+                                    - priority
+                                - type: string
+                                  enum:
+                                    - due_date
+                                - type: string
+                                  enum:
+                                    - parent_id
+                                - type: string
+                                  pattern: ^metadata\.[A-Za-z0-9_.-]+$
+                            value:
+                              anyOf:
+                                - type: string
+                                - type: number
+                                - type: boolean
+                                - nullable: true
+                                - type: object
+                                  additionalProperties:
+                                    nullable: true
+                                - nullable: true
+                          required:
+                            - type
+                            - field
+                            - value
+                        - type: object
+                          properties:
+                            type:
+                              type: string
+                              enum:
+                                - add_label
+                            label:
+                              type: string
+                              minLength: 1
+                              maxLength: 50
+                            color:
+                              type: string
+                              pattern: ^#[0-9a-fA-F]{6}$
+                          required:
+                            - type
+                            - label
+                        - type: object
+                          properties:
+                            type:
+                              type: string
+                              enum:
+                                - comment
+                            body:
+                              type: string
+                              minLength: 1
+                              maxLength: 50000
+                          required:
+                            - type
+                            - body
+                    minItems: 1
+                    maxItems: 10
+                  last_fired_at:
+                    type: string
+                    nullable: true
+                    format: date-time
+                  created_at:
+                    type: string
+                    format: date-time
+                  updated_at:
+                    type: string
+                    format: date-time
+                required:
+                  - id
+                  - project_id
+                  - name
+                  - enabled
+                  - trigger_event_types
+                  - conditions
+                  - actions
+                  - last_fired_at
+                  - created_at
+                  - updated_at
+        "400":
+          description: bad request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "401":
+          description: unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "403":
+          description: forbidden
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "404":
+          description: not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "409":
+          description: conflict
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "422":
+          description: unprocessable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "500":
+          description: internal
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+  /v1/rules/{id}:
+    get:
+      tags:
+        - Rules
+      summary: Get a rule
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  project_id:
+                    type: string
+                    format: uuid
+                  name:
+                    type: string
+                    minLength: 1
+                    maxLength: 200
+                  enabled:
+                    type: boolean
+                  trigger_event_types:
+                    type: array
+                    items:
+                      type: string
+                      enum: *a10
+                    minItems: 1
+                  conditions:
+                    anyOf:
+                      - type: object
+                        properties: {}
+                        additionalProperties: false
+                      - type: object
+                        properties:
+                          all:
+                            type: array
+                            items:
+                              anyOf:
+                                - type: object
+                                  properties:
+                                    field:
+                                      type: string
+                                      minLength: 1
+                                      maxLength: 200
+                                    op:
+                                      type: string
+                                      enum: *a18
+                                    value:
+                                      nullable: true
+                                  required:
+                                    - field
+                                    - op
+                                - type: object
+                                  properties:
+                                    any:
+                                      type: array
+                                      items:
+                                        type: object
+                                        properties:
+                                          field:
+                                            type: string
+                                            minLength: 1
+                                            maxLength: 200
+                                          op:
+                                            type: string
+                                            enum: *a18
+                                          value:
+                                            nullable: true
+                                        required:
+                                          - field
+                                          - op
+                                      minItems: 1
+                                  required:
+                                    - any
+                            minItems: 1
+                        required:
+                          - all
+                      - type: object
+                        properties:
+                          any:
+                            type: array
+                            items:
+                              anyOf:
+                                - type: object
+                                  properties:
+                                    field:
+                                      type: string
+                                      minLength: 1
+                                      maxLength: 200
+                                    op:
+                                      type: string
+                                      enum: *a18
+                                    value:
+                                      nullable: true
+                                  required:
+                                    - field
+                                    - op
+                                - type: object
+                                  properties:
+                                    all:
+                                      type: array
+                                      items:
+                                        type: object
+                                        properties:
+                                          field:
+                                            type: string
+                                            minLength: 1
+                                            maxLength: 200
+                                          op:
+                                            type: string
+                                            enum: *a18
+                                          value:
+                                            nullable: true
+                                        required:
+                                          - field
+                                          - op
+                                      minItems: 1
+                                  required:
+                                    - all
+                            minItems: 1
+                        required:
+                          - any
+                  actions:
+                    type: array
+                    items:
+                      oneOf:
+                        - type: object
+                          properties:
+                            type:
+                              type: string
+                              enum:
+                                - set_field
+                            field:
+                              anyOf:
+                                - type: string
+                                  enum:
+                                    - priority
+                                - type: string
+                                  enum:
+                                    - due_date
+                                - type: string
+                                  enum:
+                                    - parent_id
+                                - type: string
+                                  pattern: ^metadata\.[A-Za-z0-9_.-]+$
+                            value:
+                              anyOf:
+                                - type: string
+                                - type: number
+                                - type: boolean
+                                - nullable: true
+                                - type: object
+                                  additionalProperties:
+                                    nullable: true
+                                - nullable: true
+                          required:
+                            - type
+                            - field
+                            - value
+                        - type: object
+                          properties:
+                            type:
+                              type: string
+                              enum:
+                                - add_label
+                            label:
+                              type: string
+                              minLength: 1
+                              maxLength: 50
+                            color:
+                              type: string
+                              pattern: ^#[0-9a-fA-F]{6}$
+                          required:
+                            - type
+                            - label
+                        - type: object
+                          properties:
+                            type:
+                              type: string
+                              enum:
+                                - comment
+                            body:
+                              type: string
+                              minLength: 1
+                              maxLength: 50000
+                          required:
+                            - type
+                            - body
+                    minItems: 1
+                    maxItems: 10
+                  last_fired_at:
+                    type: string
+                    nullable: true
+                    format: date-time
+                  created_at:
+                    type: string
+                    format: date-time
+                  updated_at:
+                    type: string
+                    format: date-time
+                required:
+                  - id
+                  - project_id
+                  - name
+                  - enabled
+                  - trigger_event_types
+                  - conditions
+                  - actions
+                  - last_fired_at
+                  - created_at
+                  - updated_at
+        "400":
+          description: bad request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "401":
+          description: unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "403":
+          description: forbidden
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "404":
+          description: not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "409":
+          description: conflict
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "422":
+          description: unprocessable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "500":
+          description: internal
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+    patch:
+      tags:
+        - Rules
+      summary: Update a rule
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+                enabled:
+                  type: boolean
+                trigger_event_types:
+                  type: array
+                  items:
+                    type: string
+                    enum: *a10
+                  minItems: 1
+                conditions:
+                  anyOf:
+                    - type: object
+                      properties: {}
+                      additionalProperties: false
+                    - type: object
+                      properties:
+                        all:
+                          type: array
+                          items:
+                            anyOf:
+                              - type: object
+                                properties:
+                                  field:
+                                    type: string
+                                    minLength: 1
+                                    maxLength: 200
+                                  op:
+                                    type: string
+                                    enum: *a18
+                                  value:
+                                    nullable: true
+                                required:
+                                  - field
+                                  - op
+                              - type: object
+                                properties:
+                                  any:
+                                    type: array
+                                    items:
+                                      type: object
+                                      properties:
+                                        field:
+                                          type: string
+                                          minLength: 1
+                                          maxLength: 200
+                                        op:
+                                          type: string
+                                          enum: *a18
+                                        value:
+                                          nullable: true
+                                      required:
+                                        - field
+                                        - op
+                                    minItems: 1
+                                required:
+                                  - any
+                          minItems: 1
+                      required:
+                        - all
+                    - type: object
+                      properties:
+                        any:
+                          type: array
+                          items:
+                            anyOf:
+                              - type: object
+                                properties:
+                                  field:
+                                    type: string
+                                    minLength: 1
+                                    maxLength: 200
+                                  op:
+                                    type: string
+                                    enum: *a18
+                                  value:
+                                    nullable: true
+                                required:
+                                  - field
+                                  - op
+                              - type: object
+                                properties:
+                                  all:
+                                    type: array
+                                    items:
+                                      type: object
+                                      properties:
+                                        field:
+                                          type: string
+                                          minLength: 1
+                                          maxLength: 200
+                                        op:
+                                          type: string
+                                          enum: *a18
+                                        value:
+                                          nullable: true
+                                      required:
+                                        - field
+                                        - op
+                                    minItems: 1
+                                required:
+                                  - all
+                          minItems: 1
+                      required:
+                        - any
+                actions:
+                  type: array
+                  items:
+                    oneOf:
+                      - type: object
+                        properties:
+                          type:
+                            type: string
+                            enum:
+                              - set_field
+                          field:
+                            anyOf:
+                              - type: string
+                                enum:
+                                  - priority
+                              - type: string
+                                enum:
+                                  - due_date
+                              - type: string
+                                enum:
+                                  - parent_id
+                              - type: string
+                                pattern: ^metadata\.[A-Za-z0-9_.-]+$
+                          value:
+                            anyOf:
+                              - type: string
+                              - type: number
+                              - type: boolean
+                              - nullable: true
+                              - type: object
+                                additionalProperties:
+                                  nullable: true
+                              - nullable: true
+                        required:
+                          - type
+                          - field
+                          - value
+                      - type: object
+                        properties:
+                          type:
+                            type: string
+                            enum:
+                              - add_label
+                          label:
+                            type: string
+                            minLength: 1
+                            maxLength: 50
+                          color:
+                            type: string
+                            pattern: ^#[0-9a-fA-F]{6}$
+                        required:
+                          - type
+                          - label
+                      - type: object
+                        properties:
+                          type:
+                            type: string
+                            enum:
+                              - comment
+                          body:
+                            type: string
+                            minLength: 1
+                            maxLength: 50000
+                        required:
+                          - type
+                          - body
+                  minItems: 1
+                  maxItems: 10
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  project_id:
+                    type: string
+                    format: uuid
+                  name:
+                    type: string
+                    minLength: 1
+                    maxLength: 200
+                  enabled:
+                    type: boolean
+                  trigger_event_types:
+                    type: array
+                    items:
+                      type: string
+                      enum: *a10
+                    minItems: 1
+                  conditions:
+                    anyOf:
+                      - type: object
+                        properties: {}
+                        additionalProperties: false
+                      - type: object
+                        properties:
+                          all:
+                            type: array
+                            items:
+                              anyOf:
+                                - type: object
+                                  properties:
+                                    field:
+                                      type: string
+                                      minLength: 1
+                                      maxLength: 200
+                                    op:
+                                      type: string
+                                      enum: *a18
+                                    value:
+                                      nullable: true
+                                  required:
+                                    - field
+                                    - op
+                                - type: object
+                                  properties:
+                                    any:
+                                      type: array
+                                      items:
+                                        type: object
+                                        properties:
+                                          field:
+                                            type: string
+                                            minLength: 1
+                                            maxLength: 200
+                                          op:
+                                            type: string
+                                            enum: *a18
+                                          value:
+                                            nullable: true
+                                        required:
+                                          - field
+                                          - op
+                                      minItems: 1
+                                  required:
+                                    - any
+                            minItems: 1
+                        required:
+                          - all
+                      - type: object
+                        properties:
+                          any:
+                            type: array
+                            items:
+                              anyOf:
+                                - type: object
+                                  properties:
+                                    field:
+                                      type: string
+                                      minLength: 1
+                                      maxLength: 200
+                                    op:
+                                      type: string
+                                      enum: *a18
+                                    value:
+                                      nullable: true
+                                  required:
+                                    - field
+                                    - op
+                                - type: object
+                                  properties:
+                                    all:
+                                      type: array
+                                      items:
+                                        type: object
+                                        properties:
+                                          field:
+                                            type: string
+                                            minLength: 1
+                                            maxLength: 200
+                                          op:
+                                            type: string
+                                            enum: *a18
+                                          value:
+                                            nullable: true
+                                        required:
+                                          - field
+                                          - op
+                                      minItems: 1
+                                  required:
+                                    - all
+                            minItems: 1
+                        required:
+                          - any
+                  actions:
+                    type: array
+                    items:
+                      oneOf:
+                        - type: object
+                          properties:
+                            type:
+                              type: string
+                              enum:
+                                - set_field
+                            field:
+                              anyOf:
+                                - type: string
+                                  enum:
+                                    - priority
+                                - type: string
+                                  enum:
+                                    - due_date
+                                - type: string
+                                  enum:
+                                    - parent_id
+                                - type: string
+                                  pattern: ^metadata\.[A-Za-z0-9_.-]+$
+                            value:
+                              anyOf:
+                                - type: string
+                                - type: number
+                                - type: boolean
+                                - nullable: true
+                                - type: object
+                                  additionalProperties:
+                                    nullable: true
+                                - nullable: true
+                          required:
+                            - type
+                            - field
+                            - value
+                        - type: object
+                          properties:
+                            type:
+                              type: string
+                              enum:
+                                - add_label
+                            label:
+                              type: string
+                              minLength: 1
+                              maxLength: 50
+                            color:
+                              type: string
+                              pattern: ^#[0-9a-fA-F]{6}$
+                          required:
+                            - type
+                            - label
+                        - type: object
+                          properties:
+                            type:
+                              type: string
+                              enum:
+                                - comment
+                            body:
+                              type: string
+                              minLength: 1
+                              maxLength: 50000
+                          required:
+                            - type
+                            - body
+                    minItems: 1
+                    maxItems: 10
+                  last_fired_at:
+                    type: string
+                    nullable: true
+                    format: date-time
+                  created_at:
+                    type: string
+                    format: date-time
+                  updated_at:
+                    type: string
+                    format: date-time
+                required:
+                  - id
+                  - project_id
+                  - name
+                  - enabled
+                  - trigger_event_types
+                  - conditions
+                  - actions
+                  - last_fired_at
+                  - created_at
+                  - updated_at
+        "400":
+          description: bad request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "401":
+          description: unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "403":
+          description: forbidden
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "404":
+          description: not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "409":
+          description: conflict
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "422":
+          description: unprocessable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "500":
+          description: internal
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+    delete:
+      tags:
+        - Rules
+      summary: Delete a rule
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "204":
+          description: no content
+        "400":
+          description: bad request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "401":
+          description: unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "403":
+          description: forbidden
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "404":
+          description: not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "409":
+          description: conflict
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "422":
+          description: unprocessable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "500":
+          description: internal
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+  /v1/rules/{id}/firings:
+    get:
+      tags:
+        - Rules
+      summary: Recent firings for a rule (debugging)
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+        - schema:
+            type: string
+            minLength: 1
+          required: false
+          name: cursor
+          in: query
+        - schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+          required: false
+          name: limit
+          in: query
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        rule_id:
+                          type: string
+                          format: uuid
+                        event_id:
+                          type: string
+                          nullable: true
+                          format: uuid
+                        status:
+                          type: string
+                          enum: &a19
+                            - pending
+                            - running
+                            - succeeded
+                            - failed
+                            - abandoned
+                            - skipped
+                        attempts:
+                          type: integer
+                          minimum: 0
+                        last_error:
+                          type: string
+                          nullable: true
+                        last_attempt_at:
+                          type: string
+                          nullable: true
+                          format: date-time
+                        next_attempt_at:
+                          type: string
+                          nullable: true
+                          format: date-time
+                        result_summary:
+                          type: object
+                          nullable: true
+                          properties:
+                            conditions_matched:
+                              type: boolean
+                            actions:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  type:
+                                    type: string
+                                  status:
+                                    type: string
+                                    enum: &a20
+                                      - ok
+                                      - error
+                                  error:
+                                    type: string
+                                    nullable: true
+                                required:
+                                  - type
+                                  - status
+                            skip_reason:
+                              type: string
+                        created_at:
+                          type: string
+                          format: date-time
+                      required:
+                        - id
+                        - rule_id
+                        - event_id
+                        - status
+                        - attempts
+                        - last_error
+                        - last_attempt_at
+                        - next_attempt_at
+                        - result_summary
+                        - created_at
+                  page:
+                    type: object
+                    properties:
+                      next_cursor:
+                        type: string
+                        nullable: true
+                      has_more:
+                        type: boolean
+                    required:
+                      - next_cursor
+                      - has_more
+                required:
+                  - items
+                  - page
+        "400":
+          description: bad request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "401":
+          description: unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "403":
+          description: forbidden
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "404":
+          description: not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "409":
+          description: conflict
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "422":
+          description: unprocessable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "500":
+          description: internal
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+  /v1/rules/firings/{id}/redeliver:
+    post:
+      tags:
+        - Rules
+      summary: Re-queue a rule firing (resets attempts and schedules immediately)
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  rule_id:
+                    type: string
+                    format: uuid
+                  event_id:
+                    type: string
+                    nullable: true
+                    format: uuid
+                  status:
+                    type: string
+                    enum: *a19
+                  attempts:
+                    type: integer
+                    minimum: 0
+                  last_error:
+                    type: string
+                    nullable: true
+                  last_attempt_at:
+                    type: string
+                    nullable: true
+                    format: date-time
+                  next_attempt_at:
+                    type: string
+                    nullable: true
+                    format: date-time
+                  result_summary:
+                    type: object
+                    nullable: true
+                    properties:
+                      conditions_matched:
+                        type: boolean
+                      actions:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            type:
+                              type: string
+                            status:
+                              type: string
+                              enum: *a20
+                            error:
+                              type: string
+                              nullable: true
+                          required:
+                            - type
+                            - status
+                      skip_reason:
+                        type: string
+                  created_at:
+                    type: string
+                    format: date-time
+                required:
+                  - id
+                  - rule_id
+                  - event_id
+                  - status
+                  - attempts
+                  - last_error
+                  - last_attempt_at
+                  - next_attempt_at
+                  - result_summary
+                  - created_at
         "400":
           description: bad request
           content:

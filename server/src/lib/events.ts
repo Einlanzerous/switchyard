@@ -6,12 +6,13 @@
 // …all inside the caller's transaction. If the caller's transaction rolls back,
 // neither the event nor the deliveries are persisted — no orphaned webhooks.
 
-import { eq, and } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import * as schema from "../../drizzle/schema.js";
 import type { db as defaultDb } from "../db.js";
 import type {
   EventType, UserRef, TicketSummary, EventChanges, StatusChange,
 } from "@switchyard/shared";
+import { getRulesEngineUserId } from "./rules/dispatcher.js";
 
 // Drizzle's transaction type is awkward to import; this is the structurally
 // minimal subset we use. Pass either `db` or a `tx` from `db.transaction(async tx => {...})`.
@@ -70,6 +71,55 @@ export async function writeEvent(tx: Tx, input: WriteEventInput): Promise<{ id: 
     await tx.insert(schema.webhookDeliveries).values(
       matches.map((s) => ({
         subscription_id: s.id,
+        event_id: eventRow.id,
+        status: "pending" as const,
+        next_attempt_at: nowIso,
+      }))
+    );
+  }
+
+  // ─── rule fan-out (Phase 4) ──────────────────────────────────────────────
+  //
+  // Skip rule-authored events to prevent infinite fan-out: a rule's actions
+  // emit events (ticket.updated, comment.created, …) which would otherwise
+  // re-match the rule. The rules-engine user id is resolved at dispatcher
+  // boot; if the dispatcher hasn't started yet (tests, brief boot window),
+  // we look it up here so the chain still works.
+  let engineUserId = getRulesEngineUserId();
+  if (engineUserId === null) {
+    const [u] = await tx
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(eq(schema.users.name, "rules-engine"))
+      .limit(1);
+    engineUserId = u?.id ?? null;
+  }
+
+  if (actorId !== null && engineUserId !== null && actorId === engineUserId) {
+    return eventRow;
+  }
+
+  // Match enabled rules whose trigger_event_types contains this event_type
+  // AND whose project_id matches the event's project. In 4.0 every rule is
+  // project-scoped (project_id NOT NULL); 4.1 will allow NULL = global rule.
+  // Without a project_id on the event there's nothing to match against in
+  // 4.0, so skip — that's events like users.* which we don't trigger on.
+  if (!projectId) return eventRow;
+
+  const matchedRules = await tx
+    .select({ id: schema.rules.id })
+    .from(schema.rules)
+    .where(and(
+      eq(schema.rules.enabled, true),
+      eq(schema.rules.project_id, projectId),
+      sql`${schema.rules.trigger_event_types} @> ARRAY[${input.event_type}]::text[]`,
+    ));
+
+  if (matchedRules.length > 0) {
+    const nowIso = new Date().toISOString();
+    await tx.insert(schema.ruleFirings).values(
+      matchedRules.map((r) => ({
+        rule_id: r.id,
         event_id: eventRow.id,
         status: "pending" as const,
         next_attempt_at: nowIso,

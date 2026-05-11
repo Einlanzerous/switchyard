@@ -9,6 +9,7 @@ export const ApiTokenScope = z.enum([
   "webhooks:manage",
   "projects:manage",
   "users:manage",
+  "rules:manage",
   "admin",
 ]);
 export type ApiTokenScope = z.infer<typeof ApiTokenScope>;

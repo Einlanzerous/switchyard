@@ -1658,7 +1658,7 @@ export interface paths {
                                 /** Format: uuid */
                                 user_id: string;
                                 name: string;
-                                scopes: ("tickets:read" | "tickets:write" | "comments:write" | "attachments:write" | "webhooks:manage" | "projects:manage" | "users:manage" | "admin")[];
+                                scopes: ("tickets:read" | "tickets:write" | "comments:write" | "attachments:write" | "webhooks:manage" | "projects:manage" | "users:manage" | "rules:manage" | "admin")[];
                                 /** Format: date-time */
                                 last_used_at: string | null;
                                 /** Format: date-time */
@@ -1819,7 +1819,7 @@ export interface paths {
                          *       "admin"
                          *     ]
                          */
-                        scopes?: ("tickets:read" | "tickets:write" | "comments:write" | "attachments:write" | "webhooks:manage" | "projects:manage" | "users:manage" | "admin")[];
+                        scopes?: ("tickets:read" | "tickets:write" | "comments:write" | "attachments:write" | "webhooks:manage" | "projects:manage" | "users:manage" | "rules:manage" | "admin")[];
                     };
                 };
             };
@@ -1836,7 +1836,7 @@ export interface paths {
                             /** Format: uuid */
                             user_id: string;
                             name: string;
-                            scopes: ("tickets:read" | "tickets:write" | "comments:write" | "attachments:write" | "webhooks:manage" | "projects:manage" | "users:manage" | "admin")[];
+                            scopes: ("tickets:read" | "tickets:write" | "comments:write" | "attachments:write" | "webhooks:manage" | "projects:manage" | "users:manage" | "rules:manage" | "admin")[];
                             /** Format: date-time */
                             last_used_at: string | null;
                             /** Format: date-time */
@@ -13721,6 +13721,1527 @@ export interface paths {
                 };
             };
         };
+        trace?: never;
+    };
+    "/v1/rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List rules */
+        get: {
+            parameters: {
+                query?: {
+                    cursor?: string;
+                    limit?: number;
+                    project?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description ok */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: {
+                                /** Format: uuid */
+                                id: string;
+                                /** Format: uuid */
+                                project_id: string;
+                                name: string;
+                                enabled: boolean;
+                                trigger_event_types: ("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted")[];
+                                conditions: Record<string, never> | {
+                                    all: ({
+                                        field: string;
+                                        /** @enum {string} */
+                                        op: "eq" | "ne" | "in" | "not_in" | "contains" | "is_null" | "is_not_null";
+                                        value?: unknown;
+                                    } | {
+                                        any: {
+                                            field: string;
+                                            /** @enum {string} */
+                                            op: "eq" | "ne" | "in" | "not_in" | "contains" | "is_null" | "is_not_null";
+                                            value?: unknown;
+                                        }[];
+                                    })[];
+                                } | {
+                                    any: ({
+                                        field: string;
+                                        /** @enum {string} */
+                                        op: "eq" | "ne" | "in" | "not_in" | "contains" | "is_null" | "is_not_null";
+                                        value?: unknown;
+                                    } | {
+                                        all: {
+                                            field: string;
+                                            /** @enum {string} */
+                                            op: "eq" | "ne" | "in" | "not_in" | "contains" | "is_null" | "is_not_null";
+                                            value?: unknown;
+                                        }[];
+                                    })[];
+                                };
+                                actions: ({
+                                    /** @enum {string} */
+                                    type: "set_field";
+                                    field: "priority" | "due_date" | "parent_id" | string;
+                                    value: string | number | boolean | unknown | {
+                                        [key: string]: unknown;
+                                    } | unknown;
+                                } | {
+                                    /** @enum {string} */
+                                    type: "add_label";
+                                    label: string;
+                                    color?: string;
+                                } | {
+                                    /** @enum {string} */
+                                    type: "comment";
+                                    body: string;
+                                })[];
+                                /** Format: date-time */
+                                last_fired_at: string | null;
+                                /** Format: date-time */
+                                created_at: string;
+                                /** Format: date-time */
+                                updated_at: string;
+                            }[];
+                            page: {
+                                next_cursor: string | null;
+                                has_more: boolean;
+                            };
+                        };
+                    };
+                };
+                /** @description bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description unprocessable */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description internal */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Create a rule */
+        post: {
+            parameters: {
+                query?: never;
+                header?: {
+                    "idempotency-key"?: string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        project_id: string;
+                        name: string;
+                        /** @default true */
+                        enabled?: boolean;
+                        trigger_event_types: ("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted")[];
+                        /** @default {} */
+                        conditions?: Record<string, never> | {
+                            all: ({
+                                field: string;
+                                /** @enum {string} */
+                                op: "eq" | "ne" | "in" | "not_in" | "contains" | "is_null" | "is_not_null";
+                                value?: unknown;
+                            } | {
+                                any: {
+                                    field: string;
+                                    /** @enum {string} */
+                                    op: "eq" | "ne" | "in" | "not_in" | "contains" | "is_null" | "is_not_null";
+                                    value?: unknown;
+                                }[];
+                            })[];
+                        } | {
+                            any: ({
+                                field: string;
+                                /** @enum {string} */
+                                op: "eq" | "ne" | "in" | "not_in" | "contains" | "is_null" | "is_not_null";
+                                value?: unknown;
+                            } | {
+                                all: {
+                                    field: string;
+                                    /** @enum {string} */
+                                    op: "eq" | "ne" | "in" | "not_in" | "contains" | "is_null" | "is_not_null";
+                                    value?: unknown;
+                                }[];
+                            })[];
+                        };
+                        actions: ({
+                            /** @enum {string} */
+                            type: "set_field";
+                            field: "priority" | "due_date" | "parent_id" | string;
+                            value: string | number | boolean | unknown | {
+                                [key: string]: unknown;
+                            } | unknown;
+                        } | {
+                            /** @enum {string} */
+                            type: "add_label";
+                            label: string;
+                            color?: string;
+                        } | {
+                            /** @enum {string} */
+                            type: "comment";
+                            body: string;
+                        })[];
+                    };
+                };
+            };
+            responses: {
+                /** @description created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            /** Format: uuid */
+                            project_id: string;
+                            name: string;
+                            enabled: boolean;
+                            trigger_event_types: ("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted")[];
+                            conditions: Record<string, never> | {
+                                all: ({
+                                    field: string;
+                                    /** @enum {string} */
+                                    op: "eq" | "ne" | "in" | "not_in" | "contains" | "is_null" | "is_not_null";
+                                    value?: unknown;
+                                } | {
+                                    any: {
+                                        field: string;
+                                        /** @enum {string} */
+                                        op: "eq" | "ne" | "in" | "not_in" | "contains" | "is_null" | "is_not_null";
+                                        value?: unknown;
+                                    }[];
+                                })[];
+                            } | {
+                                any: ({
+                                    field: string;
+                                    /** @enum {string} */
+                                    op: "eq" | "ne" | "in" | "not_in" | "contains" | "is_null" | "is_not_null";
+                                    value?: unknown;
+                                } | {
+                                    all: {
+                                        field: string;
+                                        /** @enum {string} */
+                                        op: "eq" | "ne" | "in" | "not_in" | "contains" | "is_null" | "is_not_null";
+                                        value?: unknown;
+                                    }[];
+                                })[];
+                            };
+                            actions: ({
+                                /** @enum {string} */
+                                type: "set_field";
+                                field: "priority" | "due_date" | "parent_id" | string;
+                                value: string | number | boolean | unknown | {
+                                    [key: string]: unknown;
+                                } | unknown;
+                            } | {
+                                /** @enum {string} */
+                                type: "add_label";
+                                label: string;
+                                color?: string;
+                            } | {
+                                /** @enum {string} */
+                                type: "comment";
+                                body: string;
+                            })[];
+                            /** Format: date-time */
+                            last_fired_at: string | null;
+                            /** Format: date-time */
+                            created_at: string;
+                            /** Format: date-time */
+                            updated_at: string;
+                        };
+                    };
+                };
+                /** @description bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description unprocessable */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description internal */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/rules/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a rule */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description ok */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            /** Format: uuid */
+                            project_id: string;
+                            name: string;
+                            enabled: boolean;
+                            trigger_event_types: ("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted")[];
+                            conditions: Record<string, never> | {
+                                all: ({
+                                    field: string;
+                                    /** @enum {string} */
+                                    op: "eq" | "ne" | "in" | "not_in" | "contains" | "is_null" | "is_not_null";
+                                    value?: unknown;
+                                } | {
+                                    any: {
+                                        field: string;
+                                        /** @enum {string} */
+                                        op: "eq" | "ne" | "in" | "not_in" | "contains" | "is_null" | "is_not_null";
+                                        value?: unknown;
+                                    }[];
+                                })[];
+                            } | {
+                                any: ({
+                                    field: string;
+                                    /** @enum {string} */
+                                    op: "eq" | "ne" | "in" | "not_in" | "contains" | "is_null" | "is_not_null";
+                                    value?: unknown;
+                                } | {
+                                    all: {
+                                        field: string;
+                                        /** @enum {string} */
+                                        op: "eq" | "ne" | "in" | "not_in" | "contains" | "is_null" | "is_not_null";
+                                        value?: unknown;
+                                    }[];
+                                })[];
+                            };
+                            actions: ({
+                                /** @enum {string} */
+                                type: "set_field";
+                                field: "priority" | "due_date" | "parent_id" | string;
+                                value: string | number | boolean | unknown | {
+                                    [key: string]: unknown;
+                                } | unknown;
+                            } | {
+                                /** @enum {string} */
+                                type: "add_label";
+                                label: string;
+                                color?: string;
+                            } | {
+                                /** @enum {string} */
+                                type: "comment";
+                                body: string;
+                            })[];
+                            /** Format: date-time */
+                            last_fired_at: string | null;
+                            /** Format: date-time */
+                            created_at: string;
+                            /** Format: date-time */
+                            updated_at: string;
+                        };
+                    };
+                };
+                /** @description bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description unprocessable */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description internal */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /** Delete a rule */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description no content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description unprocessable */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description internal */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** Update a rule */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        name?: string;
+                        enabled?: boolean;
+                        trigger_event_types?: ("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted")[];
+                        conditions?: Record<string, never> | {
+                            all: ({
+                                field: string;
+                                /** @enum {string} */
+                                op: "eq" | "ne" | "in" | "not_in" | "contains" | "is_null" | "is_not_null";
+                                value?: unknown;
+                            } | {
+                                any: {
+                                    field: string;
+                                    /** @enum {string} */
+                                    op: "eq" | "ne" | "in" | "not_in" | "contains" | "is_null" | "is_not_null";
+                                    value?: unknown;
+                                }[];
+                            })[];
+                        } | {
+                            any: ({
+                                field: string;
+                                /** @enum {string} */
+                                op: "eq" | "ne" | "in" | "not_in" | "contains" | "is_null" | "is_not_null";
+                                value?: unknown;
+                            } | {
+                                all: {
+                                    field: string;
+                                    /** @enum {string} */
+                                    op: "eq" | "ne" | "in" | "not_in" | "contains" | "is_null" | "is_not_null";
+                                    value?: unknown;
+                                }[];
+                            })[];
+                        };
+                        actions?: ({
+                            /** @enum {string} */
+                            type: "set_field";
+                            field: "priority" | "due_date" | "parent_id" | string;
+                            value: string | number | boolean | unknown | {
+                                [key: string]: unknown;
+                            } | unknown;
+                        } | {
+                            /** @enum {string} */
+                            type: "add_label";
+                            label: string;
+                            color?: string;
+                        } | {
+                            /** @enum {string} */
+                            type: "comment";
+                            body: string;
+                        })[];
+                    };
+                };
+            };
+            responses: {
+                /** @description ok */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            /** Format: uuid */
+                            project_id: string;
+                            name: string;
+                            enabled: boolean;
+                            trigger_event_types: ("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted")[];
+                            conditions: Record<string, never> | {
+                                all: ({
+                                    field: string;
+                                    /** @enum {string} */
+                                    op: "eq" | "ne" | "in" | "not_in" | "contains" | "is_null" | "is_not_null";
+                                    value?: unknown;
+                                } | {
+                                    any: {
+                                        field: string;
+                                        /** @enum {string} */
+                                        op: "eq" | "ne" | "in" | "not_in" | "contains" | "is_null" | "is_not_null";
+                                        value?: unknown;
+                                    }[];
+                                })[];
+                            } | {
+                                any: ({
+                                    field: string;
+                                    /** @enum {string} */
+                                    op: "eq" | "ne" | "in" | "not_in" | "contains" | "is_null" | "is_not_null";
+                                    value?: unknown;
+                                } | {
+                                    all: {
+                                        field: string;
+                                        /** @enum {string} */
+                                        op: "eq" | "ne" | "in" | "not_in" | "contains" | "is_null" | "is_not_null";
+                                        value?: unknown;
+                                    }[];
+                                })[];
+                            };
+                            actions: ({
+                                /** @enum {string} */
+                                type: "set_field";
+                                field: "priority" | "due_date" | "parent_id" | string;
+                                value: string | number | boolean | unknown | {
+                                    [key: string]: unknown;
+                                } | unknown;
+                            } | {
+                                /** @enum {string} */
+                                type: "add_label";
+                                label: string;
+                                color?: string;
+                            } | {
+                                /** @enum {string} */
+                                type: "comment";
+                                body: string;
+                            })[];
+                            /** Format: date-time */
+                            last_fired_at: string | null;
+                            /** Format: date-time */
+                            created_at: string;
+                            /** Format: date-time */
+                            updated_at: string;
+                        };
+                    };
+                };
+                /** @description bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description unprocessable */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description internal */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/v1/rules/{id}/firings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recent firings for a rule (debugging) */
+        get: {
+            parameters: {
+                query?: {
+                    cursor?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description ok */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: {
+                                /** Format: uuid */
+                                id: string;
+                                /** Format: uuid */
+                                rule_id: string;
+                                /** Format: uuid */
+                                event_id: string | null;
+                                /** @enum {string} */
+                                status: "pending" | "running" | "succeeded" | "failed" | "abandoned" | "skipped";
+                                attempts: number;
+                                last_error: string | null;
+                                /** Format: date-time */
+                                last_attempt_at: string | null;
+                                /** Format: date-time */
+                                next_attempt_at: string | null;
+                                result_summary: {
+                                    conditions_matched?: boolean;
+                                    actions?: {
+                                        type: string;
+                                        /** @enum {string} */
+                                        status: "ok" | "error";
+                                        error?: string | null;
+                                    }[];
+                                    skip_reason?: string;
+                                } | null;
+                                /** Format: date-time */
+                                created_at: string;
+                            }[];
+                            page: {
+                                next_cursor: string | null;
+                                has_more: boolean;
+                            };
+                        };
+                    };
+                };
+                /** @description bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description unprocessable */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description internal */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/rules/firings/{id}/redeliver": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Re-queue a rule firing (resets attempts and schedules immediately) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description ok */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            /** Format: uuid */
+                            rule_id: string;
+                            /** Format: uuid */
+                            event_id: string | null;
+                            /** @enum {string} */
+                            status: "pending" | "running" | "succeeded" | "failed" | "abandoned" | "skipped";
+                            attempts: number;
+                            last_error: string | null;
+                            /** Format: date-time */
+                            last_attempt_at: string | null;
+                            /** Format: date-time */
+                            next_attempt_at: string | null;
+                            result_summary: {
+                                conditions_matched?: boolean;
+                                actions?: {
+                                    type: string;
+                                    /** @enum {string} */
+                                    status: "ok" | "error";
+                                    error?: string | null;
+                                }[];
+                                skip_reason?: string;
+                            } | null;
+                            /** Format: date-time */
+                            created_at: string;
+                        };
+                    };
+                };
+                /** @description bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description unprocessable */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description internal */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
 }

@@ -23,6 +23,8 @@ type CanonicalUser = {
   icon?: string;
 };
 
+export const RULES_ENGINE_USER_NAME = "rules-engine";
+
 const CANONICAL_USERS: CanonicalUser[] = [
   { name: "magos", type: "human" },
   { name: "claude", type: "agent" },
@@ -30,6 +32,11 @@ const CANONICAL_USERS: CanonicalUser[] = [
   { name: "n8n-vox-dictate", type: "agent" },
   { name: "servo-signal", type: "agent" },
   { name: "autosavant-bot", type: "agent" },
+  // System actor for Phase 4 automation rules. Every action a rule runs
+  // (create comment, set field, add label, …) is attributed to this user.
+  // The rule dispatcher uses this id to skip events authored by rules, which
+  // is how we prevent infinite-loop fan-out without tracking causation chains.
+  { name: RULES_ENGINE_USER_NAME, type: "agent" },
 ];
 
 export async function seed(): Promise<void> {

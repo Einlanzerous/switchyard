@@ -503,6 +503,73 @@ export const systemSettings = pgTable("system_settings", {
   updated_at: updatedAt(),
 });
 
+// ─── rules + rule_firings (Phase 4 native automation) ─────────────────────
+//
+// Rules fire async via lib/rules/dispatcher.ts (mirrors webhooks dispatcher).
+// `writeEvent` enqueues a `rule_firings` row per matching rule, skipping
+// rule-authored events (actor = rules-engine system user) to prevent infinite
+// loops. Conditions are evaluated by the dispatcher, not at enqueue time, so
+// even firings whose conditions fall false get logged with status=skipped
+// for debugging.
+
+export const ruleFiringStatus = pgEnum("rule_firing_status", [
+  "pending", "running", "succeeded", "failed", "abandoned", "skipped",
+]);
+
+export const rules = pgTable(
+  "rules",
+  {
+    id: id(),
+    // Required in 4.0; relaxed to nullable (= global rule) in Phase 4.1.
+    project_id: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 200 }).notNull(),
+    enabled: boolean("enabled").notNull().default(true),
+    // Empty array is invalid — at least one event type required. Enforced by
+    // Zod at the API layer; no DB constraint to keep migration story simple.
+    trigger_event_types: text("trigger_event_types").array().notNull(),
+    // RuleConditions in shared/schemas/rule.ts. `{}` = always-true.
+    conditions: jsonb("conditions").notNull().default({}),
+    // Array of RuleAction (discriminated union); evaluated in order.
+    actions: jsonb("actions").notNull().default([]),
+    last_fired_at: timestamp("last_fired_at", { withTimezone: true, mode: "string" }),
+    created_at: createdAt(),
+    updated_at: updatedAt(),
+  },
+  (t) => ({
+    projectIdx: index("rules_project_idx").on(t.project_id),
+    enabledIdx: index("rules_enabled_idx").on(t.enabled).where(sql`${t.enabled} = true`),
+  })
+);
+
+export const ruleFirings = pgTable(
+  "rule_firings",
+  {
+    id: id(),
+    rule_id: uuid("rule_id")
+      .notNull()
+      .references(() => rules.id, { onDelete: "cascade" }),
+    // Nullable for Phase 4.2 scheduled firings (no triggering event).
+    event_id: uuid("event_id").references(() => events.id, { onDelete: "cascade" }),
+    status: ruleFiringStatus("status").notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    last_error: text("last_error"),
+    last_attempt_at: timestamp("last_attempt_at", { withTimezone: true, mode: "string" }),
+    next_attempt_at: timestamp("next_attempt_at", { withTimezone: true, mode: "string" }),
+    // RuleFiringResultSummary in shared/schemas/rule.ts — which conditions
+    // matched, per-action ok/error, optional skip reason.
+    result_summary: jsonb("result_summary"),
+    created_at: createdAt(),
+  },
+  (t) => ({
+    pendingIdx: index("rule_firings_pending_idx")
+      .on(t.next_attempt_at)
+      .where(sql`${t.status} IN ('pending', 'failed')`),
+    ruleIdx: index("rule_firings_rule_idx").on(t.rule_id, t.created_at),
+  })
+);
+
 // ─── idempotency keys (request deduplication for POSTs) ─────────────────────
 
 export const idempotencyKeys = pgTable(

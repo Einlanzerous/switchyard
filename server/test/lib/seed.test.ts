@@ -23,12 +23,12 @@ beforeEach(async () => {
 });
 
 describe("seed", () => {
-  test("creates 6 canonical users on first run", async () => {
+  test("creates 7 canonical users on first run", async () => {
     delete process.env.BOOTSTRAP_TOKEN;
     const { seed } = await import("../../src/lib/seed.js");
     await seed();
     const users = await testDb.select().from(schema.users);
-    expect(users).toHaveLength(6);
+    expect(users).toHaveLength(7);
     const names = users.map((u) => u.name).sort();
     expect(names).toEqual([
       "autosavant-bot",
@@ -36,6 +36,7 @@ describe("seed", () => {
       "magos",
       "n8n-cogitation",
       "n8n-vox-dictate",
+      "rules-engine",
       "servo-signal",
     ]);
   });
@@ -46,7 +47,7 @@ describe("seed", () => {
     await seed();
     await seed();
     const users = await testDb.select().from(schema.users);
-    expect(users).toHaveLength(6);
+    expect(users).toHaveLength(7);
   });
 
   test("auto-generates one bootstrap token when api_tokens is empty", async () => {

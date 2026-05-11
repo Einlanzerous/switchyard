@@ -27,6 +27,13 @@ const Env = z.object({
   WEBHOOK_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
   WEBHOOK_BATCH_SIZE: z.coerce.number().int().positive().default(32),
 
+  // Rule dispatcher tuning. Lower retry ceiling than webhooks because action
+  // failures are typically deterministic (a bad transition, a missing
+  // assignee) — retrying just amplifies the noise. Admin redelivers
+  // explicitly via POST /v1/rules/firings/{id}/redeliver.
+  RULE_FIRING_MAX_ATTEMPTS: z.coerce.number().int().positive().default(3),
+  RULE_BATCH_SIZE: z.coerce.number().int().positive().default(32),
+
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 });
 

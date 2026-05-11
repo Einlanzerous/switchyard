@@ -341,16 +341,56 @@ What moves out of the current Home:
 
 ## Phase 4 — Native automation rules
 
-Goal: replace n8n for simple "if status = X, do Y" rules. n8n keeps the complex flows.
+Goal: replace simple "if X then Y" flows currently living in n8n with first-class switchyard rules. n8n keeps the multi-system flows.
 
-- **Rules schema:** `rules (id, project_id, trigger_event, conditions JSONB, actions JSONB, enabled, last_fired_at)`.
-- **Trigger types:** event-based (any `event_type`) and scheduled (cron, single goroutine evaluating all scheduled rules).
-- **Condition DSL:** small, JSON-encoded — `{"and": [{"field": "ticket.status.category", "op": "eq", "value": "closed"}, ...]}`.
-- **Actions:** `set_field`, `add_label`, `comment`, `assign`, `move_status`, `fire_webhook`, `call_n8n` (convenience wrapper).
-- **Audit:** every rule firing writes to `events` with `actor_id` referencing a system "rule" user.
-- **UI:** rule editor in settings; recent firings panel for debugging.
+### Locked decisions for Phase 4
 
-This is also where pluggable transition guards land (e.g., user-defined "epic can't close while children open" — currently hardcoded). Those become rules-as-guards.
+- **Execution model:** async via in-process dispatcher (mirrors `webhooks/dispatcher.ts` — `FOR UPDATE SKIP LOCKED`, backoff, attempts, abandoned, redeliver). Bounded request latency, free retry+observability via the existing pattern. No in-band recursion risk.
+- **Loop prevention:** rules skip events whose `actor_id` is the `rules-engine` system user. Simpler than causation-chain tracking; rule chains land in Phase 5 if needed.
+- **Rule actor:** single `rules-engine` canonical agent user added to `seed.ts`. Audit log cleanly separates rule-authored events from human/agent ones.
+- **Condition DSL:** flat JSONB. Ops `eq / ne / in / not_in / contains / is_null / is_not_null`. Combinators `all` / `any`, one level of nesting only — keeps the form-based builder UI honest. Field paths resolve against the event payload (`actor`, `ticket`, `changes`, extras); array path `ticket.labels[].name` is "any label matches".
+- **Action retry policy:** auto-retry on infra errors (DB conflicts, transient failures) only. Action-internal failures (e.g. `move_status` rejected by the transitions table) mark the firing `failed` without auto-retry; admin redelivers via `POST /v1/rules/firings/{id}/redeliver`.
+- **Scheduled rules:** deferred to 4.2. Event triggers ship first because they're the higher-value first cut; scheduled rules carry their own cron parser + ticket-query DSL.
+- **Transition guards:** out of Phase 4. The hardcoded epic-close check (`server/src/routes/tickets.ts:504`) stays. Guards are sync-and-reject with a reason — a different shape from async after-the-fact rules. Revisit after daily rule use surfaces what guard primitives are actually needed.
+
+### Schema
+
+New migration adds two tables (modeled on `webhook_subscriptions` / `webhook_deliveries`):
+
+- `rules` — `id, project_id NULLABLE (NULL in 4.1+), name, enabled, trigger_event_types TEXT[], conditions JSONB, actions JSONB, last_fired_at, created_at, updated_at`. Partial index on `enabled = true`.
+- `rule_firings` — `id, rule_id, event_id NULLABLE (NULL for scheduled in 4.2), status (pending|running|succeeded|failed|abandoned|skipped), attempts, last_error, last_attempt_at, next_attempt_at, result_summary JSONB, created_at`. Partial index on `status IN ('pending','failed')`.
+
+`writeEvent` (`server/src/lib/events.ts`) gains a second fan-out after the webhook enqueue: query matching enabled rules and insert `rule_firings` rows, skipping when `actor_id = rules-engine`. Conditions are evaluated by the dispatcher, not at enqueue time, so even firings whose conditions fall false get logged as `skipped` for debugging.
+
+### Action catalog
+
+| Action | Shape | Ships in |
+|---|---|---|
+| `set_field` | `{ type: "set_field", field, value }` — whitelist: priority, due_date, parent_id, metadata.* | 4.0 |
+| `add_label` | `{ type: "add_label", label }` — creates label if missing | 4.0 |
+| `comment` | `{ type: "comment", body }` — supports `{{ticket.key}}` / `{{actor.name}}` / `{{rule.name}}` templating | 4.0 |
+| `assign` | `{ type: "assign", user }` — name or id | 4.1 |
+| `move_status` | `{ type: "move_status", to_category, resolution? }` — validates project's transitions table | 4.1 |
+| `fire_webhook` | `{ type: "fire_webhook", url, method, headers? }` — HMAC-signed | 4.1 |
+| `call_n8n` | `{ type: "call_n8n", workflow }` — `fire_webhook` prefixed by `N8N_BASE_URL` env | 4.1 |
+
+Actions execute as `rules-engine` and route through the same helpers human handlers use (`loadTicketSummary`, `writeEvent`), so audit + downstream rule eligibility come for free.
+
+### Milestones
+
+- **4.0 — Foundations + event-triggered rules + 3 core actions ⏳ in progress (SWY-28).** Migration, `rules-engine` seed user, Zod schemas (`shared/src/schemas/rule.ts`), `lib/rules/{dispatcher,evaluator,actions,types}.ts`, `writeEvent` fan-out, CRUD routes + firings log + redeliver, health subsystem (`rules: { queue_depth }`, warn at 500), new `rules:manage` scope. Tests: unit (evaluator: every op, missing-field, nested), integration (rule fires → action lands → second event written → no infinite loop). Codegen `client/src/lib/api.types.ts`.
+- **4.1 — Remaining actions + cross-project + safety (SWY-29).** Add `assign` / `move_status` / `fire_webhook` / `call_n8n`. Allow `project_id IS NULL` rules (global). Per-rule rate limit (default 100/hour, env `RULE_RATE_LIMIT_PER_HOUR`; over-limit firings get status `skipped`).
+- **4.2 — Scheduled rules (SWY-30).** Add `schedule_cron` + `target_query` columns with a CHECK enforcing exactly-one-trigger-mode. Cron parser (`cron-parser`, ≈30KB). `lib/rules/scheduler.ts` polling loop, 60s tick, fires one `rule_firings` row per ticket matched by the rule's `target_query` (reuses the existing `/v1/tickets` filter shape — no second DSL).
+- **4.3 — UI: rules + firings tabs under Automations (SWY-33).** `AutomationsLayout` already exists; add nav links for `/automations/rules` and `/automations/firings`. Form-based rule builder ("When [event-type] AND/OR [field op value] Then [action]") via vee-validate + Zod. Firings table with redeliver button and drawer that renders `result_summary` (matched conditions, action outcomes).
+- **4.4 — Polish + docs (SWY-34).** README "Automation rules" section (DSL grammar, action catalog, 3–4 worked examples). Recent-firings debug surface. E2E test (`client/e2e/automations.spec.ts`). Empty/skeleton audit.
+
+Out of scope (deferred to Phase 5):
+
+- Pluggable transition guards (the hardcoded epic-close check stays).
+- Rule chains / causation tracking (rules-engine events skip the engine — no recursion).
+- Multi-level nested conditions deeper than one level.
+- Auto-disable on N consecutive failures.
+- "Run rule now" debug button.
 
 ## Phase 5 — As demanded
 
@@ -386,6 +426,12 @@ These were settled during planning. Don't relitigate without naming the *why* li
 | Operational | Exit non-zero on bad config / DB unreachable | Vikunja's password-drift bug is the cautionary tale: silent recovery into a broken state is worse than a clear restart loop the orchestrator can surface. |
 | Watchtower | Opted out (`enable=false` label) | Same reason. Updates are explicit deploys. |
 | Migrations | Drizzle Kit + custom `triggers.sql` | Drizzle handles tables/columns/indexes; the trigger SQL covers cross-row constraints Drizzle can't express. |
+| Rule execution (Phase 4) | Async via in-process dispatcher, mirrors `webhooks/dispatcher.ts` | Reuses a proven pattern (FOR UPDATE SKIP LOCKED, backoff, attempts, redeliver). Bounded request latency. No in-band recursion risk. |
+| Rule loop prevention (Phase 4) | Rules skip events authored by `rules-engine` system user | Simpler than depth-bounded causation chains; chains aren't needed until they are. |
+| Rule actor (Phase 4) | Single `rules-engine` canonical agent user | Audit log cleanly distinguishes rule-authored events from human/agent actions; one user keeps event-eligibility filtering simple. |
+| Rule condition DSL (Phase 4) | Flat JSONB, `eq/ne/in/not_in/contains/is_null/is_not_null`, one level of `all`/`any` | Strong enough for daily rules without inventing a parser; flat enough that the form-based UI stays honest. |
+| Rule action retry (Phase 4) | Auto-retry on infra errors only; action-internal failures stop without retry | Infra-flake should self-heal; a rule whose `move_status` is rejected by the transitions table shouldn't keep hammering. Admin redelivers explicitly. |
+| Transition guards (Phase 4) | Out of scope; hardcoded epic-close stays | Guards are sync-and-reject — a different shape from async after-the-fact rules. Revisit when daily use surfaces the needed primitives. |
 
 ## Non-goals (deliberately out of scope)
 

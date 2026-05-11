@@ -267,6 +267,47 @@ export function mapWebhookDelivery(d: WebhookDeliveryRow): ApiWebhookDelivery {
 
 // ─── api tokens ────────────────────────────────────────────────────────────
 
+// ─── rules (Phase 4) ───────────────────────────────────────────────────────
+
+type RuleRow = typeof schema.rules.$inferSelect;
+type RuleFiringRow = typeof schema.ruleFirings.$inferSelect;
+
+import type {
+  Rule as ApiRule, RuleFiring as ApiRuleFiring,
+  RuleAction as ApiRuleAction, RuleConditions as ApiRuleConditions,
+  RuleFiringResultSummary as ApiRuleFiringSummary,
+} from "@switchyard/shared";
+
+export function mapRule(r: RuleRow): ApiRule {
+  return {
+    id: r.id,
+    project_id: r.project_id,
+    name: r.name,
+    enabled: r.enabled,
+    trigger_event_types: r.trigger_event_types as ApiRule["trigger_event_types"],
+    conditions: (r.conditions ?? {}) as ApiRuleConditions,
+    actions: (r.actions ?? []) as ApiRuleAction[],
+    last_fired_at: r.last_fired_at,
+    created_at: r.created_at,
+    updated_at: r.updated_at,
+  };
+}
+
+export function mapRuleFiring(f: RuleFiringRow): ApiRuleFiring {
+  return {
+    id: f.id,
+    rule_id: f.rule_id,
+    event_id: f.event_id,
+    status: f.status as ApiRuleFiring["status"],
+    attempts: f.attempts,
+    last_error: f.last_error,
+    last_attempt_at: f.last_attempt_at,
+    next_attempt_at: f.next_attempt_at,
+    result_summary: (f.result_summary ?? null) as ApiRuleFiringSummary | null,
+    created_at: f.created_at,
+  };
+}
+
 export function mapApiToken(t: TokenRow): ApiToken {
   return {
     id: t.id,

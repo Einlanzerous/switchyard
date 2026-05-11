@@ -5,6 +5,10 @@ import { assertDatabaseReachable, shutdownDatabase } from "./db.js";
 import { installErrorHandler } from "./errors.js";
 import { mountRoutes } from "./routes/index.js";
 import { startDispatcher, stopDispatcher } from "./lib/webhooks/dispatcher.js";
+import {
+  startDispatcher as startRulesDispatcher,
+  stopDispatcher as stopRulesDispatcher,
+} from "./lib/rules/dispatcher.js";
 import { cleanupExpiredIdempotencyKeys } from "./lib/idempotency.js";
 import { accessLog } from "./lib/access-log.js";
 import { buildHealthReport } from "./lib/health.js";
@@ -59,6 +63,7 @@ const server = Bun.serve({
 
 // Background workers.
 startDispatcher();
+startRulesDispatcher();
 const idempotencyCleanup = setInterval(
   () => void cleanupExpiredIdempotencyKeys().catch((e) => console.warn("[idempotency cleanup]", e)),
   60 * 60 * 1000
@@ -78,7 +83,11 @@ const shutdown = async (signal: string) => {
   clearInterval(idempotencyCleanup);
 
   const dispatcherBudget = Math.max(1_000, deadline - Date.now() - 1_000);
-  await stopDispatcher(dispatcherBudget);
+  // Drain both dispatchers in parallel — each respects the budget independently.
+  await Promise.all([
+    stopDispatcher(dispatcherBudget),
+    stopRulesDispatcher(dispatcherBudget),
+  ]);
   await shutdownDatabase();
 
   console.log(`[switchyard] shutdown complete in ${Date.now() - (deadline - 10_000)}ms`);
