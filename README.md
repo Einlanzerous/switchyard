@@ -1,5 +1,7 @@
 # switchyard
 
+<img src="client/src/assets/switchyard_logo_large_unboxed_concept.png" alt="Switchyard" width="300" />
+
 Self-hosted ticketing / project-management system. API-first, agent-first. Replaces Vikunja in the Imperium-Loop pipeline.
 
 ## Stack

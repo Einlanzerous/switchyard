@@ -4,6 +4,7 @@ import { computed } from "vue";
 import { Inbox, LayoutDashboard, KanbanSquare, FolderKanban, Settings, Zap, HeartPulse } from "lucide-vue-next";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import SwitchyardLogo from "@/components/SwitchyardLogo.vue";
 
 type NavItem = { to: string; label: string; icon: any; group: "main" | "admin" };
 
@@ -42,10 +43,9 @@ function isActive(to: string) {
 
 <template>
   <aside class="hidden md:flex md:w-60 md:flex-col border-r bg-muted/30">
-    <div class="flex h-14 items-center px-4 border-b">
-      <RouterLink to="/" class="flex items-center gap-2 font-semibold tracking-tight">
-        <span class="inline-block h-6 w-6 rounded bg-primary" />
-        switchyard
+    <div class="flex h-16 items-center px-4 border-b">
+      <RouterLink to="/">
+        <SwitchyardLogo />
       </RouterLink>
     </div>
 
