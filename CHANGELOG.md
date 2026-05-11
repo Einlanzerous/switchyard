@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.0](https://github.com/Einlanzerous/switchyard/compare/v2.0.0...v2.1.0) (2026-05-11)
+
+
+### Features
+
+* New logo ([78a771e](https://github.com/Einlanzerous/switchyard/commit/78a771e051fa05502dd687668f6dd8e3bbd664a4))
+
 ## [2.0.0](https://github.com/Einlanzerous/switchyard/compare/v1.2.1...v2.0.0) (2026-05-10)
 
 
