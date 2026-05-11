@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.0](https://github.com/Einlanzerous/switchyard/compare/v2.3.0...v2.4.0) (2026-05-11)
+
+
+### Features
+
+* Phase 4.0 native automation rules — engine foundations + 3 core actions ([9cf48f7](https://github.com/Einlanzerous/switchyard/commit/9cf48f7ef44bf76e4eb9aace20aec2716c7c3721))
+
 ## [2.3.0](https://github.com/Einlanzerous/switchyard/compare/v2.2.0...v2.3.0) (2026-05-11)
 
 
