@@ -32,8 +32,12 @@ test.describe("dashboard (HomeView)", () => {
     // is the smoke-test concern. With the E2E seed (3 tickets, no event
     // history) the stats endpoints return all zeros, so the widgets sit
     // in the empty state; against a populated install they show canvases.
-    const throughput = page.getByText(/^Throughput$/i).first();
-    const statusDist = page.getByText(/^Status distribution$/i).first();
+    // DashboardWidget renders its title in a CardTitle (<h3>) alongside
+    // optional prefix/suffix slots; the throughput card includes a
+    // "closed/week, last 12" suffix so the accessible name isn't an
+    // exact "Throughput" match. Hit by role + substring instead.
+    const throughput = page.getByRole("heading", { name: /throughput/i });
+    const statusDist = page.getByRole("heading", { name: /status distribution/i });
     await expect(throughput).toBeVisible();
     await expect(statusDist).toBeVisible();
 
