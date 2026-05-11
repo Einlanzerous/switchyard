@@ -40,9 +40,13 @@ jobs:
       # uses this to mint a per-test-user token at runtime.
       BOOTSTRAP_TOKEN: ${{ secrets.E2E_BOOTSTRAP_TOKEN }}
 
-      # Optional: skip the bootstrap-token flow entirely by providing a
-      # pre-minted test-user token. Faster, no /tokens write needed.
-      E2E_TEST_USER_TOKEN: ${{ secrets.E2E_TEST_USER_TOKEN }}
+      # NB: E2E_TEST_USER_TOKEN intentionally NOT set. The pre-minted
+      # secret was registered in the prod `switchyard` DB and won't
+      # validate against the test backend (which reads switchyard_test).
+      # auth.setup falls through to the mint path, which calls POST
+      # /v1/users/{id}/tokens against the test backend using the
+      # BOOTSTRAP_TOKEN above — that token IS registered in
+      # switchyard_test by the migrate/seed step earlier in this job.
 
       # Port the test backend listens on. Must not collide with the
       # deployed :4002 backend on the same host.
