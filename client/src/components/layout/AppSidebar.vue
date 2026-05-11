@@ -43,6 +43,8 @@ function isActive(to: string) {
 
 <template>
   <aside class="hidden md:flex md:w-60 md:flex-col border-r bg-sidebar">
+    <!-- TODO: replace wordmark with Commissioner (fonts.google.com/specimen/Commissioner)
+         once the logo SVG is cleaned up as a proper mark-only file -->
     <div class="flex h-16 items-center px-4 border-b">
       <RouterLink to="/">
         <SwitchyardLogo />

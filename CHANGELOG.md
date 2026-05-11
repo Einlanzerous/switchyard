@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.2.0](https://github.com/Einlanzerous/switchyard/compare/v2.1.0...v2.2.0) (2026-05-11)
+
+
+### Features
+
+* graphify support, and added workflow ([f3b0aeb](https://github.com/Einlanzerous/switchyard/commit/f3b0aebc881d83b55f2183938118144e71f25063))
+
+
+### Bug Fixes
+
+* logo cleanup ([9898260](https://github.com/Einlanzerous/switchyard/commit/9898260d0a18105413e0c7624938dc607779db25))
+
 ## [2.1.0](https://github.com/Einlanzerous/switchyard/compare/v2.0.0...v2.1.0) (2026-05-11)
 
 
