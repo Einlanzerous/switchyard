@@ -1,5 +1,3 @@
-# switchyard
-
 <img src="client/src/assets/switchyard_logo_large_unboxed_concept.png" alt="Switchyard" width="300" />
 
 Self-hosted ticketing / project-management system. **API-first, agent-first** — every mutation the UI exposes is equally available via the REST API, making the same codebase useful to both a human clicking through a dashboard and an autonomous agent driving CI or workflow automation.
