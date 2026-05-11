@@ -3,5 +3,5 @@ import logoUrl from "@/assets/sy_logo.svg";
 </script>
 
 <template>
-  <img :src="logoUrl" alt="Switchyard" class="h-8 w-auto dark:invert" />
+  <img :src="logoUrl" alt="Switchyard" class="h-[48px] w-auto dark:invert" />
 </template>

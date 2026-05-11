@@ -42,7 +42,7 @@ function isActive(to: string) {
 </script>
 
 <template>
-  <aside class="hidden md:flex md:w-60 md:flex-col border-r bg-muted/30">
+  <aside class="hidden md:flex md:w-60 md:flex-col border-r bg-sidebar">
     <div class="flex h-16 items-center px-4 border-b">
       <RouterLink to="/">
         <SwitchyardLogo />
