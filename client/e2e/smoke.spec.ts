@@ -49,10 +49,11 @@ test.describe("smoke", () => {
 
   test("automations renders", async ({ page }) => {
     await page.goto("/automations");
-    // Default redirect is /automations/webhooks; assert on the "New webhook" CTA
-    // (visible whether or not webhooks exist — empty state and populated state
-    // both surface it).
-    await expect(page.getByRole("button", { name: /new webhook/i })).toBeVisible();
+    // Default redirect is /automations/webhooks; assert on the "New webhook" CTA.
+    // Both header and empty-state surface the CTA — when there are zero
+    // webhooks both render simultaneously, so use .first() to keep the
+    // assertion focused on "the page boots with a way to create one".
+    await expect(page.getByRole("button", { name: /new webhook/i }).first()).toBeVisible();
   });
 
   test("settings renders", async ({ page }) => {
