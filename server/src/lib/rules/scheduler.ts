@@ -12,12 +12,18 @@ import { and, eq, gt, inArray, isNotNull, isNull, lt, or, sql, type SQL } from "
 import { CronExpressionParser } from "cron-parser";
 import * as schema from "../../../drizzle/schema.js";
 import { db } from "../../db.js";
-import type { ScheduledRuleTarget } from "@switchyard/shared";
+import { StatusCategory, TicketType, type ScheduledRuleTarget } from "@switchyard/shared";
 
 const POLL_INTERVAL_MS = 60_000;
+// Cap per scheduled-tick result so a misconfigured target_query
+// (e.g. wildcard date range against a busy install) doesn't enqueue
+// tens of thousands of firings in one go. The per-rule rate limit
+// (RULE_RATE_LIMIT_PER_HOUR) is the primary circuit breaker; this
+// cap protects memory + INSERT batch size at fire-out time.
+const TARGET_QUERY_LIMIT = 1_000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const STATUS_CATEGORIES = new Set(["backlog", "planning", "in_progress", "blocked", "closed"]);
-const TICKET_TYPES = new Set(["spike", "task", "bug", "epic"]);
+const STATUS_CATEGORIES = new Set<string>(StatusCategory.options);
+const TICKET_TYPES = new Set<string>(TicketType.options);
 
 let running = false;
 let timer: ReturnType<typeof setInterval> | null = null;
@@ -200,9 +206,18 @@ async function queryTargetTickets(target: ScheduledRuleTarget): Promise<string[]
   if (target.updated_after) conds.push(gt(schema.tickets.updated_at, target.updated_after));
   if (target.updated_before) conds.push(lt(schema.tickets.updated_at, target.updated_before));
 
+  // limit + 1 so we can detect overflow and warn — actual fire-out uses
+  // the first `TARGET_QUERY_LIMIT` rows.
   const rows = await db
     .select({ id: schema.tickets.id })
     .from(schema.tickets)
-    .where(and(...conds));
-  return rows.map((r) => r.id);
+    .where(and(...conds))
+    .limit(TARGET_QUERY_LIMIT + 1);
+  if (rows.length > TARGET_QUERY_LIMIT) {
+    console.warn(
+      `[rules-scheduler] target_query matched > ${TARGET_QUERY_LIMIT} tickets; truncating. ` +
+      `tighten the filter or trust the per-rule rate limit to skip the rest.`,
+    );
+  }
+  return rows.slice(0, TARGET_QUERY_LIMIT).map((r) => r.id);
 }

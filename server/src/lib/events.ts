@@ -78,7 +78,7 @@ export async function writeEvent(tx: Tx, input: WriteEventInput): Promise<{ id: 
     );
   }
 
-  // ─── rule fan-out (Phase 4) ──────────────────────────────────────────────
+  // ─── rule fan-out ────────────────────────────────────────────────────────
   //
   // Skip rule-authored events to prevent infinite fan-out: a rule's actions
   // emit events (ticket.updated, comment.created, …) which would otherwise

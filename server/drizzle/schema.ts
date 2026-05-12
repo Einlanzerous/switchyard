@@ -347,7 +347,7 @@ export const boardProjects = pgTable(
   (t) => ({ pk: primaryKey({ columns: [t.board_id, t.project_id] }) })
 );
 
-// ─── targets (Phase 4.2.5) ─────────────────────────────────────────────────
+// ─── targets ───────────────────────────────────────────────────────────────
 //
 // Named webhook endpoints. Decouples URLs from the rules and
 // subscriptions that reference them — change a target's URL once and
@@ -388,7 +388,7 @@ export const webhookSubscriptions = pgTable(
     event_types: text("event_types").array().notNull(),
     status_filter: jsonb("status_filter"),
     secret: text("secret").notNull(),
-    // Optional named target (Phase 4.2.5). When set, the dispatcher
+    // Optional named target. When set, the dispatcher
     // resolves the URL + signing secret from the target at delivery
     // time, overriding the `url`/`secret` columns above. The columns
     // remain so dropping the target falls back to the literal URL.
@@ -574,7 +574,7 @@ export const rules = pgTable(
     // generated at rule creation (cheap; lets users add webhook actions
     // later via PATCH without re-creating the rule).
     webhook_secret: text("webhook_secret"),
-    // ─── scheduled-rule columns (Phase 4.2) ───────────────────────────
+    // ─── scheduled-rule columns ───────────────────────────────────────
     // Standard 5-field cron (e.g. "0 9 * * MON"). When set, the rule is
     // a scheduled rule — trigger_event_types must be empty and the
     // scheduler loop fires it on the cron cadence rather than reacting
@@ -618,7 +618,7 @@ export const ruleFirings = pgTable(
     rule_id: uuid("rule_id")
       .notNull()
       .references(() => rules.id, { onDelete: "cascade" }),
-    // Nullable for Phase 4.2 scheduled firings (no triggering event).
+    // Nullable for scheduled firings (no triggering event).
     event_id: uuid("event_id").references(() => events.id, { onDelete: "cascade" }),
     // Set for scheduled firings — the ticket the actions operate on,
     // pre-matched by the rule's target_query. NULL for event-triggered

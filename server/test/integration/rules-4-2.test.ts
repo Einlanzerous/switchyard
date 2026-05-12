@@ -6,7 +6,7 @@
 //     bun --cwd server test test/integration/rules-4-2.test.ts
 
 import { afterAll, beforeEach, describe, expect, test } from "bun:test";
-import { sql, eq, and } from "drizzle-orm";
+import { sql, eq } from "drizzle-orm";
 import { closeTestDb, schema, testDb } from "../db.js";
 
 process.env.DATABASE_URL = process.env.DATABASE_URL_TEST!;
@@ -27,7 +27,7 @@ beforeEach(async () => {
   dispatcher._resetForTesting();
   await testDb.execute(
     sql`TRUNCATE rule_firings, rules, webhook_deliveries, webhook_subscriptions,
-        events, ticket_labels, comments, attachments, tickets,
+        targets, events, ticket_labels, comments, attachments, tickets,
         project_counters, statuses, status_transitions, labels, projects,
         api_tokens, idempotency_keys, users RESTART IDENTITY CASCADE`
   );
@@ -114,8 +114,7 @@ describe("4.2 scheduled rules", () => {
   }, 20_000);
 
   test("scheduled rule with no matched tickets still advances cron cursor", async () => {
-    const { magos, project, backlog } = await seedCtx();
-    void magos; void backlog;
+    const { project } = await seedCtx();
 
     const [rule] = await testDb.insert(schema.rules).values({
       project_id: project.id,
@@ -192,8 +191,7 @@ describe("4.2 scheduled rules", () => {
   }, 10_000);
 
   test("invalid cron expression doesn't crash the scheduler", async () => {
-    const { magos, project, inProgress } = await seedCtx();
-    void magos; void inProgress;
+    const { project } = await seedCtx();
 
     await testDb.insert(schema.rules).values({
       project_id: project.id,
@@ -210,6 +208,5 @@ describe("4.2 scheduled rules", () => {
     // Should swallow the error and return 0 (not throw).
     const fired = await scheduler._tickOnce();
     expect(fired).toBe(0);
-    void and;
   }, 10_000);
 });

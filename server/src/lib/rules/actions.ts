@@ -15,15 +15,15 @@ import { env } from "../../env.js";
 import { writeEvent } from "../events.js";
 import { loadTicketSummary } from "../tickets.js";
 import { signHmac } from "../hmac.js";
+import { Priority } from "@switchyard/shared";
 import type {
   RuleAction, SetFieldAction, AddLabelAction, CommentAction,
   AssignAction, MoveStatusAction, FireWebhookAction, CallN8nAction,
-  Priority, StatusCategory,
+  StatusCategory,
 } from "@switchyard/shared";
 import type { RuleContext, ActionOutcome } from "./types.js";
 import { resolveFieldPath } from "./evaluator.js";
 
-const VALID_PRIORITIES: Priority[] = ["low", "medium", "high", "critical"];
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
 export async function runAction(action: RuleAction, ctx: RuleContext): Promise<ActionOutcome> {
@@ -131,13 +131,15 @@ async function runSetField(action: SetFieldAction, ctx: RuleContext): Promise<vo
   });
 }
 
-function coercePriority(raw: unknown): Priority | null {
+type PriorityValue = (typeof Priority.options)[number];
+
+function coercePriority(raw: unknown): PriorityValue | null {
   if (raw === null) return null;
-  if (typeof raw !== "string") throw new Error(`priority must be a string, got ${typeof raw}`);
-  if (!VALID_PRIORITIES.includes(raw as Priority)) {
-    throw new Error(`priority must be one of ${VALID_PRIORITIES.join("|")}`);
+  const parsed = Priority.safeParse(raw);
+  if (!parsed.success) {
+    throw new Error(`priority must be one of ${Priority.options.join("|")}`);
   }
-  return raw as Priority;
+  return parsed.data;
 }
 
 function coerceIso(raw: unknown): string | null {
@@ -510,19 +512,11 @@ async function deliverWebhook(opts: {
 }): Promise<void> {
   const { url, method, headers, ctx, hmacKey } = opts;
 
-  // Choose the signing key: explicit target secret > rule webhook_secret.
-  // Look up the rule's secret only when needed.
-  let signingKey: string | null = hmacKey ?? null;
+  // Signing key: explicit target secret beats the rule's. ctx.rule.webhook_secret
+  // is hydrated by the dispatcher's claim SQL — no per-fire DB hit.
+  const signingKey = hmacKey ?? ctx.rule.webhook_secret;
   if (!signingKey) {
-    const [rule] = await db
-      .select({ webhook_secret: schema.rules.webhook_secret })
-      .from(schema.rules)
-      .where(eq(schema.rules.id, ctx.rule.id))
-      .limit(1);
-    if (!rule?.webhook_secret) {
-      throw new Error("fire_webhook: rule has no webhook_secret (recreate the rule)");
-    }
-    signingKey = rule.webhook_secret;
+    throw new Error("fire_webhook: rule has no webhook_secret (recreate the rule)");
   }
 
   // Webhook envelope identical to subscriptions: id/event/occurred_at on

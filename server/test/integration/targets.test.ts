@@ -282,8 +282,7 @@ describe("4.2.5 targets — rule fire_webhook action", () => {
 
 describe("4.2.5 targets — delete with references", () => {
   test("deleting a referenced target throws and the dependent ids surface in details", async () => {
-    const { magos, project, backlog } = await seedCtx();
-    void backlog;
+    const { project } = await seedCtx();
 
     const [target] = await testDb.insert(schema.targets).values({
       name: "n8n",
@@ -317,7 +316,5 @@ describe("4.2.5 targets — delete with references", () => {
       .from(schema.webhookSubscriptions)
       .where(eq(schema.webhookSubscriptions.target_id, target!.id));
     expect(subRefs.map((s: any) => s.id)).toContain(sub!.id);
-
-    void magos;
   }, 10_000);
 });

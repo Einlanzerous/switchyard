@@ -6,6 +6,7 @@ import { alias } from "drizzle-orm/pg-core";
 import {
   Ticket, TicketSummary, CreateTicket, UpdateTicket, TransitionTicket,
   TicketListFilters, Event, paginated, Pagination,
+  StatusCategory, TicketType,
   type TicketSummary as ApiTicketSummary,
   type EventType,
 } from "@switchyard/shared";
@@ -26,8 +27,8 @@ const tag = "Tickets";
 const idOrKey = z.string().min(1);
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const STATUS_CATEGORIES = new Set(["backlog", "planning", "in_progress", "blocked", "closed"]);
-const TICKET_TYPES = new Set(["spike", "task", "bug", "epic"]);
+const STATUS_CATEGORIES = new Set<string>(StatusCategory.options);
+const TICKET_TYPES = new Set<string>(TicketType.options);
 
 const list = createRoute({
   method: "get", path: "/v1/tickets", tags: [tag], summary: "List tickets",

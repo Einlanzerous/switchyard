@@ -127,6 +127,7 @@ type ClaimedRow = {
   rule_enabled: boolean;
   rule_conditions: unknown;
   rule_actions: unknown;
+  rule_webhook_secret: string | null;
   event_type: string | null;
   event_payload: unknown;
 };
@@ -141,13 +142,14 @@ async function processBatch(): Promise<number> {
         f.event_id      AS event_id,
         f.ticket_id     AS ticket_id,
         f.attempts      AS attempts,
-        r.name          AS rule_name,
-        r.project_id    AS rule_project_id,
-        r.enabled       AS rule_enabled,
-        r.conditions    AS rule_conditions,
-        r.actions       AS rule_actions,
-        e.event_type    AS event_type,
-        e.payload       AS event_payload
+        r.name           AS rule_name,
+        r.project_id     AS rule_project_id,
+        r.enabled        AS rule_enabled,
+        r.conditions     AS rule_conditions,
+        r.actions        AS rule_actions,
+        r.webhook_secret AS rule_webhook_secret,
+        e.event_type     AS event_type,
+        e.payload        AS event_payload
       FROM rule_firings f
       JOIN rules r ON r.id = f.rule_id
       LEFT JOIN events e ON e.id = f.event_id
@@ -200,8 +202,8 @@ async function processOne(row: ClaimedRow): Promise<void> {
       return;
     }
 
-    // Rate-limit gate (Phase 4.1). Count this rule's firings that were
-    // enqueued strictly BEFORE this one (within the trailing hour). If
+    // Rate-limit gate. Count this rule's firings that were enqueued
+    // strictly BEFORE this one (within the trailing hour). If
     // that count is already at the cap, this firing is over the limit
     // and gets skipped. Counting "strictly before" makes the gate
     // deterministic when a burst of firings shares a batch — each one
@@ -264,7 +266,12 @@ async function processOne(row: ClaimedRow): Promise<void> {
       event_id: row.event_id ?? "",
       event_type: effectiveEventType,
       event_payload: payload,
-      rule: { id: row.rule_id, name: row.rule_name, project_id: row.rule_project_id ?? "" },
+      rule: {
+        id: row.rule_id,
+        name: row.rule_name,
+        project_id: row.rule_project_id ?? "",
+        webhook_secret: row.rule_webhook_secret,
+      },
       rules_engine_user_id: rulesEngineUserId,
       rulesEngineActor,
     };

@@ -5,7 +5,7 @@
 //     bun --cwd server test test/integration/rules-4-1.test.ts
 
 import { afterAll, beforeEach, describe, expect, test } from "bun:test";
-import { sql, and, eq } from "drizzle-orm";
+import { sql, eq } from "drizzle-orm";
 import { closeTestDb, schema, testDb } from "../db.js";
 import { writeEvent } from "../../src/lib/events.js";
 
@@ -30,7 +30,7 @@ beforeEach(async () => {
   _resetForTesting();
   await testDb.execute(
     sql`TRUNCATE rule_firings, rules, webhook_deliveries, webhook_subscriptions,
-        events, ticket_labels, comments, attachments, tickets,
+        targets, events, ticket_labels, comments, attachments, tickets,
         project_counters, statuses, status_transitions, labels, projects,
         api_tokens, idempotency_keys, users RESTART IDENTITY CASCADE`
   );
@@ -154,7 +154,7 @@ describe("4.1 actions", () => {
   }, 15_000);
 
   test("move_status rejects when no transition is whitelisted", async () => {
-    const { magos, project, backlog, inProgress, closed } = await seedCtx();
+    const { magos, project, backlog, inProgress } = await seedCtx();
 
     // Whitelist exists but only backlog → in_progress, not → closed.
     await testDb.insert(schema.statusTransitions).values({
@@ -181,7 +181,6 @@ describe("4.1 actions", () => {
 
     const [refreshed] = await testDb.select().from(schema.tickets).where(eq(schema.tickets.id, ticket!.id));
     expect(refreshed!.status_id).toBe(backlog.id); // unchanged
-    void inProgress; void closed;
   }, 15_000);
 
   test("fire_webhook posts HMAC-signed envelope and succeeds on 200", async () => {
@@ -323,6 +322,5 @@ describe("4.1 cross-project + rate limit", () => {
     expect(succeeded).toBe(3);
     expect(skipped).toBe(2);
     expect(firings.filter((f) => f.last_error === "rate_limited").length).toBe(2);
-    void and;
   }, 20_000);
 });

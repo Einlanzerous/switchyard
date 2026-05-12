@@ -18,6 +18,10 @@ export type RuleContext = {
     id: string;
     name: string;
     project_id: string;
+    // Carried into ctx by the dispatcher so deliverWebhook doesn't have
+    // to re-SELECT the rule for every fire_webhook action. Nullable
+    // because legacy rules pre-4.1 may have a null secret column.
+    webhook_secret: string | null;
   };
   // Resolved at dispatch time. Single user shared across every firing.
   rules_engine_user_id: string;

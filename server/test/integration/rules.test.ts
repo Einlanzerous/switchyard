@@ -36,7 +36,7 @@ beforeEach(async () => {
   _resetForTesting();
   await testDb.execute(
     sql`TRUNCATE rule_firings, rules, webhook_deliveries, webhook_subscriptions,
-        events, ticket_labels, comments, attachments, tickets,
+        targets, events, ticket_labels, comments, attachments, tickets,
         project_counters, statuses, status_transitions, labels, projects,
         api_tokens, idempotency_keys, users RESTART IDENTITY CASCADE`
   );

@@ -8,7 +8,7 @@
 // dependent ids so the UI can prompt for explicit detach.
 
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { and, desc, eq, lt, sql, type SQL } from "drizzle-orm";
+import { and, eq, sql, type SQL } from "drizzle-orm";
 import {
   Target, TargetWithSecret, CreateTarget, UpdateTarget,
   Uuid, paginated, Pagination,
@@ -105,7 +105,6 @@ export function mount(app: OpenAPIHono) {
       .limit(limit + 1);
 
     return c.json(buildPage(rows.map(mapTarget), limit), 200);
-    void desc; void lt;
   }) as any);
 
   // ─── create ──────────────────────────────────────────────────────────────
