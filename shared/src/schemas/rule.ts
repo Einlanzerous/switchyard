@@ -108,16 +108,46 @@ export const MoveStatusAction = z.object({
 });
 export type MoveStatusAction = z.infer<typeof MoveStatusAction>;
 
-// Arbitrary HTTP POST. Body is the standard Event envelope; signed with the
-// rule's `webhook_secret` (returned ONCE on rule creation). Headers map is
-// optional — useful for receivers that need a static auth header alongside
-// the HMAC signature.
-export const FireWebhookAction = z.object({
-  type: z.literal("fire_webhook"),
-  url: z.string().url(),
-  method: z.enum(["POST", "PUT"]).default("POST"),
-  headers: z.record(z.string()).optional(),
-});
+// Arbitrary HTTP POST. Body is the standard Event envelope; signed with
+// the appropriate HMAC secret (see below). Two forms:
+//
+//   1. URL form (4.1 original): `{ url, method?, headers? }`. The body
+//      is signed with the rule's `webhook_secret`. Use for one-off
+//      endpoints that don't warrant a named target.
+//   2. Target form (4.2.5+):    `{ target, path?, method?, headers? }`.
+//      The runner looks up the target by name, resolves the URL =
+//      `target.url + (path ?? "")`, signs with `target.hmac_secret ??
+//      rule.webhook_secret`, and merges `target.headers` with the
+//      action's headers (action wins on collision).
+//
+// Exactly one of `url` / `target` must be set — enforced by superRefine.
+export const FireWebhookAction = z
+  .object({
+    type: z.literal("fire_webhook"),
+    url: z.string().url().optional(),
+    target: z.string().min(1).max(80).optional(),
+    path: z.string().max(500).optional(),
+    method: z.enum(["POST", "PUT"]).default("POST"),
+    headers: z.record(z.string()).optional(),
+  })
+  .superRefine((data, ctx) => {
+    const hasUrl = typeof data.url === "string" && data.url.length > 0;
+    const hasTarget = typeof data.target === "string" && data.target.length > 0;
+    if (hasUrl === hasTarget) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "fire_webhook requires exactly one of url or target",
+        path: ["target"],
+      });
+    }
+    if (data.path !== undefined && !hasTarget) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "fire_webhook.path is only valid when `target` is set",
+        path: ["path"],
+      });
+    }
+  });
 export type FireWebhookAction = z.infer<typeof FireWebhookAction>;
 
 // Convenience wrapper around fire_webhook. The runner POSTs to
@@ -132,7 +162,12 @@ export const CallN8nAction = z.object({
 });
 export type CallN8nAction = z.infer<typeof CallN8nAction>;
 
-export const RuleAction = z.discriminatedUnion("type", [
+// `z.union` rather than `discriminatedUnion` because FireWebhookAction
+// wraps its object in a `.superRefine` (for the url/target XOR check),
+// and zod's discriminatedUnion requires bare ZodObject members. Each
+// variant carries a unique `type` literal so runtime matching still
+// works; only the error-message clarity on bad input differs slightly.
+export const RuleAction = z.union([
   SetFieldAction,
   AddLabelAction,
   CommentAction,

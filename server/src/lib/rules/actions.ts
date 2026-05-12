@@ -434,6 +434,25 @@ async function runMoveStatus(action: MoveStatusAction, ctx: RuleContext): Promis
 // retried automatically — admin redelivers the firing.
 
 async function runFireWebhook(action: FireWebhookAction, ctx: RuleContext): Promise<void> {
+  // Two forms: literal URL, or named target with optional path.
+  // Resolution happens at fire time so target URL/secret changes propagate
+  // without rewriting the rule.
+  if (action.target) {
+    const target = await resolveTargetByName(action.target);
+    const path = action.path ?? "";
+    await deliverWebhook({
+      url: target.url + path,
+      method: action.method ?? "POST",
+      headers: { ...(target.headers as Record<string, string> ?? {}), ...(action.headers ?? {}) },
+      hmacKey: target.hmac_secret, // null = fall back to rule's webhook_secret in deliverWebhook
+      ctx,
+    });
+    return;
+  }
+  if (!action.url) {
+    // Zod refine already rejected this, but be defensive at runtime.
+    throw new Error("fire_webhook: neither url nor target was set");
+  }
   await deliverWebhook({
     url: action.url,
     method: action.method ?? "POST",
@@ -442,11 +461,35 @@ async function runFireWebhook(action: FireWebhookAction, ctx: RuleContext): Prom
   });
 }
 
+async function resolveTargetByName(name: string): Promise<typeof schema.targets.$inferSelect> {
+  const lowered = name.toLowerCase();
+  const [t] = await db.select().from(schema.targets).where(eq(schema.targets.name, lowered)).limit(1);
+  if (!t) throw new Error(`fire_webhook: target "${name}" not found`);
+  return t;
+}
+
 async function runCallN8n(action: CallN8nAction, ctx: RuleContext): Promise<void> {
-  if (!env.N8N_BASE_URL) {
-    throw new Error("call_n8n: N8N_BASE_URL env is not set");
-  }
+  const targetName = process.env.N8N_TARGET_NAME ?? "n8n";
   const path = action.workflow.startsWith("/") ? action.workflow : `/${action.workflow}`;
+
+  // Prefer a named target so n8n routing benefits from the same
+  // decoupling as fire_webhook. Falls back to the legacy N8N_BASE_URL
+  // env so existing rules keep working during rollout.
+  const [target] = await db.select().from(schema.targets)
+    .where(eq(schema.targets.name, targetName.toLowerCase())).limit(1);
+  if (target) {
+    await deliverWebhook({
+      url: target.url + path,
+      method: "POST",
+      headers: (target.headers as Record<string, string> ?? {}),
+      hmacKey: target.hmac_secret,
+      ctx,
+    });
+    return;
+  }
+  if (!env.N8N_BASE_URL) {
+    throw new Error(`call_n8n: no target "${targetName}" and N8N_BASE_URL env is not set`);
+  }
   await deliverWebhook({
     url: `${env.N8N_BASE_URL}${path}`,
     method: "POST",
@@ -460,18 +503,26 @@ async function deliverWebhook(opts: {
   method: "POST" | "PUT";
   headers: Record<string, string>;
   ctx: RuleContext;
+  // Optional override; falls through to the rule's webhook_secret when
+  // null/undefined. Set by callers that resolved a target with its own
+  // hmac_secret column.
+  hmacKey?: string | null;
 }): Promise<void> {
-  const { url, method, headers, ctx } = opts;
+  const { url, method, headers, ctx, hmacKey } = opts;
 
-  // Look up the rule's webhook secret (cached on context would be nicer;
-  // one read per fire is cheap enough that it isn't worth the plumbing).
-  const [rule] = await db
-    .select({ webhook_secret: schema.rules.webhook_secret })
-    .from(schema.rules)
-    .where(eq(schema.rules.id, ctx.rule.id))
-    .limit(1);
-  if (!rule?.webhook_secret) {
-    throw new Error("fire_webhook: rule has no webhook_secret (recreate the rule)");
+  // Choose the signing key: explicit target secret > rule webhook_secret.
+  // Look up the rule's secret only when needed.
+  let signingKey: string | null = hmacKey ?? null;
+  if (!signingKey) {
+    const [rule] = await db
+      .select({ webhook_secret: schema.rules.webhook_secret })
+      .from(schema.rules)
+      .where(eq(schema.rules.id, ctx.rule.id))
+      .limit(1);
+    if (!rule?.webhook_secret) {
+      throw new Error("fire_webhook: rule has no webhook_secret (recreate the rule)");
+    }
+    signingKey = rule.webhook_secret;
   }
 
   // Webhook envelope identical to subscriptions: id/event/occurred_at on
@@ -483,7 +534,7 @@ async function deliverWebhook(opts: {
     ...ctx.event_payload,
   };
   const body = JSON.stringify(envelope);
-  const signature = signHmac(rule.webhook_secret, body);
+  const signature = signHmac(signingKey, body);
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), env.RULE_WEBHOOK_TIMEOUT_MS);

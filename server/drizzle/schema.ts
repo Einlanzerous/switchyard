@@ -347,6 +347,37 @@ export const boardProjects = pgTable(
   (t) => ({ pk: primaryKey({ columns: [t.board_id, t.project_id] }) })
 );
 
+// ─── targets (Phase 4.2.5) ─────────────────────────────────────────────────
+//
+// Named webhook endpoints. Decouples URLs from the rules and
+// subscriptions that reference them — change a target's URL once and
+// every subscription/action pointing at it follows. Receivers verify
+// HMAC with `hmac_secret` when present; falls back to the rule's
+// webhook_secret for fire_webhook actions when both are unset.
+
+export const targets = pgTable(
+  "targets",
+  {
+    id: id(),
+    name: varchar("name", { length: 80 }).notNull(),
+    description: text("description"),
+    url: text("url").notNull(),
+    // Optional target-scoped HMAC secret. When set, beats the rule's
+    // webhook_secret for fire_webhook actions. Returned ONCE on POST.
+    hmac_secret: text("hmac_secret"),
+    // Static headers merged into every outbound request. Per-action
+    // headers win on collision.
+    headers: jsonb("headers"),
+    created_at: createdAt(),
+    updated_at: updatedAt(),
+  },
+  (t) => ({
+    // Names are lowercased + validated at the API layer; case-insensitive
+    // uniqueness is enforced by storing them lowercased.
+    nameUnique: uniqueIndex("targets_name_unique").on(t.name),
+  })
+);
+
 // ─── webhooks ───────────────────────────────────────────────────────────────
 
 export const webhookSubscriptions = pgTable(
@@ -357,12 +388,18 @@ export const webhookSubscriptions = pgTable(
     event_types: text("event_types").array().notNull(),
     status_filter: jsonb("status_filter"),
     secret: text("secret").notNull(),
+    // Optional named target (Phase 4.2.5). When set, the dispatcher
+    // resolves the URL + signing secret from the target at delivery
+    // time, overriding the `url`/`secret` columns above. The columns
+    // remain so dropping the target falls back to the literal URL.
+    target_id: uuid("target_id").references(() => targets.id, { onDelete: "set null" }),
     active: boolean("active").notNull().default(true),
     created_at: createdAt(),
     updated_at: updatedAt(),
   },
   (t) => ({
     activeIdx: index("webhook_subscriptions_active_idx").on(t.active),
+    targetIdx: index("webhook_subscriptions_target_idx").on(t.target_id),
   })
 );
 

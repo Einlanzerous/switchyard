@@ -10,6 +10,7 @@ export const ApiTokenScope = z.enum([
   "projects:manage",
   "users:manage",
   "rules:manage",
+  "targets:manage",
   "admin",
 ]);
 export type ApiTokenScope = z.infer<typeof ApiTokenScope>;

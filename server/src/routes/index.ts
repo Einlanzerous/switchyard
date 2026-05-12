@@ -13,6 +13,7 @@ import * as settings from "./settings.js";
 import * as stats from "./stats.js";
 import * as savedViews from "./savedViews.js";
 import * as rules from "./rules.js";
+import * as targets from "./targets.js";
 
 export function mountRoutes(app: OpenAPIHono) {
   users.mount(app);
@@ -29,4 +30,5 @@ export function mountRoutes(app: OpenAPIHono) {
   stats.mount(app);
   savedViews.mount(app);
   rules.mount(app);
+  targets.mount(app);
 }

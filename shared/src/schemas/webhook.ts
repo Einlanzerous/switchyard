@@ -20,6 +20,11 @@ export const WebhookSubscription = z
     url: z.string().url(),
     event_types: z.array(z.union([EventType, z.literal("*")])).min(1),
     status_filter: WebhookStatusFilter.nullable(),
+    // Phase 4.2.5: optional named target. When set, the dispatcher
+    // resolves the URL + signing secret from the target at delivery
+    // time; the literal `url` + `secret` remain as fallback if the
+    // target is deleted (FK is ON DELETE SET NULL).
+    target_id: Uuid.nullable(),
     active: z.boolean(),
     // Secret is omitted from responses after creation; only returned once on POST.
   })
@@ -30,11 +35,19 @@ export const CreateWebhookSubscription = z.object({
   url: z.string().url(),
   event_types: z.array(z.union([EventType, z.literal("*")])).min(1),
   status_filter: WebhookStatusFilter.optional(),
+  // Optional target reference; subscriptions can stick with the literal
+  // URL form or attach to a named target.
+  target_id: Uuid.optional(),
   active: z.boolean().default(true),
 });
 export type CreateWebhookSubscription = z.infer<typeof CreateWebhookSubscription>;
 
-export const UpdateWebhookSubscription = CreateWebhookSubscription.partial();
+export const UpdateWebhookSubscription = CreateWebhookSubscription.partial().extend({
+  // Allow explicit null on PATCH to detach a target without recreating
+  // the subscription. `.partial()` makes target_id optional already;
+  // we widen it here so callers can clear it.
+  target_id: Uuid.nullable().optional(),
+});
 export type UpdateWebhookSubscription = z.infer<typeof UpdateWebhookSubscription>;
 
 export const WebhookSubscriptionWithSecret = WebhookSubscription.extend({

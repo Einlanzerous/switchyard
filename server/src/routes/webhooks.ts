@@ -94,11 +94,21 @@ export function mount(app: OpenAPIHono) {
     const body = c.req.valid("json");
     const secret = generateWebhookSecret();
 
+    // If the caller attached a target, validate it exists so we fail
+    // cleanly with 400 instead of writing an orphan row that confuses
+    // the dispatcher's LEFT JOIN.
+    if (body.target_id) {
+      const [t] = await db.select({ id: schema.targets.id }).from(schema.targets)
+        .where(eq(schema.targets.id, body.target_id)).limit(1);
+      if (!t) throw badRequest(`target_id ${body.target_id} not found`);
+    }
+
     const [created] = await db.insert(schema.webhookSubscriptions).values({
       url: body.url,
       event_types: body.event_types,
       status_filter: body.status_filter ?? null,
       secret,
+      target_id: body.target_id ?? null,
       active: body.active ?? true,
     }).returning();
     if (!created) throw new Error("insert returned nothing");
@@ -130,6 +140,15 @@ export function mount(app: OpenAPIHono) {
     if (body.event_types !== undefined) sets.event_types = body.event_types;
     if (body.status_filter !== undefined) sets.status_filter = body.status_filter ?? null;
     if (body.active !== undefined) sets.active = body.active;
+    if (body.target_id !== undefined) {
+      // null detaches; a uuid attaches (validate it exists).
+      if (body.target_id !== null) {
+        const [t] = await db.select({ id: schema.targets.id }).from(schema.targets)
+          .where(eq(schema.targets.id, body.target_id)).limit(1);
+        if (!t) throw badRequest(`target_id ${body.target_id} not found`);
+      }
+      sets.target_id = body.target_id;
+    }
 
     if (Object.keys(sets).length === 0) {
       return c.json(mapWebhookSubscription(existing), 200);

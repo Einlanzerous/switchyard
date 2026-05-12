@@ -239,6 +239,7 @@ export function mapWebhookSubscription(s: WebhookSubRow): ApiWebhookSubscription
     url: s.url,
     event_types: s.event_types as ApiWebhookSubscription["event_types"],
     status_filter: (s.status_filter ?? null) as ApiWebhookSubscription["status_filter"],
+    target_id: s.target_id,
     active: s.active,
     created_at: s.created_at,
     updated_at: s.updated_at,

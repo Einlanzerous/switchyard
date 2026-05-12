@@ -76,6 +76,9 @@ type ClaimedRow = {
   attempts: number;
   url: string;
   secret: string;
+  // Phase 4.2.5: static headers from the resolved target (null when
+  // the subscription has no target or the target has no headers).
+  target_headers: Record<string, string> | null;
   event_type: string;
   payload: unknown;
 };
@@ -83,6 +86,11 @@ type ClaimedRow = {
 async function processBatch(): Promise<number> {
   // Claim a batch in one transaction. SKIP LOCKED keeps multiple instances
   // from grabbing the same row (we're single-instance today, but cheap insurance).
+  //
+  // Phase 4.2.5: LEFT JOIN on targets. When the subscription has a
+  // target_id, coalesce(target.url, s.url) gives target precedence;
+  // same for the signing secret. ON DELETE SET NULL on the FK means a
+  // deleted target falls back to the subscription's literal columns.
   const claimed = await db.transaction(async (tx) => {
     const rows = (await tx.execute(sql`
       SELECT
@@ -90,12 +98,14 @@ async function processBatch(): Promise<number> {
         d.subscription_id,
         d.event_id,
         d.attempts,
-        s.url,
-        s.secret,
+        coalesce(t.url, s.url)              AS url,
+        coalesce(t.hmac_secret, s.secret)   AS secret,
+        t.headers                           AS target_headers,
         e.event_type,
         e.payload
       FROM webhook_deliveries d
       JOIN webhook_subscriptions s ON s.id = d.subscription_id
+      LEFT JOIN targets t ON t.id = s.target_id
       JOIN events e ON e.id = d.event_id
       WHERE d.status IN ('pending', 'failed')
         AND d.next_attempt_at <= now()
@@ -147,9 +157,14 @@ async function deliverOne(row: ClaimedRow): Promise<void> {
   const timeout = setTimeout(() => controller.abort(), env.WEBHOOK_TIMEOUT_MS);
 
   try {
+    // Phase 4.2.5: target-attached subscriptions get the target's
+    // static headers merged in. Standard switchyard headers (signature,
+    // event, delivery, UA, content-type) override on collision so the
+    // receiver always sees the canonical envelope metadata.
     const res = await fetch(row.url, {
       method: "POST",
       headers: {
+        ...(row.target_headers ?? {}),
         "Content-Type": "application/json",
         "X-Switchyard-Signature": `sha256=${signature}`,
         "X-Switchyard-Event": row.event_type,
