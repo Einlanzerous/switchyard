@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.7.0](https://github.com/Einlanzerous/switchyard/compare/v2.6.0...v2.7.0) (2026-05-12)
+
+
+### Features
+
+* Phase 4.2 native rules — scheduled triggers + ticket-query targeting ([3c12ff6](https://github.com/Einlanzerous/switchyard/commit/3c12ff69b4ec0ea060bc62985fae88fa1d02a46a))
+* Phase 4.2.5 native rules — named webhook targets ([ef31034](https://github.com/Einlanzerous/switchyard/commit/ef31034c4329d0c640d2a394ca1be3e83a7abc11))
+
 ## [2.6.0](https://github.com/Einlanzerous/switchyard/compare/v2.5.0...v2.6.0) (2026-05-12)
 
 
