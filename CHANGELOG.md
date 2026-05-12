@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.6.0](https://github.com/Einlanzerous/switchyard/compare/v2.5.0...v2.6.0) (2026-05-12)
+
+
+### Features
+
+* show release version in sidebar footer ([f3b138d](https://github.com/Einlanzerous/switchyard/commit/f3b138d8147865bb133a7399ce6ba70bad127314))
+
 ## [2.5.0](https://github.com/Einlanzerous/switchyard/compare/v2.4.0...v2.5.0) (2026-05-12)
 
 
