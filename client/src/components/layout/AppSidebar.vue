@@ -5,6 +5,7 @@ import { Inbox, LayoutDashboard, KanbanSquare, FolderKanban, Settings, Zap, Hear
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import SwitchyardLogo from "@/components/SwitchyardLogo.vue";
+import { APP_VERSION_DISPLAY } from "@/lib/version";
 
 type NavItem = { to: string; label: string; icon: any; group: "main" | "admin" };
 
@@ -81,5 +82,12 @@ function isActive(to: string) {
         </RouterLink>
       </nav>
     </ScrollArea>
+
+    <!-- Version chip — release-please semver in CI builds, "dev" locally.
+         Sits in the sidebar footer so it doesn't add chrome to the main
+         content area. -->
+    <div class="px-4 py-2 border-t text-[10px] text-muted-foreground/70 font-mono">
+      {{ APP_VERSION_DISPLAY }}
+    </div>
   </aside>
 </template>

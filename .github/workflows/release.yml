@@ -92,6 +92,10 @@ jobs:
           labels: ${{ steps.meta-frontend.outputs.labels }}
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
+          # Bake the release-please semver into the Vue bundle so the
+          # sidebar footer can render it (see client/src/lib/version.ts).
+          build-args: |
+            VITE_APP_VERSION=${{ needs.release-please.outputs.version }}
 
       - name: Notify construct-server
         uses: peter-evans/repository-dispatch@v3

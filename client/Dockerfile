@@ -14,6 +14,13 @@ RUN bun install --frozen-lockfile || bun install
 
 COPY shared ./shared
 COPY client ./client
+
+# Release-please version baked into the Vue bundle. Falls back to "dev"
+# when the build-arg isn't provided (local `docker build`); release.yml
+# passes the real semver during CI builds.
+ARG VITE_APP_VERSION=dev
+ENV VITE_APP_VERSION=${VITE_APP_VERSION}
+
 RUN bun run --cwd client build
 
 # ─── runtime ───────────────────────────────────────────────────────────────
