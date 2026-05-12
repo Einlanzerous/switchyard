@@ -34,6 +34,21 @@ const Env = z.object({
   RULE_FIRING_MAX_ATTEMPTS: z.coerce.number().int().positive().default(3),
   RULE_BATCH_SIZE: z.coerce.number().int().positive().default(32),
 
+  // Per-rule rate limit (Phase 4.1). Firings beyond this count in the
+  // trailing hour are marked `skipped` with reason="rate_limited" instead
+  // of executing. Catches runaway loops if a rule's condition is too
+  // permissive on a wide event type.
+  RULE_RATE_LIMIT_PER_HOUR: z.coerce.number().int().positive().default(100),
+
+  // fire_webhook / call_n8n outbound timeout. Reuses the webhook
+  // dispatcher's value by default; override independently when n8n is
+  // slow and you don't want it to compete with subscription deliveries.
+  RULE_WEBHOOK_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
+
+  // Base URL for call_n8n. The action prefixes this onto its `workflow`
+  // path. Unset = call_n8n actions fail with a clear error at runtime.
+  N8N_BASE_URL: z.string().url().optional(),
+
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 });
 

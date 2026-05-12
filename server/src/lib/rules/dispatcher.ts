@@ -10,7 +10,7 @@
 // Admins redeliver explicitly via POST /v1/rules/firings/{id}/redeliver,
 // which sets status back to pending and clears next_attempt_at.
 
-import { eq, inArray, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { db, schema } from "../../db.js";
 import { env } from "../../env.js";
 import { mapUserRef } from "../mappers.js";
@@ -67,6 +67,17 @@ export function dispatcherInflight(): number {
   return inflight;
 }
 
+// Test-only: drop the cached bootstrap state so the next startDispatcher()
+// re-resolves the rules-engine user. Used by integration tests that
+// TRUNCATE users between cases — without it the dispatcher keeps writing
+// events with a now-deleted actor_id and hits an FK violation.
+export function _resetForTesting(): void {
+  running = false;
+  loopPromise = null;
+  rulesEngineUserId = null;
+  rulesEngineActor = null;
+}
+
 // Used by lib/events.ts to skip rule fan-out for rule-authored events.
 export function getRulesEngineUserId(): string | null {
   return rulesEngineUserId;
@@ -104,11 +115,12 @@ async function loop(): Promise<void> {
 
 type ClaimedRow = {
   firing_id: string;
+  firing_created_at: string;
   rule_id: string;
   event_id: string | null;
   attempts: number;
   rule_name: string;
-  rule_project_id: string;
+  rule_project_id: string | null;
   rule_enabled: boolean;
   rule_conditions: unknown;
   rule_actions: unknown;
@@ -121,6 +133,7 @@ async function processBatch(): Promise<number> {
     const rows = (await tx.execute(sql`
       SELECT
         f.id            AS firing_id,
+        f.created_at    AS firing_created_at,
         f.rule_id       AS rule_id,
         f.event_id      AS event_id,
         f.attempts      AS attempts,
@@ -174,6 +187,32 @@ async function processOne(row: ClaimedRow): Promise<void> {
     }
     if (!row.event_type || row.event_payload == null) {
       await markSkipped(row.firing_id, newAttempts, "event missing", { skip_reason: "event missing" });
+      return;
+    }
+
+    // Rate-limit gate (Phase 4.1). Count this rule's firings that were
+    // enqueued strictly BEFORE this one (within the trailing hour). If
+    // that count is already at the cap, this firing is over the limit
+    // and gets skipped. Counting "strictly before" makes the gate
+    // deterministic when a burst of firings shares a batch — each one
+    // is judged against history, not against its concurrent peers.
+    //
+    // Re-read from process.env at runtime so integration tests can
+    // override the limit without forcing the env module to re-parse.
+    const rateLimit = readPositiveInt(process.env.RULE_RATE_LIMIT_PER_HOUR, env.RULE_RATE_LIMIT_PER_HOUR);
+    const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const [recent] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(schema.ruleFirings)
+      .where(and(
+        eq(schema.ruleFirings.rule_id, row.rule_id),
+        gte(schema.ruleFirings.created_at, hourAgo),
+        lt(schema.ruleFirings.created_at, row.firing_created_at),
+      ));
+    if ((recent?.count ?? 0) >= rateLimit) {
+      await markSkipped(row.firing_id, newAttempts, "rate_limited", {
+        skip_reason: `rate_limited (>=${rateLimit}/hour)`,
+      });
       return;
     }
 
@@ -319,3 +358,9 @@ async function markAbandoned(
 }
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+function readPositiveInt(raw: string | undefined, fallback: number): number {
+  if (raw === undefined || raw === "") return fallback;
+  const n = Number(raw);
+  return Number.isInteger(n) && n > 0 ? n : fallback;
+}

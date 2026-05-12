@@ -2,6 +2,7 @@ import { z } from "zod";
 import { Uuid, Iso8601, Timestamps } from "./common.js";
 import { EventType } from "./event.js";
 import { Priority } from "./ticket.js";
+import { StatusCategory, Resolution } from "./status.js";
 
 // ─── condition DSL ──────────────────────────────────────────────────────────
 //
@@ -84,10 +85,61 @@ export const CommentAction = z.object({
 });
 export type CommentAction = z.infer<typeof CommentAction>;
 
+// Assign the ticket to a user, referenced by name OR id (the runner resolves).
+// Use "unassign" or omit `user` to clear the assignee.
+export const AssignAction = z.object({
+  type: z.literal("assign"),
+  user: z.string().min(1).max(100).nullable(),
+});
+export type AssignAction = z.infer<typeof AssignAction>;
+
+// Transition the ticket to a category. The runner picks the default status
+// for that category in the ticket's project, then runs through the same
+// transition validation /v1/tickets/{id}/transition uses (transitions table,
+// epic-close guard, resolution requirement for closed). Optional `to_status`
+// targets a specific status by display_name when a project has multiple in
+// the same category.
+export const MoveStatusAction = z.object({
+  type: z.literal("move_status"),
+  to_category: StatusCategory,
+  to_status: z.string().min(1).max(50).optional(),
+  // Required when to_category = 'closed' — same constraint as /transition.
+  resolution: Resolution.optional(),
+});
+export type MoveStatusAction = z.infer<typeof MoveStatusAction>;
+
+// Arbitrary HTTP POST. Body is the standard Event envelope; signed with the
+// rule's `webhook_secret` (returned ONCE on rule creation). Headers map is
+// optional — useful for receivers that need a static auth header alongside
+// the HMAC signature.
+export const FireWebhookAction = z.object({
+  type: z.literal("fire_webhook"),
+  url: z.string().url(),
+  method: z.enum(["POST", "PUT"]).default("POST"),
+  headers: z.record(z.string()).optional(),
+});
+export type FireWebhookAction = z.infer<typeof FireWebhookAction>;
+
+// Convenience wrapper around fire_webhook. The runner POSTs to
+// `${N8N_BASE_URL}${workflow}` with the same Event envelope, HMAC-signed
+// with the rule's webhook_secret. Keeps n8n flow registration out of
+// each individual rule.
+export const CallN8nAction = z.object({
+  type: z.literal("call_n8n"),
+  // Path component of the n8n webhook URL (e.g. "/webhook/triage-bug").
+  // The server prefixes with N8N_BASE_URL.
+  workflow: z.string().min(1).max(500),
+});
+export type CallN8nAction = z.infer<typeof CallN8nAction>;
+
 export const RuleAction = z.discriminatedUnion("type", [
   SetFieldAction,
   AddLabelAction,
   CommentAction,
+  AssignAction,
+  MoveStatusAction,
+  FireWebhookAction,
+  CallN8nAction,
 ]);
 export type RuleAction = z.infer<typeof RuleAction>;
 
@@ -96,8 +148,9 @@ export type RuleAction = z.infer<typeof RuleAction>;
 export const Rule = z
   .object({
     id: Uuid,
-    // Required in 4.0 — global (null) rules ship in 4.1.
-    project_id: Uuid,
+    // NULL = global rule (matches every project), 4.1+. Project-scoped rules
+    // only fire on events in their project.
+    project_id: Uuid.nullable(),
     name: z.string().min(1).max(200),
     enabled: z.boolean(),
     // At least one event type; the dispatcher matches on exact equality.
@@ -109,8 +162,16 @@ export const Rule = z
   .merge(Timestamps);
 export type Rule = z.infer<typeof Rule>;
 
+// Returned ONCE on POST /v1/rules. Subsequent reads use Rule (no secret).
+// Mirrors WebhookSubscriptionWithSecret.
+export const RuleWithSecret = Rule.extend({
+  webhook_secret: z.string(),
+});
+export type RuleWithSecret = z.infer<typeof RuleWithSecret>;
+
 export const CreateRule = z.object({
-  project_id: Uuid,
+  // null = global rule (Phase 4.1+).
+  project_id: Uuid.nullable().optional(),
   name: z.string().min(1).max(200),
   enabled: z.boolean().default(true),
   trigger_event_types: z.array(EventType).min(1),

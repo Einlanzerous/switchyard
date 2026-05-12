@@ -13755,7 +13755,7 @@ export interface paths {
                                 /** Format: uuid */
                                 id: string;
                                 /** Format: uuid */
-                                project_id: string;
+                                project_id: string | null;
                                 name: string;
                                 enabled: boolean;
                                 trigger_event_types: ("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted")[];
@@ -13804,6 +13804,35 @@ export interface paths {
                                     /** @enum {string} */
                                     type: "comment";
                                     body: string;
+                                } | {
+                                    /** @enum {string} */
+                                    type: "assign";
+                                    user: string | null;
+                                } | {
+                                    /** @enum {string} */
+                                    type: "move_status";
+                                    /** @enum {string} */
+                                    to_category: "backlog" | "planning" | "in_progress" | "blocked" | "closed";
+                                    to_status?: string;
+                                    /** @enum {string} */
+                                    resolution?: "done" | "released" | "cancelled";
+                                } | {
+                                    /** @enum {string} */
+                                    type: "fire_webhook";
+                                    /** Format: uri */
+                                    url: string;
+                                    /**
+                                     * @default POST
+                                     * @enum {string}
+                                     */
+                                    method: "POST" | "PUT";
+                                    headers?: {
+                                        [key: string]: string;
+                                    };
+                                } | {
+                                    /** @enum {string} */
+                                    type: "call_n8n";
+                                    workflow: string;
                                 })[];
                                 /** Format: date-time */
                                 last_fired_at: string | null;
@@ -13948,7 +13977,7 @@ export interface paths {
             };
         };
         put?: never;
-        /** Create a rule */
+        /** Create a rule (webhook_secret returned ONCE) */
         post: {
             parameters: {
                 query?: never;
@@ -13962,7 +13991,7 @@ export interface paths {
                 content: {
                     "application/json": {
                         /** Format: uuid */
-                        project_id: string;
+                        project_id?: string | null;
                         name: string;
                         /** @default true */
                         enabled?: boolean;
@@ -14013,6 +14042,35 @@ export interface paths {
                             /** @enum {string} */
                             type: "comment";
                             body: string;
+                        } | {
+                            /** @enum {string} */
+                            type: "assign";
+                            user: string | null;
+                        } | {
+                            /** @enum {string} */
+                            type: "move_status";
+                            /** @enum {string} */
+                            to_category: "backlog" | "planning" | "in_progress" | "blocked" | "closed";
+                            to_status?: string;
+                            /** @enum {string} */
+                            resolution?: "done" | "released" | "cancelled";
+                        } | {
+                            /** @enum {string} */
+                            type: "fire_webhook";
+                            /** Format: uri */
+                            url: string;
+                            /**
+                             * @default POST
+                             * @enum {string}
+                             */
+                            method?: "POST" | "PUT";
+                            headers?: {
+                                [key: string]: string;
+                            };
+                        } | {
+                            /** @enum {string} */
+                            type: "call_n8n";
+                            workflow: string;
                         })[];
                     };
                 };
@@ -14028,7 +14086,7 @@ export interface paths {
                             /** Format: uuid */
                             id: string;
                             /** Format: uuid */
-                            project_id: string;
+                            project_id: string | null;
                             name: string;
                             enabled: boolean;
                             trigger_event_types: ("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted")[];
@@ -14077,6 +14135,35 @@ export interface paths {
                                 /** @enum {string} */
                                 type: "comment";
                                 body: string;
+                            } | {
+                                /** @enum {string} */
+                                type: "assign";
+                                user: string | null;
+                            } | {
+                                /** @enum {string} */
+                                type: "move_status";
+                                /** @enum {string} */
+                                to_category: "backlog" | "planning" | "in_progress" | "blocked" | "closed";
+                                to_status?: string;
+                                /** @enum {string} */
+                                resolution?: "done" | "released" | "cancelled";
+                            } | {
+                                /** @enum {string} */
+                                type: "fire_webhook";
+                                /** Format: uri */
+                                url: string;
+                                /**
+                                 * @default POST
+                                 * @enum {string}
+                                 */
+                                method: "POST" | "PUT";
+                                headers?: {
+                                    [key: string]: string;
+                                };
+                            } | {
+                                /** @enum {string} */
+                                type: "call_n8n";
+                                workflow: string;
                             })[];
                             /** Format: date-time */
                             last_fired_at: string | null;
@@ -14084,6 +14171,7 @@ export interface paths {
                             created_at: string;
                             /** Format: date-time */
                             updated_at: string;
+                            webhook_secret: string;
                         };
                     };
                 };
@@ -14250,7 +14338,7 @@ export interface paths {
                             /** Format: uuid */
                             id: string;
                             /** Format: uuid */
-                            project_id: string;
+                            project_id: string | null;
                             name: string;
                             enabled: boolean;
                             trigger_event_types: ("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted")[];
@@ -14299,6 +14387,35 @@ export interface paths {
                                 /** @enum {string} */
                                 type: "comment";
                                 body: string;
+                            } | {
+                                /** @enum {string} */
+                                type: "assign";
+                                user: string | null;
+                            } | {
+                                /** @enum {string} */
+                                type: "move_status";
+                                /** @enum {string} */
+                                to_category: "backlog" | "planning" | "in_progress" | "blocked" | "closed";
+                                to_status?: string;
+                                /** @enum {string} */
+                                resolution?: "done" | "released" | "cancelled";
+                            } | {
+                                /** @enum {string} */
+                                type: "fire_webhook";
+                                /** Format: uri */
+                                url: string;
+                                /**
+                                 * @default POST
+                                 * @enum {string}
+                                 */
+                                method: "POST" | "PUT";
+                                headers?: {
+                                    [key: string]: string;
+                                };
+                            } | {
+                                /** @enum {string} */
+                                type: "call_n8n";
+                                workflow: string;
                             })[];
                             /** Format: date-time */
                             last_fired_at: string | null;
@@ -14649,6 +14766,35 @@ export interface paths {
                             /** @enum {string} */
                             type: "comment";
                             body: string;
+                        } | {
+                            /** @enum {string} */
+                            type: "assign";
+                            user: string | null;
+                        } | {
+                            /** @enum {string} */
+                            type: "move_status";
+                            /** @enum {string} */
+                            to_category: "backlog" | "planning" | "in_progress" | "blocked" | "closed";
+                            to_status?: string;
+                            /** @enum {string} */
+                            resolution?: "done" | "released" | "cancelled";
+                        } | {
+                            /** @enum {string} */
+                            type: "fire_webhook";
+                            /** Format: uri */
+                            url: string;
+                            /**
+                             * @default POST
+                             * @enum {string}
+                             */
+                            method?: "POST" | "PUT";
+                            headers?: {
+                                [key: string]: string;
+                            };
+                        } | {
+                            /** @enum {string} */
+                            type: "call_n8n";
+                            workflow: string;
                         })[];
                     };
                 };
@@ -14664,7 +14810,7 @@ export interface paths {
                             /** Format: uuid */
                             id: string;
                             /** Format: uuid */
-                            project_id: string;
+                            project_id: string | null;
                             name: string;
                             enabled: boolean;
                             trigger_event_types: ("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted")[];
@@ -14713,6 +14859,35 @@ export interface paths {
                                 /** @enum {string} */
                                 type: "comment";
                                 body: string;
+                            } | {
+                                /** @enum {string} */
+                                type: "assign";
+                                user: string | null;
+                            } | {
+                                /** @enum {string} */
+                                type: "move_status";
+                                /** @enum {string} */
+                                to_category: "backlog" | "planning" | "in_progress" | "blocked" | "closed";
+                                to_status?: string;
+                                /** @enum {string} */
+                                resolution?: "done" | "released" | "cancelled";
+                            } | {
+                                /** @enum {string} */
+                                type: "fire_webhook";
+                                /** Format: uri */
+                                url: string;
+                                /**
+                                 * @default POST
+                                 * @enum {string}
+                                 */
+                                method: "POST" | "PUT";
+                                headers?: {
+                                    [key: string]: string;
+                                };
+                            } | {
+                                /** @enum {string} */
+                                type: "call_n8n";
+                                workflow: string;
                             })[];
                             /** Format: date-time */
                             last_fired_at: string | null;

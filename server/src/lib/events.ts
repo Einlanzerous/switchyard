@@ -99,11 +99,11 @@ export async function writeEvent(tx: Tx, input: WriteEventInput): Promise<{ id: 
     return eventRow;
   }
 
-  // Match enabled rules whose trigger_event_types contains this event_type
-  // AND whose project_id matches the event's project. In 4.0 every rule is
-  // project-scoped (project_id NOT NULL); 4.1 will allow NULL = global rule.
-  // Without a project_id on the event there's nothing to match against in
-  // 4.0, so skip — that's events like users.* which we don't trigger on.
+  // Match enabled rules whose trigger_event_types contains this event_type.
+  // Project_id matching (4.1+):
+  //   - rule.project_id IS NULL → global, matches every event with a project_id
+  //   - rule.project_id = event's project_id → project-scoped match
+  // Events without a project_id (e.g. user.* hypotheticals) match no rules.
   if (!projectId) return eventRow;
 
   const matchedRules = await tx
@@ -111,7 +111,7 @@ export async function writeEvent(tx: Tx, input: WriteEventInput): Promise<{ id: 
     .from(schema.rules)
     .where(and(
       eq(schema.rules.enabled, true),
-      eq(schema.rules.project_id, projectId),
+      sql`(${schema.rules.project_id} IS NULL OR ${schema.rules.project_id} = ${projectId})`,
       sql`${schema.rules.trigger_event_types} @> ARRAY[${input.event_type}]::text[]`,
     ));
 

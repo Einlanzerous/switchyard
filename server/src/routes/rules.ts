@@ -9,9 +9,9 @@
 // uses (updated_at, id) for rules and (created_at, id) for firings.
 
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { and, desc, eq, lt, type SQL } from "drizzle-orm";
+import { and, desc, eq, isNull, lt, or, type SQL } from "drizzle-orm";
 import {
-  Rule, CreateRule, UpdateRule, RuleFiring,
+  Rule, RuleWithSecret, CreateRule, UpdateRule, RuleFiring,
   Uuid, paginated, Pagination,
 } from "@switchyard/shared";
 import { db } from "../db.js";
@@ -19,9 +19,10 @@ import * as schema from "../../drizzle/schema.js";
 import { requireAuth } from "../auth.js";
 import { idempotency } from "../lib/idempotency.js";
 import { errorResponses, okJson, createdJson, noContent, checkScope, z, idempotencyHeader } from "./_helpers.js";
-import { mapRule, mapRuleFiring } from "../lib/mappers.js";
+import { mapRule, mapRuleWithSecret, mapRuleFiring } from "../lib/mappers.js";
 import { buildPage, cursorOrderBy, cursorWhere, decodeCursor, encodeCursor } from "../lib/pagination.js";
 import { getProjectById } from "../lib/lookups.js";
+import { generateWebhookSecret } from "../lib/id.js";
 import { badRequest, notFound } from "../errors.js";
 
 const tag = "Rules";
@@ -33,12 +34,13 @@ const list = createRoute({
 });
 
 const create = createRoute({
-  method: "post", path: "/v1/rules", tags: [tag], summary: "Create a rule",
+  method: "post", path: "/v1/rules", tags: [tag],
+  summary: "Create a rule (webhook_secret returned ONCE)",
   request: {
     headers: idempotencyHeader,
     body: { content: { "application/json": { schema: CreateRule } } },
   },
-  responses: { ...createdJson(Rule), ...errorResponses },
+  responses: { ...createdJson(RuleWithSecret), ...errorResponses },
 });
 
 const get = createRoute({
@@ -90,7 +92,9 @@ export function mount(app: OpenAPIHono) {
       const [proj] = await db.select({ id: schema.projects.id })
         .from(schema.projects).where(eq(schema.projects.key, q.project)).limit(1);
       if (!proj) return c.json({ items: [], page: { next_cursor: null, has_more: false } }, 200);
-      conds.push(eq(schema.rules.project_id, proj.id));
+      // Include global rules — they apply to every project, so they
+      // belong in the answer when the caller asks "what rules affect KEY".
+      conds.push(or(eq(schema.rules.project_id, proj.id), isNull(schema.rules.project_id))!);
     }
 
     if (q.cursor) {
@@ -112,20 +116,29 @@ export function mount(app: OpenAPIHono) {
     checkScope(c, "rules:manage");
     const body = c.req.valid("json");
 
-    // Validate project exists + not deleted (mirrors webhooks/tickets style).
-    await getProjectById(body.project_id);
+    // Validate project exists + not deleted, but only when one is supplied.
+    // null/missing project_id = global rule (Phase 4.1+).
+    if (body.project_id) {
+      await getProjectById(body.project_id);
+    }
+
+    // Always generate a webhook_secret at creation. Returned ONCE; cheap
+    // to mint and lets users add fire_webhook/call_n8n actions later via
+    // PATCH without recreating the rule.
+    const webhook_secret = generateWebhookSecret();
 
     const [created] = await db.insert(schema.rules).values({
-      project_id: body.project_id,
+      project_id: body.project_id ?? null,
       name: body.name,
       enabled: body.enabled ?? true,
       trigger_event_types: body.trigger_event_types,
       conditions: body.conditions as any,
       actions: body.actions as any,
+      webhook_secret,
     }).returning();
     if (!created) throw new Error("rule insert returned nothing");
 
-    return c.json(mapRule(created), 201);
+    return c.json(mapRuleWithSecret(created), 201);
   }) as any);
 
   // ─── get ─────────────────────────────────────────────────────────────────

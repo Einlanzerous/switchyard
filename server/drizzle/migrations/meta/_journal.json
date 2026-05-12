@@ -50,6 +50,13 @@
       "when": 1778476929263,
       "tag": "0006_perfect_morg",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1778545182371,
+      "tag": "0007_complete_johnny_blaze",
+      "breakpoints": true
     }
   ]
 }

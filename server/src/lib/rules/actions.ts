@@ -8,13 +8,17 @@
 // the firing as action-internal failures. They do NOT auto-retry — admins
 // redeliver via POST /v1/rules/firings/{id}/redeliver.
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import * as schema from "../../../drizzle/schema.js";
 import { db } from "../../db.js";
+import { env } from "../../env.js";
 import { writeEvent } from "../events.js";
 import { loadTicketSummary } from "../tickets.js";
+import { signHmac } from "../hmac.js";
 import type {
-  RuleAction, SetFieldAction, AddLabelAction, CommentAction, Priority,
+  RuleAction, SetFieldAction, AddLabelAction, CommentAction,
+  AssignAction, MoveStatusAction, FireWebhookAction, CallN8nAction,
+  Priority, StatusCategory,
 } from "@switchyard/shared";
 import type { RuleContext, ActionOutcome } from "./types.js";
 import { resolveFieldPath } from "./evaluator.js";
@@ -33,6 +37,18 @@ export async function runAction(action: RuleAction, ctx: RuleContext): Promise<A
         break;
       case "comment":
         await runComment(action, ctx);
+        break;
+      case "assign":
+        await runAssign(action, ctx);
+        break;
+      case "move_status":
+        await runMoveStatus(action, ctx);
+        break;
+      case "fire_webhook":
+        await runFireWebhook(action, ctx);
+        break;
+      case "call_n8n":
+        await runCallN8n(action, ctx);
         break;
     }
     return { type: action.type, status: "ok" };
@@ -216,6 +232,287 @@ async function runComment(action: CommentAction, ctx: RuleContext): Promise<void
       extras: { comment_id: created.id, comment_body: created.body },
     });
   });
+}
+
+// ─── assign ─────────────────────────────────────────────────────────────────
+
+async function runAssign(action: AssignAction, ctx: RuleContext): Promise<void> {
+  const ticket = requireTicket(ctx);
+
+  await db.transaction(async (tx) => {
+    const [existing] = await tx
+      .select()
+      .from(schema.tickets)
+      .where(eq(schema.tickets.id, ticket.id))
+      .limit(1);
+    if (!existing) throw new Error(`ticket ${ticket.id} not found`);
+
+    // Resolve target user. `null` = clear; otherwise look up by id (uuid)
+    // or name. The name path lets rule authors write a stable rule that
+    // doesn't break when a user's row id changes (e.g. re-seed).
+    let nextAssigneeId: string | null = null;
+    if (action.user !== null) {
+      nextAssigneeId = await resolveUserIdentifier(tx as any, action.user);
+    }
+
+    if (existing.assignee_id === nextAssigneeId) return; // no-op
+
+    await tx
+      .update(schema.tickets)
+      .set({ assignee_id: nextAssigneeId })
+      .where(eq(schema.tickets.id, ticket.id));
+
+    const refreshed = (await tx.select().from(schema.tickets).where(eq(schema.tickets.id, ticket.id)).limit(1))[0]!;
+    const summary = await loadTicketSummary(refreshed, tx as any);
+    await writeEvent(tx as any, {
+      event_type: "ticket.assigned",
+      actor: ctx.rulesEngineActor,
+      ticket: summary,
+      project_id: refreshed.project_id,
+      changes: { fields: [{ field: "assignee_id", from: existing.assignee_id, to: nextAssigneeId }] },
+    });
+  });
+}
+
+async function resolveUserIdentifier(
+  tx: typeof db,
+  identifier: string
+): Promise<string> {
+  // UUID-ish? Look up by id; otherwise by (live) name.
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identifier);
+  const [user] = await tx
+    .select({ id: schema.users.id })
+    .from(schema.users)
+    .where(and(
+      isUuid ? eq(schema.users.id, identifier) : eq(schema.users.name, identifier),
+      isNull(schema.users.deleted_at),
+    ))
+    .limit(1);
+  if (!user) throw new Error(`assign: user "${identifier}" not found`);
+  return user.id;
+}
+
+// ─── move_status ────────────────────────────────────────────────────────────
+//
+// Mirrors the validation in routes/tickets.ts:/transition — the transitions
+// whitelist (zero rows = wildcard, any rows = whitelist), epic-close guard,
+// and resolution-required-when-closed rule. Emits ticket.status_changed
+// always plus ticket.closed / ticket.released when appropriate.
+
+async function runMoveStatus(action: MoveStatusAction, ctx: RuleContext): Promise<void> {
+  const ticket = requireTicket(ctx);
+
+  if (action.to_category === "closed" && !action.resolution) {
+    throw new Error("move_status to closed requires a resolution");
+  }
+
+  await db.transaction(async (tx) => {
+    const [existing] = await tx
+      .select()
+      .from(schema.tickets)
+      .where(eq(schema.tickets.id, ticket.id))
+      .limit(1);
+    if (!existing) throw new Error(`ticket ${ticket.id} not found`);
+
+    // Resolve target status: prefer an exact display_name match in the
+    // requested category; fall back to the project's default in that
+    // category; finally any status in the category (first by position).
+    const candidates = await tx
+      .select()
+      .from(schema.statuses)
+      .where(and(
+        eq(schema.statuses.project_id, existing.project_id),
+        eq(schema.statuses.category, action.to_category as StatusCategory),
+      ));
+    if (candidates.length === 0) {
+      throw new Error(
+        `move_status: project has no status in category "${action.to_category}"`,
+      );
+    }
+    const target = action.to_status
+      ? candidates.find((s) => s.display_name === action.to_status)
+      : candidates.find((s) => s.is_default) ?? candidates.sort((a, b) => a.position - b.position)[0];
+    if (!target) {
+      throw new Error(
+        `move_status: no status matching to_status="${action.to_status}" in category "${action.to_category}"`,
+      );
+    }
+
+    if (existing.status_id === target.id) return; // no-op
+
+    // Transitions whitelist — same logic as /transition.
+    const transitions = await tx
+      .select()
+      .from(schema.statusTransitions)
+      .where(eq(schema.statusTransitions.project_id, existing.project_id));
+    if (transitions.length > 0) {
+      const allowed = transitions.some(
+        (t) =>
+          t.to_status_id === target.id &&
+          (t.from_status_id === null || t.from_status_id === existing.status_id),
+      );
+      if (!allowed) {
+        throw new Error(
+          `move_status: transition from current status to "${target.display_name}" is not allowed`,
+        );
+      }
+    }
+
+    // Epic-close guard — same shape as routes/tickets.ts:/transition.
+    if (existing.type === "epic" && action.to_category === "closed") {
+      const children = await tx
+        .select({ category: schema.statuses.category })
+        .from(schema.tickets)
+        .innerJoin(schema.statuses, eq(schema.statuses.id, schema.tickets.status_id))
+        .where(and(
+          eq(schema.tickets.parent_id, existing.id),
+          isNull(schema.tickets.deleted_at),
+        ));
+      const openCount = children.filter((c) => c.category !== "closed").length;
+      if (openCount > 0) {
+        throw new Error(`move_status: cannot close epic with ${openCount} open child ticket(s)`);
+      }
+    }
+
+    const prevStatusId = existing.status_id;
+    const [prevStatus] = await tx
+      .select()
+      .from(schema.statuses)
+      .where(eq(schema.statuses.id, prevStatusId))
+      .limit(1);
+
+    await tx
+      .update(schema.tickets)
+      .set({
+        status_id: target.id,
+        resolution: action.to_category === "closed" ? (action.resolution ?? null) : null,
+      })
+      .where(eq(schema.tickets.id, ticket.id));
+
+    const refreshed = (await tx.select().from(schema.tickets).where(eq(schema.tickets.id, ticket.id)).limit(1))[0]!;
+    const summary = await loadTicketSummary(refreshed, tx as any);
+
+    await writeEvent(tx as any, {
+      event_type: "ticket.status_changed",
+      actor: ctx.rulesEngineActor,
+      ticket: summary,
+      project_id: refreshed.project_id,
+      changes: {
+        status: {
+          from: prevStatus ? { id: prevStatus.id, category: prevStatus.category as any, display_name: prevStatus.display_name } : null,
+          to: { id: target.id, category: target.category as any, display_name: target.display_name },
+          resolution: refreshed.resolution as any,
+        },
+      },
+    });
+
+    if (action.to_category === "closed") {
+      await writeEvent(tx as any, {
+        event_type: "ticket.closed",
+        actor: ctx.rulesEngineActor,
+        ticket: summary,
+        project_id: refreshed.project_id,
+      });
+      if (action.resolution === "released") {
+        await writeEvent(tx as any, {
+          event_type: "ticket.released",
+          actor: ctx.rulesEngineActor,
+          ticket: summary,
+          project_id: refreshed.project_id,
+        });
+      }
+    }
+  });
+}
+
+// ─── fire_webhook / call_n8n ────────────────────────────────────────────────
+//
+// HMAC-signed HTTP POST. Body is the standard Event envelope from the
+// triggering event payload; signing key is the rule's `webhook_secret`
+// (returned ONCE on rule creation; rotation = recreate the rule). Unlike
+// the webhook subscription dispatcher, action failures here do NOT get
+// retried automatically — admin redelivers the firing.
+
+async function runFireWebhook(action: FireWebhookAction, ctx: RuleContext): Promise<void> {
+  await deliverWebhook({
+    url: action.url,
+    method: action.method ?? "POST",
+    headers: action.headers ?? {},
+    ctx,
+  });
+}
+
+async function runCallN8n(action: CallN8nAction, ctx: RuleContext): Promise<void> {
+  if (!env.N8N_BASE_URL) {
+    throw new Error("call_n8n: N8N_BASE_URL env is not set");
+  }
+  const path = action.workflow.startsWith("/") ? action.workflow : `/${action.workflow}`;
+  await deliverWebhook({
+    url: `${env.N8N_BASE_URL}${path}`,
+    method: "POST",
+    headers: {},
+    ctx,
+  });
+}
+
+async function deliverWebhook(opts: {
+  url: string;
+  method: "POST" | "PUT";
+  headers: Record<string, string>;
+  ctx: RuleContext;
+}): Promise<void> {
+  const { url, method, headers, ctx } = opts;
+
+  // Look up the rule's webhook secret (cached on context would be nicer;
+  // one read per fire is cheap enough that it isn't worth the plumbing).
+  const [rule] = await db
+    .select({ webhook_secret: schema.rules.webhook_secret })
+    .from(schema.rules)
+    .where(eq(schema.rules.id, ctx.rule.id))
+    .limit(1);
+  if (!rule?.webhook_secret) {
+    throw new Error("fire_webhook: rule has no webhook_secret (recreate the rule)");
+  }
+
+  // Webhook envelope identical to subscriptions: id/event/occurred_at on
+  // top of the stored payload (actor, ticket, changes, extras).
+  const envelope = {
+    id: ctx.event_id,
+    event: ctx.event_type,
+    occurred_at: new Date().toISOString(),
+    ...ctx.event_payload,
+  };
+  const body = JSON.stringify(envelope);
+  const signature = signHmac(rule.webhook_secret, body);
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), env.RULE_WEBHOOK_TIMEOUT_MS);
+
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: {
+        ...headers,
+        "Content-Type": "application/json",
+        "X-Switchyard-Signature": `sha256=${signature}`,
+        "X-Switchyard-Event": ctx.event_type,
+        "X-Switchyard-Rule": ctx.rule.id,
+        "User-Agent": "switchyard-rules/0.0.0",
+      },
+      body,
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      throw new Error(`webhook ${url} → HTTP ${res.status}`);
+    }
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error(`webhook ${url} timed out after ${env.RULE_WEBHOOK_TIMEOUT_MS}ms`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 // ─── helpers ────────────────────────────────────────────────────────────────

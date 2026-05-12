@@ -20276,6 +20276,7 @@ paths:
                           format: uuid
                         project_id:
                           type: string
+                          nullable: true
                           format: uuid
                         name:
                           type: string
@@ -20457,6 +20458,74 @@ paths:
                                 required:
                                   - type
                                   - body
+                              - type: object
+                                properties:
+                                  type:
+                                    type: string
+                                    enum:
+                                      - assign
+                                  user:
+                                    type: string
+                                    nullable: true
+                                    minLength: 1
+                                    maxLength: 100
+                                required:
+                                  - type
+                                  - user
+                              - type: object
+                                properties:
+                                  type:
+                                    type: string
+                                    enum:
+                                      - move_status
+                                  to_category:
+                                    type: string
+                                    enum: *a4
+                                  to_status:
+                                    type: string
+                                    minLength: 1
+                                    maxLength: 50
+                                  resolution:
+                                    type: string
+                                    enum: *a6
+                                required:
+                                  - type
+                                  - to_category
+                              - type: object
+                                properties:
+                                  type:
+                                    type: string
+                                    enum:
+                                      - fire_webhook
+                                  url:
+                                    type: string
+                                    format: uri
+                                  method:
+                                    type: string
+                                    enum: &a19
+                                      - POST
+                                      - PUT
+                                    default: POST
+                                  headers:
+                                    type: object
+                                    additionalProperties:
+                                      type: string
+                                required:
+                                  - type
+                                  - url
+                              - type: object
+                                properties:
+                                  type:
+                                    type: string
+                                    enum:
+                                      - call_n8n
+                                  workflow:
+                                    type: string
+                                    minLength: 1
+                                    maxLength: 500
+                                required:
+                                  - type
+                                  - workflow
                           minItems: 1
                           maxItems: 10
                         last_fired_at:
@@ -20665,7 +20734,7 @@ paths:
     post:
       tags:
         - Rules
-      summary: Create a rule
+      summary: Create a rule (webhook_secret returned ONCE)
       parameters:
         - schema:
             type: string
@@ -20682,6 +20751,7 @@ paths:
               properties:
                 project_id:
                   type: string
+                  nullable: true
                   format: uuid
                 name:
                   type: string
@@ -20858,10 +20928,75 @@ paths:
                         required:
                           - type
                           - body
+                      - type: object
+                        properties:
+                          type:
+                            type: string
+                            enum:
+                              - assign
+                          user:
+                            type: string
+                            nullable: true
+                            minLength: 1
+                            maxLength: 100
+                        required:
+                          - type
+                          - user
+                      - type: object
+                        properties:
+                          type:
+                            type: string
+                            enum:
+                              - move_status
+                          to_category:
+                            type: string
+                            enum: *a4
+                          to_status:
+                            type: string
+                            minLength: 1
+                            maxLength: 50
+                          resolution:
+                            type: string
+                            enum: *a6
+                        required:
+                          - type
+                          - to_category
+                      - type: object
+                        properties:
+                          type:
+                            type: string
+                            enum:
+                              - fire_webhook
+                          url:
+                            type: string
+                            format: uri
+                          method:
+                            type: string
+                            enum: *a19
+                            default: POST
+                          headers:
+                            type: object
+                            additionalProperties:
+                              type: string
+                        required:
+                          - type
+                          - url
+                      - type: object
+                        properties:
+                          type:
+                            type: string
+                            enum:
+                              - call_n8n
+                          workflow:
+                            type: string
+                            minLength: 1
+                            maxLength: 500
+                        required:
+                          - type
+                          - workflow
                   minItems: 1
                   maxItems: 10
               required:
-                - project_id
                 - name
                 - trigger_event_types
                 - actions
@@ -20878,6 +21013,7 @@ paths:
                     format: uuid
                   project_id:
                     type: string
+                    nullable: true
                     format: uuid
                   name:
                     type: string
@@ -21052,6 +21188,72 @@ paths:
                           required:
                             - type
                             - body
+                        - type: object
+                          properties:
+                            type:
+                              type: string
+                              enum:
+                                - assign
+                            user:
+                              type: string
+                              nullable: true
+                              minLength: 1
+                              maxLength: 100
+                          required:
+                            - type
+                            - user
+                        - type: object
+                          properties:
+                            type:
+                              type: string
+                              enum:
+                                - move_status
+                            to_category:
+                              type: string
+                              enum: *a4
+                            to_status:
+                              type: string
+                              minLength: 1
+                              maxLength: 50
+                            resolution:
+                              type: string
+                              enum: *a6
+                          required:
+                            - type
+                            - to_category
+                        - type: object
+                          properties:
+                            type:
+                              type: string
+                              enum:
+                                - fire_webhook
+                            url:
+                              type: string
+                              format: uri
+                            method:
+                              type: string
+                              enum: *a19
+                              default: POST
+                            headers:
+                              type: object
+                              additionalProperties:
+                                type: string
+                          required:
+                            - type
+                            - url
+                        - type: object
+                          properties:
+                            type:
+                              type: string
+                              enum:
+                                - call_n8n
+                            workflow:
+                              type: string
+                              minLength: 1
+                              maxLength: 500
+                          required:
+                            - type
+                            - workflow
                     minItems: 1
                     maxItems: 10
                   last_fired_at:
@@ -21064,6 +21266,8 @@ paths:
                   updated_at:
                     type: string
                     format: date-time
+                  webhook_secret:
+                    type: string
                 required:
                   - id
                   - project_id
@@ -21075,6 +21279,7 @@ paths:
                   - last_fired_at
                   - created_at
                   - updated_at
+                  - webhook_secret
         "400":
           description: bad request
           content:
@@ -21268,6 +21473,7 @@ paths:
                     format: uuid
                   project_id:
                     type: string
+                    nullable: true
                     format: uuid
                   name:
                     type: string
@@ -21442,6 +21648,72 @@ paths:
                           required:
                             - type
                             - body
+                        - type: object
+                          properties:
+                            type:
+                              type: string
+                              enum:
+                                - assign
+                            user:
+                              type: string
+                              nullable: true
+                              minLength: 1
+                              maxLength: 100
+                          required:
+                            - type
+                            - user
+                        - type: object
+                          properties:
+                            type:
+                              type: string
+                              enum:
+                                - move_status
+                            to_category:
+                              type: string
+                              enum: *a4
+                            to_status:
+                              type: string
+                              minLength: 1
+                              maxLength: 50
+                            resolution:
+                              type: string
+                              enum: *a6
+                          required:
+                            - type
+                            - to_category
+                        - type: object
+                          properties:
+                            type:
+                              type: string
+                              enum:
+                                - fire_webhook
+                            url:
+                              type: string
+                              format: uri
+                            method:
+                              type: string
+                              enum: *a19
+                              default: POST
+                            headers:
+                              type: object
+                              additionalProperties:
+                                type: string
+                          required:
+                            - type
+                            - url
+                        - type: object
+                          properties:
+                            type:
+                              type: string
+                              enum:
+                                - call_n8n
+                            workflow:
+                              type: string
+                              minLength: 1
+                              maxLength: 500
+                          required:
+                            - type
+                            - workflow
                     minItems: 1
                     maxItems: 10
                   last_fired_at:
@@ -21823,6 +22095,72 @@ paths:
                         required:
                           - type
                           - body
+                      - type: object
+                        properties:
+                          type:
+                            type: string
+                            enum:
+                              - assign
+                          user:
+                            type: string
+                            nullable: true
+                            minLength: 1
+                            maxLength: 100
+                        required:
+                          - type
+                          - user
+                      - type: object
+                        properties:
+                          type:
+                            type: string
+                            enum:
+                              - move_status
+                          to_category:
+                            type: string
+                            enum: *a4
+                          to_status:
+                            type: string
+                            minLength: 1
+                            maxLength: 50
+                          resolution:
+                            type: string
+                            enum: *a6
+                        required:
+                          - type
+                          - to_category
+                      - type: object
+                        properties:
+                          type:
+                            type: string
+                            enum:
+                              - fire_webhook
+                          url:
+                            type: string
+                            format: uri
+                          method:
+                            type: string
+                            enum: *a19
+                            default: POST
+                          headers:
+                            type: object
+                            additionalProperties:
+                              type: string
+                        required:
+                          - type
+                          - url
+                      - type: object
+                        properties:
+                          type:
+                            type: string
+                            enum:
+                              - call_n8n
+                          workflow:
+                            type: string
+                            minLength: 1
+                            maxLength: 500
+                        required:
+                          - type
+                          - workflow
                   minItems: 1
                   maxItems: 10
       responses:
@@ -21838,6 +22176,7 @@ paths:
                     format: uuid
                   project_id:
                     type: string
+                    nullable: true
                     format: uuid
                   name:
                     type: string
@@ -22012,6 +22351,72 @@ paths:
                           required:
                             - type
                             - body
+                        - type: object
+                          properties:
+                            type:
+                              type: string
+                              enum:
+                                - assign
+                            user:
+                              type: string
+                              nullable: true
+                              minLength: 1
+                              maxLength: 100
+                          required:
+                            - type
+                            - user
+                        - type: object
+                          properties:
+                            type:
+                              type: string
+                              enum:
+                                - move_status
+                            to_category:
+                              type: string
+                              enum: *a4
+                            to_status:
+                              type: string
+                              minLength: 1
+                              maxLength: 50
+                            resolution:
+                              type: string
+                              enum: *a6
+                          required:
+                            - type
+                            - to_category
+                        - type: object
+                          properties:
+                            type:
+                              type: string
+                              enum:
+                                - fire_webhook
+                            url:
+                              type: string
+                              format: uri
+                            method:
+                              type: string
+                              enum: *a19
+                              default: POST
+                            headers:
+                              type: object
+                              additionalProperties:
+                                type: string
+                          required:
+                            - type
+                            - url
+                        - type: object
+                          properties:
+                            type:
+                              type: string
+                              enum:
+                                - call_n8n
+                            workflow:
+                              type: string
+                              minLength: 1
+                              maxLength: 500
+                          required:
+                            - type
+                            - workflow
                     minItems: 1
                     maxItems: 10
                   last_fired_at:
@@ -22436,7 +22841,7 @@ paths:
                           format: uuid
                         status:
                           type: string
-                          enum: &a19
+                          enum: &a20
                             - pending
                             - running
                             - succeeded
@@ -22472,7 +22877,7 @@ paths:
                                     type: string
                                   status:
                                     type: string
-                                    enum: &a20
+                                    enum: &a21
                                       - ok
                                       - error
                                   error:
@@ -22711,7 +23116,7 @@ paths:
                     format: uuid
                   status:
                     type: string
-                    enum: *a19
+                    enum: *a20
                   attempts:
                     type: integer
                     minimum: 0
@@ -22741,7 +23146,7 @@ paths:
                               type: string
                             status:
                               type: string
-                              enum: *a20
+                              enum: *a21
                             error:
                               type: string
                               nullable: true

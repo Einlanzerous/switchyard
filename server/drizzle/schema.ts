@@ -520,10 +520,9 @@ export const rules = pgTable(
   "rules",
   {
     id: id(),
-    // Required in 4.0; relaxed to nullable (= global rule) in Phase 4.1.
-    project_id: uuid("project_id")
-      .notNull()
-      .references(() => projects.id, { onDelete: "cascade" }),
+    // NULL = global rule (matches every project), 4.1+. Project-scoped
+    // rules carry the owning project's id and only fire on its events.
+    project_id: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }),
     name: varchar("name", { length: 200 }).notNull(),
     enabled: boolean("enabled").notNull().default(true),
     // Empty array is invalid — at least one event type required. Enforced by
@@ -533,6 +532,11 @@ export const rules = pgTable(
     conditions: jsonb("conditions").notNull().default({}),
     // Array of RuleAction (discriminated union); evaluated in order.
     actions: jsonb("actions").notNull().default([]),
+    // HMAC secret used by fire_webhook / call_n8n actions. Returned ONCE
+    // on POST /v1/rules; hidden from every subsequent response. Always
+    // generated at rule creation (cheap; lets users add webhook actions
+    // later via PATCH without re-creating the rule).
+    webhook_secret: text("webhook_secret"),
     last_fired_at: timestamp("last_fired_at", { withTimezone: true, mode: "string" }),
     created_at: createdAt(),
     updated_at: updatedAt(),

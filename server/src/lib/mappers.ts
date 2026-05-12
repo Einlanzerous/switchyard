@@ -273,7 +273,8 @@ type RuleRow = typeof schema.rules.$inferSelect;
 type RuleFiringRow = typeof schema.ruleFirings.$inferSelect;
 
 import type {
-  Rule as ApiRule, RuleFiring as ApiRuleFiring,
+  Rule as ApiRule, RuleWithSecret as ApiRuleWithSecret,
+  RuleFiring as ApiRuleFiring,
   RuleAction as ApiRuleAction, RuleConditions as ApiRuleConditions,
   RuleFiringResultSummary as ApiRuleFiringSummary,
 } from "@switchyard/shared";
@@ -291,6 +292,16 @@ export function mapRule(r: RuleRow): ApiRule {
     created_at: r.created_at,
     updated_at: r.updated_at,
   };
+}
+
+// Used ONLY by POST /v1/rules — every other surface returns mapRule()
+// without the secret. Throws when the column is unexpectedly null
+// (shouldn't happen post-4.1 since create always populates).
+export function mapRuleWithSecret(r: RuleRow): ApiRuleWithSecret {
+  if (!r.webhook_secret) {
+    throw new Error("rule has no webhook_secret — cannot map with secret");
+  }
+  return { ...mapRule(r), webhook_secret: r.webhook_secret };
 }
 
 export function mapRuleFiring(f: RuleFiringRow): ApiRuleFiring {
