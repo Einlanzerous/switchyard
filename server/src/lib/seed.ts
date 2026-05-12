@@ -1,4 +1,4 @@
-// Idempotent seed: canonical users + bootstrap token.
+// Idempotent seed: canonical users + bootstrap token + canonical labels.
 // Called from migrate.ts after schema migrations and triggers are applied.
 //
 // Bootstrap rules (locked decision):
@@ -23,7 +23,22 @@ type CanonicalUser = {
   icon?: string;
 };
 
+type CanonicalLabel = {
+  name: string;
+  color: string;
+};
+
 export const RULES_ENGINE_USER_NAME = "rules-engine";
+
+// Labels shipped with every install. New ones added here will appear on
+// next migrate run; existing rows are never touched (so an admin's color
+// tweak survives a redeploy).
+const CANONICAL_LABELS: CanonicalLabel[] = [
+  // Used by imperium-loop (and any other agent flow) to mark tickets the
+  // user has explicitly green-lit for autonomous work. Rule editors can
+  // target `ticket.labels[].name = "ready-for-agent"` to gate firings.
+  { name: "ready-for-agent", color: "#10b981" },
+];
 
 const CANONICAL_USERS: CanonicalUser[] = [
   { name: "magos", type: "human" },
@@ -43,6 +58,20 @@ export async function seed(): Promise<void> {
   const userIdsByName = await ensureUsers();
   await ensureBootstrapToken(userIdsByName.get("magos")!);
   await ensureDefaultSettings();
+  await ensureLabels();
+}
+
+async function ensureLabels(): Promise<void> {
+  for (const l of CANONICAL_LABELS) {
+    const [existing] = await db
+      .select({ id: schema.labels.id })
+      .from(schema.labels)
+      .where(eq(schema.labels.name, l.name))
+      .limit(1);
+    if (existing) continue;
+    await db.insert(schema.labels).values({ name: l.name, color: l.color });
+    console.log(`[seed] created label: ${l.name}`);
+  }
 }
 
 // Insert default values for any system_settings keys that don't have a row

@@ -19,7 +19,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  await testDb.execute(sql`TRUNCATE api_tokens, users RESTART IDENTITY CASCADE`);
+  await testDb.execute(sql`TRUNCATE api_tokens, labels, users RESTART IDENTITY CASCADE`);
 });
 
 describe("seed", () => {
@@ -64,6 +64,19 @@ describe("seed", () => {
     await seed();
     const after = await testDb.select().from(schema.apiTokens);
     expect(after).toHaveLength(1);
+  });
+
+  test("seeds the ready-for-agent canonical label (idempotent)", async () => {
+    delete process.env.BOOTSTRAP_TOKEN;
+    const { seed } = await import("../../src/lib/seed.js");
+    await seed();
+    const labels = await testDb.select().from(schema.labels);
+    expect(labels.map((l) => l.name)).toContain("ready-for-agent");
+
+    // Re-running doesn't duplicate or overwrite.
+    await seed();
+    const after = await testDb.select().from(schema.labels);
+    expect(after.filter((l) => l.name === "ready-for-agent")).toHaveLength(1);
   });
 
   test("explicit BOOTSTRAP_TOKEN env wins (registered, not regenerated)", async () => {

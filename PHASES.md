@@ -203,14 +203,8 @@ Out of scope for Phase 2 (deferred):
 - WIP limits on kanban columns (cheap to add; defer until needed)
 - Audio playback (metadata-only display)
 - Native automation rules editor (Phase 4)
-- **Project ↔ repo linking + PR/commit indicators on cards.** Tie each project
-  to one or more GitHub repos, surface PR/commit references on ticket cards
-  via a small icon (closed/open/draft PR state, commit count), let agents
-  attach PR URLs when they ship work. Likely involves: (a) `project_repos`
-  table or `metadata.repos[]` on projects, (b) `ticket_links` table for
-  PR/commit refs (URL + state polled or webhook'd), (c) a card slot for the
-  GitHub icon + tooltip. Probably Phase 3 alongside dashboards, since the
-  data is also useful for "tickets shipped this week" charts.
+- **Project ↔ repo linking + PR/commit indicators on cards.** Subsumed by
+  Phase 4.5.2 (external refs / GitHub integration).
 - **User-defined custom swimlanes.** Today swimlanes group by project /
   assignee / type. Expand to "named groups" — user defines categories like
   "Documentation row" or "Engineering row" and assigns tickets/labels/projects
@@ -382,10 +376,14 @@ Actions execute as `rules-engine` and route through the same helpers human handl
 - **4.1 — Remaining actions + cross-project + safety (SWY-29).** Add `assign` / `move_status` / `fire_webhook` / `call_n8n`. Allow `project_id IS NULL` rules (global). Per-rule rate limit (default 100/hour, env `RULE_RATE_LIMIT_PER_HOUR`; over-limit firings get status `skipped`).
 - **4.2 — Scheduled rules (SWY-30).** Add `schedule_cron` + `target_query` columns with a CHECK enforcing exactly-one-trigger-mode. Cron parser (`cron-parser`, ≈30KB). `lib/rules/scheduler.ts` polling loop, 60s tick, fires one `rule_firings` row per ticket matched by the rule's `target_query` (reuses the existing `/v1/tickets` filter shape — no second DSL).
 - **4.2.5 — Named webhook targets (SWY-35).** Decouple webhook URLs from the rules and subscriptions that reference them. New `targets` table (`name`, `url`, optional `hmac_secret`, optional `headers`). `webhook_subscriptions.target_id` nullable FK. `fire_webhook` action gains a `{ target, path? }` variant alongside the URL form; `call_n8n` becomes thin sugar over a target named via `N8N_TARGET_NAME` env (default `n8n`), with `N8N_BASE_URL` still working as a fallback during rollout. New `targets:manage` scope. DELETE rejects with 409 + referencer list when anything still points at the target. Ships before 4.3 so the UI lands with target pickers from day one.
-- **4.3 — UI: rules + firings tabs under Automations (SWY-33).** `AutomationsLayout` already exists; add nav links for `/automations/rules` and `/automations/firings`. Form-based rule builder ("When [event-type] AND/OR [field op value] Then [action]") via vee-validate + Zod. Firings table with redeliver button and drawer that renders `result_summary` (matched conditions, action outcomes).
+- **4.3 — UI: rules / firings / targets under Automations (SWY-33).** `AutomationsLayout` already exists; add nav links for `/automations/rules` and `/automations/firings`. Form-based rule builder ("When [event-type] AND/OR [field op value] Then [action]") via vee-validate + Zod. Firings table with redeliver button and drawer that renders `result_summary` (matched conditions, action outcomes).
 - **4.4 — Polish + docs (SWY-34).** README "Automation rules" section (DSL grammar, action catalog, 3–4 worked examples). Recent-firings debug surface. E2E test (`client/e2e/automations.spec.ts`). Empty/skeleton audit.
+- **4.5 — Imperium-loop integration: ticket links + custom fields + external refs (SWY-37 epic).** Three coupled primitives the imperium-loop migration needs once test-firing starts. Closeout push for Phase 4 — bundled rather than scattered through Phase 5 because they're tightly coupled to how agents will use switchyard in practice.
+  - **4.5.0 — Ticket links (SWY-38).** New `ticket_links` table for typed relations: `blocks` / `relates_to` / `duplicates`. Bidirectional rendering (A blocks B shows as "blocked by A" on B; rendered from a single row, not two). `parent_id` stays as the epic→child mechanism (separate primitive — postgres trigger keeps enforcing the epic-only invariant). Events `ticket.link_added` / `ticket.link_removed` so rules and webhooks can react. UI: drawer section on TicketDetail with add/remove + jump-to.
+  - **4.5.1 — Custom field schemas (SWY-39).** `custom_fields` table declaring typed views over `metadata.<key>`: `text` / `number` / `boolean` / `url` / `select` (options jsonb for select). Per-project or global (`project_id` nullable). Surface flags: `show_on_card`, `show_on_create_form`, `show_on_filter_bar`. Filter integration: `?cf.<key>=<value>` on the tickets list. The existing `metadata` JSONB stays — defined fields are typed views over known keys, not a new column. Lets imperium-loop stash `cogitation_run_id`, `deploy_url`, etc. as first-class queryable state without a migration per key.
+  - **4.5.2 — External refs / GitHub integration (SWY-40).** `ticket_external_refs` table: `kind` enum (`github_pr` / `github_issue` / `github_commit` / `github_action` / `generic`), `url`, `state` (open / closed / merged / success / failed / null), `title`, `polled_at`, `polled_state_changed_at`. Polling via GitHub API for state changes; optional `POST /v1/external/github` webhook receiver (HMAC-verified) for push-mode updates. UI: card slot badges (open PR, merged PR, CI pass/fail) + ticket-detail section listing refs. Subsumes the deferred "Project ↔ repo linking + PR/commit indicators" bullet from Phase 2. GitHub-specific kinds first; GitLab/Bitbucket only if asked.
 
-Out of scope (deferred to Phase 5):
+Out of scope for Phase 4 (incl. 4.5):
 
 - Pluggable transition guards (the hardcoded epic-close check stays).
 - Rule chains / causation tracking (rules-engine events skip the engine — no recursion).

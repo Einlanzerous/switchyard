@@ -5,7 +5,7 @@ import { db } from "../db.js";
 import * as schema from "../../drizzle/schema.js";
 import { requireAuth } from "../auth.js";
 import { idempotency } from "../lib/idempotency.js";
-import { errorResponses, okJson, createdJson, noContent, scope, z } from "./_helpers.js";
+import { errorResponses, okJson, createdJson, noContent, checkScope, z } from "./_helpers.js";
 import { mapLabel } from "../lib/mappers.js";
 import { catchUnique, notFound } from "../errors.js";
 
@@ -50,7 +50,11 @@ export function mount(app: OpenAPIHono) {
     return c.json({ items: rows.map(mapLabel) }, 200);
   }) as any);
 
-  app.openapi(create, scope("projects:manage"), (async (c: any) => {
+  // scope is checked inside the handler — passing `scope("…")` as
+  // middleware to app.openapi breaks the validator chain so c.req.valid
+  // is undefined when the handler runs. See Phase 1.6 pattern note.
+  app.openapi(create, (async (c: any) => {
+    checkScope(c, "projects:manage");
     const body = c.req.valid("json");
     const [inserted] = await catchUnique(`label "${body.name}" already exists`, () =>
       db.insert(schema.labels).values({ name: body.name, color: body.color }).returning()
@@ -59,7 +63,8 @@ export function mount(app: OpenAPIHono) {
     return c.json(mapLabel(inserted), 201);
   }) as any);
 
-  app.openapi(update, scope("projects:manage"), (async (c: any) => {
+  app.openapi(update, (async (c: any) => {
+    checkScope(c, "projects:manage");
     const { id } = c.req.valid("param");
     const body = c.req.valid("json");
 
@@ -78,7 +83,8 @@ export function mount(app: OpenAPIHono) {
     return c.json(mapLabel(updated), 200);
   }) as any);
 
-  app.openapi(remove, scope("projects:manage"), (async (c: any) => {
+  app.openapi(remove, (async (c: any) => {
+    checkScope(c, "projects:manage");
     const { id } = c.req.valid("param");
     const result = await db.delete(schema.labels)
       .where(eq(schema.labels.id, id))
