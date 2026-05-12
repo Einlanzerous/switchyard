@@ -248,6 +248,52 @@ export const ticketLabels = pgTable(
   (t) => ({ pk: primaryKey({ columns: [t.ticket_id, t.label_id] }) })
 );
 
+// ─── ticket links (typed cross-ticket relations) ───────────────────────────
+//
+// Separate primitive from `parent_id` (which encodes epic→child only,
+// one level deep, with a postgres trigger). Link rows are stored once
+// from the source side; the GET handler unions source + target lookups
+// so both tickets see the link, and a verb table flips the rendered
+// preposition based on direction.
+//
+// Verbs:
+//   blocks       → forward "blocks",       inverse "is blocked by"
+//   relates_to   → forward "relates to",   inverse "relates to"   (symmetric)
+//   duplicates   → forward "duplicates",   inverse "is duplicated by"
+
+export const ticketLinkType = pgEnum("ticket_link_type", [
+  "blocks", "relates_to", "duplicates",
+]);
+
+export const ticketLinks = pgTable(
+  "ticket_links",
+  {
+    id: id(),
+    source_ticket_id: uuid("source_ticket_id")
+      .notNull()
+      .references(() => tickets.id, { onDelete: "cascade" }),
+    target_ticket_id: uuid("target_ticket_id")
+      .notNull()
+      .references(() => tickets.id, { onDelete: "cascade" }),
+    type: ticketLinkType("type").notNull(),
+    created_at: createdAt(),
+    created_by: uuid("created_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+  },
+  (t) => ({
+    edgeUnique: uniqueIndex("ticket_links_edge_unique").on(
+      t.source_ticket_id, t.target_ticket_id, t.type,
+    ),
+    sourceIdx: index("ticket_links_source_idx").on(t.source_ticket_id),
+    targetIdx: index("ticket_links_target_idx").on(t.target_ticket_id),
+    noSelfLink: check(
+      "ticket_links_no_self_link",
+      sql`${t.source_ticket_id} <> ${t.target_ticket_id}`,
+    ),
+  })
+);
+
 // ─── comments ───────────────────────────────────────────────────────────────
 
 export const comments = pgTable(

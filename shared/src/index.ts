@@ -17,3 +17,4 @@ export * from "./schemas/savedView.js";
 export * from "./schemas/notification.js";
 export * from "./schemas/rule.js";
 export * from "./schemas/target.js";
+export * from "./schemas/ticketLink.js";

@@ -71,6 +71,13 @@
       "when": 1778553760760,
       "tag": "0009_nappy_orphan",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1778624346041,
+      "tag": "0010_wandering_puppet_master",
+      "breakpoints": true
     }
   ]
 }

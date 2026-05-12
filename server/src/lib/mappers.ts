@@ -7,7 +7,7 @@ import type {
   User, UserRef, Project, ProjectRef, Status, StatusRef,
   Label, LabelRef, TicketSummary, Ticket, Comment, Attachment, Event as ApiEvent,
   Resolution, TicketType, Priority, EventType, AttachmentKind, StatusCategory,
-  ApiToken,
+  ApiToken, TicketLink, TicketLinkType, TicketLinkDirection,
 } from "@switchyard/shared";
 import * as schema from "../../drizzle/schema.js";
 import { env } from "../env.js";
@@ -132,6 +132,38 @@ export function mapComment(c: CommentRow, author: UserRow, attachments: Attachme
   };
 }
 
+// ─── ticket links ──────────────────────────────────────────────────────────
+
+type TicketLinkRow = typeof schema.ticketLinks.$inferSelect;
+
+// Caller supplies the viewing ticket (so we can pick `direction`) plus
+// the "other" ticket's project (for the key) and the creator. We don't
+// embed the verb here — UI picks it from (type, direction).
+export type TicketLinkDeps = {
+  viewingTicketId: string;
+  otherTicket: { id: string; number: number };
+  otherProjectKey: string;
+  otherTitle: string;
+  creator: UserRow;
+};
+
+export function mapTicketLink(row: TicketLinkRow, deps: TicketLinkDeps): TicketLink {
+  const direction: TicketLinkDirection =
+    row.source_ticket_id === deps.viewingTicketId ? "outgoing" : "incoming";
+  return {
+    id: row.id,
+    type: row.type as TicketLinkType,
+    direction,
+    other_ticket: {
+      id: deps.otherTicket.id,
+      key: `${deps.otherProjectKey}-${deps.otherTicket.number}`,
+      title: deps.otherTitle,
+    },
+    created_at: row.created_at,
+    created_by: mapUserRef(deps.creator),
+  };
+}
+
 // ─── tickets ───────────────────────────────────────────────────────────────
 
 export type TicketSummaryDeps = {
@@ -170,6 +202,7 @@ export type TicketDetailDeps = TicketSummaryDeps & {
   comments: Comment[];
   ticketAttachments: Attachment[];
   commentAttachments: Attachment[];
+  links: TicketLink[];
 };
 
 export function mapTicket(t: TicketRow, deps: TicketDetailDeps): Ticket {
@@ -184,6 +217,7 @@ export function mapTicket(t: TicketRow, deps: TicketDetailDeps): Ticket {
     comments: deps.comments,
     attachments: deps.ticketAttachments,
     all_attachments: all,
+    links: deps.links,
   };
 }
 

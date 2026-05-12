@@ -6,6 +6,7 @@ import { StatusRef, Resolution } from "./status.js";
 import { LabelRef } from "./label.js";
 import { Comment } from "./comment.js";
 import { Attachment } from "./attachment.js";
+import { TicketLink } from "./ticketLink.js";
 
 export const TicketType = z.enum(["spike", "task", "bug", "epic"]);
 export type TicketType = z.infer<typeof TicketType>;
@@ -38,13 +39,14 @@ export const TicketSummary = z
   .merge(SoftDeletable);
 export type TicketSummary = z.infer<typeof TicketSummary>;
 
-// Full detail response — adds description, comments, all attachments.
+// Full detail response — adds description, comments, all attachments, links.
 export const Ticket = TicketSummary.extend({
   description: z.string(), // markdown, may be ""
   metadata: z.record(z.unknown()),
   comments: z.array(Comment),
   attachments: z.array(Attachment), // ticket-level attachments only
   all_attachments: z.array(Attachment), // ticket + all comment attachments, flattened
+  links: z.array(TicketLink), // outgoing + incoming, tagged by direction
 });
 export type Ticket = z.infer<typeof Ticket>;
 

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useRouter } from "vue-router";
+import { useMutation, useQueryClient } from "@tanstack/vue-query";
+import { toast } from "vue-sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import StatusBadge from "./StatusBadge.vue";
 import TypeIcon from "./TypeIcon.vue";
@@ -16,6 +18,9 @@ import AssigneeEditor from "./AssigneeEditor.vue";
 import LabelEditor from "./LabelEditor.vue";
 import { cn } from "@/lib/utils";
 import { useTicketDetail } from "@/composables/useTicketDetail";
+import { api } from "@/lib/api";
+import { queryKeys } from "@/lib/queryKeys";
+import type { TicketLinkType } from "@switchyard/shared";
 
 // Reused by the drawer (route.query.focus) and the standalone page route
 // (params.idOrKey). The parent owns the key and decides what "navigate to a
@@ -55,9 +60,56 @@ function navigateToLinked(key: string) {
   else router.push(`/tickets/${key}`);
 }
 
+// LinkedWork renders three sections (parent, children-if-epic, typed links).
+// Show it whenever any of those is meaningful: there's a parent, this is an
+// epic (children always rendered, even if empty), or any cross-ticket links
+// exist. Hide when the ticket has none of those AND no links — most lonely
+// tickets shouldn't see an empty section.
 const showLinkedWork = computed(() => {
   if (!ticket.value) return false;
-  return !!ticket.value.parent_id || ticket.value.type === "epic";
+  if (ticket.value.parent_id) return true;
+  if (ticket.value.type === "epic") return true;
+  if ((ticket.value.links?.length ?? 0) > 0) return true;
+  return true; // always render so users can add their first link
+});
+
+const qc = useQueryClient();
+
+const addLinkMutation = useMutation({
+  mutationFn: async (input: { type: TicketLinkType; target: string }) => {
+    if (!ticket.value) throw new Error("no ticket loaded");
+    const { error } = await api.POST("/v1/tickets/{idOrKey}/links", {
+      params: { path: { idOrKey: ticket.value.key } },
+      body: input,
+    });
+    if (error) throw error;
+  },
+  onSuccess: () => {
+    qc.invalidateQueries({ queryKey: queryKeys.ticket(idOrKey.value) });
+    toast.success("Link added");
+  },
+  onError: (err: unknown) => {
+    const msg = (err as { error?: { message?: string } })?.error?.message ?? "Failed to add link";
+    toast.error(msg);
+  },
+});
+
+const removingLinkId = ref<string | null>(null);
+const removeLinkMutation = useMutation({
+  mutationFn: async (linkId: string) => {
+    removingLinkId.value = linkId;
+    const { error } = await api.DELETE("/v1/tickets/links/{id}", { params: { path: { id: linkId } } });
+    if (error) throw error;
+  },
+  onSuccess: () => {
+    qc.invalidateQueries({ queryKey: queryKeys.ticket(idOrKey.value) });
+    toast.success("Link removed");
+  },
+  onError: (err: unknown) => {
+    const msg = (err as { error?: { message?: string } })?.error?.message ?? "Failed to remove link";
+    toast.error(msg);
+  },
+  onSettled: () => { removingLinkId.value = null; },
 });
 </script>
 
@@ -140,7 +192,7 @@ const showLinkedWork = computed(() => {
       </div>
     </div>
 
-    <!-- Linked work: parent breadcrumb (mirrored) + sub-tickets for epics. -->
+    <!-- Linked work: parent breadcrumb (mirrored) + sub-tickets for epics + typed links. -->
     <LinkedWork
       v-if="showLinkedWork"
       :parent="parent"
@@ -148,7 +200,12 @@ const showLinkedWork = computed(() => {
       :children="children"
       :children-loading="childrenLoading"
       :is-epic="ticket.type === 'epic'"
+      :links="ticket.links ?? []"
+      :adding-link="addLinkMutation.isPending.value"
+      :removing-link-id="removingLinkId"
       @navigate="navigateToLinked"
+      @add-link="(p) => addLinkMutation.mutate(p)"
+      @remove-link="(id) => removeLinkMutation.mutate(id)"
     />
 
     <!-- Tabs -->

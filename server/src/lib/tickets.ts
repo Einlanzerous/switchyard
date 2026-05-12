@@ -7,12 +7,13 @@ import { and, asc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import * as schema from "../../drizzle/schema.js";
 import { db } from "../db.js";
 import {
-  mapTicket, mapTicketSummary, mapComment, mapAttachment,
+  mapTicket, mapTicketSummary, mapComment, mapAttachment, mapTicketLink,
   type TicketSummaryDeps,
 } from "./mappers.js";
 import type {
   Ticket as ApiTicket, TicketSummary as ApiTicketSummary,
   Comment as ApiComment, Attachment as ApiAttachment,
+  TicketLink as ApiTicketLink,
 } from "@switchyard/shared";
 import { badRequest, notFound } from "../errors.js";
 
@@ -113,12 +114,72 @@ export async function loadTicketDetail(ticket: TicketRow, tx?: Tx): Promise<ApiT
 
   const commentAttachments = [...commentAttachmentsByComment.values()].flat();
 
+  const links = await loadTicketLinks(ticket.id);
+
   return mapTicket(ticket, {
     ...summaryDeps,
     comments,
     ticketAttachments,
     commentAttachments,
+    links,
   });
+}
+
+// All links touching this ticket, in either direction. Single query for
+// rows (source = X OR target = X), then one fan-out for the "other"
+// tickets, their projects, and the creators.
+export async function loadTicketLinks(ticketId: string): Promise<ApiTicketLink[]> {
+  const rows = await db
+    .select()
+    .from(schema.ticketLinks)
+    .where(
+      or(
+        eq(schema.ticketLinks.source_ticket_id, ticketId),
+        eq(schema.ticketLinks.target_ticket_id, ticketId),
+      ),
+    )
+    .orderBy(asc(schema.ticketLinks.created_at));
+
+  if (rows.length === 0) return [];
+
+  const otherIds = [
+    ...new Set(
+      rows.map((r) => (r.source_ticket_id === ticketId ? r.target_ticket_id : r.source_ticket_id)),
+    ),
+  ];
+  const creatorIds = [...new Set(rows.map((r) => r.created_by))];
+
+  const [others, creators] = await Promise.all([
+    db.select().from(schema.tickets).where(inArray(schema.tickets.id, otherIds)),
+    db.select().from(schema.users).where(inArray(schema.users.id, creatorIds)),
+  ]);
+
+  const projectIds = [...new Set(others.map((t) => t.project_id))];
+  const projects = await db.select().from(schema.projects).where(inArray(schema.projects.id, projectIds));
+
+  const ticketById = new Map(others.map((t) => [t.id, t]));
+  const projectById = new Map(projects.map((p) => [p.id, p]));
+  const userById = new Map(creators.map((u) => [u.id, u]));
+
+  const result: ApiTicketLink[] = [];
+  for (const row of rows) {
+    const otherId = row.source_ticket_id === ticketId ? row.target_ticket_id : row.source_ticket_id;
+    const other = ticketById.get(otherId);
+    const creator = userById.get(row.created_by);
+    if (!other || !creator) continue; // dangling rows shouldn't happen (FKs), but be defensive
+    const project = projectById.get(other.project_id);
+    if (!project) continue;
+    result.push(
+      mapTicketLink(row, {
+        viewingTicketId: ticketId,
+        otherTicket: { id: other.id, number: other.number },
+        otherProjectKey: project.key,
+        otherTitle: other.title,
+        creator,
+      }),
+    );
+  }
+  return result;
 }
 
 // Increment the per-project counter inside a transaction. Returns the new

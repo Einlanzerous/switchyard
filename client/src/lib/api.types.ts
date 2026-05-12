@@ -5485,6 +5485,30 @@ export interface paths {
                                 /** Format: date-time */
                                 created_at: string;
                             }[];
+                            links: {
+                                /** Format: uuid */
+                                id: string;
+                                /** @enum {string} */
+                                type: "blocks" | "relates_to" | "duplicates";
+                                /** @enum {string} */
+                                direction: "outgoing" | "incoming";
+                                other_ticket: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    key: string;
+                                    title: string;
+                                };
+                                /** Format: date-time */
+                                created_at: string;
+                                created_by: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    name: string;
+                                    icon: string | null;
+                                    /** @enum {string} */
+                                    type: "agent" | "human";
+                                };
+                            }[];
                         };
                     };
                 };
@@ -5808,6 +5832,30 @@ export interface paths {
                                 };
                                 /** Format: date-time */
                                 created_at: string;
+                            }[];
+                            links: {
+                                /** Format: uuid */
+                                id: string;
+                                /** @enum {string} */
+                                type: "blocks" | "relates_to" | "duplicates";
+                                /** @enum {string} */
+                                direction: "outgoing" | "incoming";
+                                other_ticket: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    key: string;
+                                    title: string;
+                                };
+                                /** Format: date-time */
+                                created_at: string;
+                                created_by: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    name: string;
+                                    icon: string | null;
+                                    /** @enum {string} */
+                                    type: "agent" | "human";
+                                };
                             }[];
                         };
                     };
@@ -6293,6 +6341,30 @@ export interface paths {
                                 /** Format: date-time */
                                 created_at: string;
                             }[];
+                            links: {
+                                /** Format: uuid */
+                                id: string;
+                                /** @enum {string} */
+                                type: "blocks" | "relates_to" | "duplicates";
+                                /** @enum {string} */
+                                direction: "outgoing" | "incoming";
+                                other_ticket: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    key: string;
+                                    title: string;
+                                };
+                                /** Format: date-time */
+                                created_at: string;
+                                created_by: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    name: string;
+                                    icon: string | null;
+                                    /** @enum {string} */
+                                    type: "agent" | "human";
+                                };
+                            }[];
                         };
                     };
                 };
@@ -6628,6 +6700,30 @@ export interface paths {
                                 /** Format: date-time */
                                 created_at: string;
                             }[];
+                            links: {
+                                /** Format: uuid */
+                                id: string;
+                                /** @enum {string} */
+                                type: "blocks" | "relates_to" | "duplicates";
+                                /** @enum {string} */
+                                direction: "outgoing" | "incoming";
+                                other_ticket: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    key: string;
+                                    title: string;
+                                };
+                                /** Format: date-time */
+                                created_at: string;
+                                created_by: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    name: string;
+                                    icon: string | null;
+                                    /** @enum {string} */
+                                    type: "agent" | "human";
+                                };
+                            }[];
                         };
                     };
                 };
@@ -6798,7 +6894,7 @@ export interface paths {
                                 /** Format: uuid */
                                 id: string;
                                 /** @enum {string} */
-                                event: "ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted";
+                                event: "ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.link_added" | "ticket.link_removed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted";
                                 /** Format: date-time */
                                 occurred_at: string;
                                 actor: {
@@ -9957,7 +10053,7 @@ export interface paths {
                                 id: string;
                                 /** Format: uri */
                                 url: string;
-                                event_types: (("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted") | "*")[];
+                                event_types: (("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.link_added" | "ticket.link_removed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted") | "*")[];
                                 status_filter: {
                                     /** @enum {string} */
                                     to_category?: "backlog" | "planning" | "in_progress" | "blocked" | "closed";
@@ -10122,7 +10218,7 @@ export interface paths {
                     "application/json": {
                         /** Format: uri */
                         url: string;
-                        event_types: (("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted") | "*")[];
+                        event_types: (("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.link_added" | "ticket.link_removed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted") | "*")[];
                         status_filter?: {
                             /** @enum {string} */
                             to_category?: "backlog" | "planning" | "in_progress" | "blocked" | "closed";
@@ -10149,7 +10245,7 @@ export interface paths {
                             id: string;
                             /** Format: uri */
                             url: string;
-                            event_types: (("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted") | "*")[];
+                            event_types: (("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.link_added" | "ticket.link_removed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted") | "*")[];
                             status_filter: {
                                 /** @enum {string} */
                                 to_category?: "backlog" | "planning" | "in_progress" | "blocked" | "closed";
@@ -10332,7 +10428,7 @@ export interface paths {
                             id: string;
                             /** Format: uri */
                             url: string;
-                            event_types: (("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted") | "*")[];
+                            event_types: (("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.link_added" | "ticket.link_removed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted") | "*")[];
                             status_filter: {
                                 /** @enum {string} */
                                 to_category?: "backlog" | "planning" | "in_progress" | "blocked" | "closed";
@@ -10644,7 +10740,7 @@ export interface paths {
                     "application/json": {
                         /** Format: uri */
                         url?: string;
-                        event_types?: (("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted") | "*")[];
+                        event_types?: (("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.link_added" | "ticket.link_removed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted") | "*")[];
                         status_filter?: {
                             /** @enum {string} */
                             to_category?: "backlog" | "planning" | "in_progress" | "blocked" | "closed";
@@ -10671,7 +10767,7 @@ export interface paths {
                             id: string;
                             /** Format: uri */
                             url: string;
-                            event_types: (("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted") | "*")[];
+                            event_types: (("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.link_added" | "ticket.link_removed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted") | "*")[];
                             status_filter: {
                                 /** @enum {string} */
                                 to_category?: "backlog" | "planning" | "in_progress" | "blocked" | "closed";
@@ -11231,7 +11327,7 @@ export interface paths {
                                 /** Format: uuid */
                                 id: string;
                                 /** @enum {string} */
-                                event: "ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted";
+                                event: "ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.link_added" | "ticket.link_removed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted";
                                 /** Format: date-time */
                                 occurred_at: string;
                                 actor: {
@@ -13770,7 +13866,7 @@ export interface paths {
                                 project_id: string | null;
                                 name: string;
                                 enabled: boolean;
-                                trigger_event_types: ("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted")[];
+                                trigger_event_types: ("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.link_added" | "ticket.link_removed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted")[];
                                 conditions: Record<string, never> | {
                                     all: ({
                                         field: string;
@@ -14027,7 +14123,7 @@ export interface paths {
                         /** @default true */
                         enabled?: boolean;
                         /** @default [] */
-                        trigger_event_types?: ("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted")[];
+                        trigger_event_types?: ("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.link_added" | "ticket.link_removed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted")[];
                         /** @default {} */
                         conditions?: Record<string, never> | {
                             all: ({
@@ -14140,7 +14236,7 @@ export interface paths {
                             project_id: string | null;
                             name: string;
                             enabled: boolean;
-                            trigger_event_types: ("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted")[];
+                            trigger_event_types: ("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.link_added" | "ticket.link_removed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted")[];
                             conditions: Record<string, never> | {
                                 all: ({
                                     field: string;
@@ -14411,7 +14507,7 @@ export interface paths {
                             project_id: string | null;
                             name: string;
                             enabled: boolean;
-                            trigger_event_types: ("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted")[];
+                            trigger_event_types: ("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.link_added" | "ticket.link_removed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted")[];
                             conditions: Record<string, never> | {
                                 all: ({
                                     field: string;
@@ -14809,7 +14905,7 @@ export interface paths {
                     "application/json": {
                         name?: string;
                         enabled?: boolean;
-                        trigger_event_types?: ("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted")[];
+                        trigger_event_types?: ("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.link_added" | "ticket.link_removed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted")[];
                         conditions?: Record<string, never> | {
                             all: ({
                                 field: string;
@@ -14921,7 +15017,7 @@ export interface paths {
                             project_id: string | null;
                             name: string;
                             enabled: boolean;
-                            trigger_event_types: ("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted")[];
+                            trigger_event_types: ("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.link_added" | "ticket.link_removed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted")[];
                             conditions: Record<string, never> | {
                                 all: ({
                                     field: string;
@@ -16408,6 +16504,538 @@ export interface paths {
                 };
             };
         };
+        trace?: never;
+    };
+    "/v1/tickets/{idOrKey}/links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List typed cross-ticket relations involving this ticket */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    idOrKey: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description ok */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: {
+                                /** Format: uuid */
+                                id: string;
+                                /** @enum {string} */
+                                type: "blocks" | "relates_to" | "duplicates";
+                                /** @enum {string} */
+                                direction: "outgoing" | "incoming";
+                                other_ticket: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    key: string;
+                                    title: string;
+                                };
+                                /** Format: date-time */
+                                created_at: string;
+                                created_by: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    name: string;
+                                    icon: string | null;
+                                    /** @enum {string} */
+                                    type: "agent" | "human";
+                                };
+                            }[];
+                        };
+                    };
+                };
+                /** @description bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description unprocessable */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description internal */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Create a typed cross-ticket relation (source = path ticket) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: {
+                    "idempotency-key"?: string;
+                };
+                path: {
+                    idOrKey: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        type: "blocks" | "relates_to" | "duplicates";
+                        target: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            /** @enum {string} */
+                            type: "blocks" | "relates_to" | "duplicates";
+                            /** @enum {string} */
+                            direction: "outgoing" | "incoming";
+                            other_ticket: {
+                                /** Format: uuid */
+                                id: string;
+                                key: string;
+                                title: string;
+                            };
+                            /** Format: date-time */
+                            created_at: string;
+                            created_by: {
+                                /** Format: uuid */
+                                id: string;
+                                name: string;
+                                icon: string | null;
+                                /** @enum {string} */
+                                type: "agent" | "human";
+                            };
+                        };
+                    };
+                };
+                /** @description bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description unprocessable */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description internal */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tickets/links/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a typed cross-ticket relation */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description no content */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description unprocessable */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description internal */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
 }
