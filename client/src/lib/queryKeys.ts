@@ -38,6 +38,13 @@ export const queryKeys = {
   webhook: (id: string) => ["sw", "webhooks", id] as const,
   webhookDeliveries: (id: string) => ["sw", "webhooks", id, "deliveries"] as const,
 
+  rules: (params?: Record<string, unknown>) => ["sw", "rules", params ?? {}] as const,
+  rule: (id: string) => ["sw", "rules", id] as const,
+  ruleFirings: (id: string) => ["sw", "rules", id, "firings"] as const,
+
+  targets: () => ["sw", "targets"] as const,
+  target: (id: string) => ["sw", "targets", id] as const,
+
   systemSettings: () => ["sw", "settings"] as const,
 
   // Stats endpoints. Bulk projects-stats is keyed without parameters since

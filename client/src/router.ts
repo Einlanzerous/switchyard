@@ -29,6 +29,9 @@ import SettingsUsers from "./views/settings/SettingsUsers.vue";
 import AutomationsLayout from "./views/automations/AutomationsLayout.vue";
 import AutomationsWebhooks from "./views/automations/AutomationsWebhooks.vue";
 import AutomationsWebhookDeliveries from "./views/automations/AutomationsWebhookDeliveries.vue";
+import AutomationsRules from "./views/automations/AutomationsRules.vue";
+import AutomationsRuleFirings from "./views/automations/AutomationsRuleFirings.vue";
+import AutomationsTargets from "./views/automations/AutomationsTargets.vue";
 
 import { getStoredToken } from "./lib/api.js";
 
@@ -83,6 +86,13 @@ export const router = createRouter({
           name: "automations-webhook-deliveries",
           component: AutomationsWebhookDeliveries,
         },
+        { path: "rules", name: "automations-rules", component: AutomationsRules },
+        {
+          path: "rules/:id/firings",
+          name: "automations-rule-firings",
+          component: AutomationsRuleFirings,
+        },
+        { path: "targets", name: "automations-targets", component: AutomationsTargets },
       ],
     },
   ],

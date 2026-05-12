@@ -34,12 +34,28 @@ const subsQuery = useQuery({
 });
 const items = computed(() => subsQuery.data.value?.items ?? []);
 
+const targetsQuery = useQuery({
+  queryKey: queryKeys.targets(),
+  queryFn: async () => {
+    const { data, error } = await api.GET("/v1/targets", { params: { query: { limit: 200 } } });
+    if (error) throw error;
+    return data;
+  },
+});
+const targets = computed(() => targetsQuery.data.value?.items ?? []);
+function targetById(id: string | null | undefined) {
+  if (!id) return null;
+  return targets.value.find((t) => t.id === id) ?? null;
+}
+
 // ─── create / edit dialog ───────────────────────────────────────────────────
 const dialogOpen = ref(false);
 const editing = ref<WebhookSubscription | null>(null);
 const draftUrl = ref("");
 const draftActive = ref(true);
 const draftEvents = ref<Set<string>>(new Set(["*"]));
+// "" = literal URL form; a uuid = attach to that target.
+const draftTargetId = ref<string>("");
 const fresh = ref<{ secret: string; url: string } | null>(null);
 
 const ALL_EVENTS: EventType[] = [
@@ -62,6 +78,7 @@ function openCreate() {
   draftUrl.value = "";
   draftActive.value = true;
   draftEvents.value = new Set(["*"]);
+  draftTargetId.value = "";
   fresh.value = null;
   dialogOpen.value = true;
 }
@@ -71,6 +88,7 @@ function openEdit(s: WebhookSubscription) {
   draftUrl.value = s.url;
   draftActive.value = s.active;
   draftEvents.value = new Set(s.event_types as string[]);
+  draftTargetId.value = s.target_id ?? "";
   fresh.value = null;
   dialogOpen.value = true;
 }
@@ -89,13 +107,21 @@ function toggleEvent(e: string) {
 
 const saveMutation = useMutation({
   mutationFn: async () => {
+    const target_id = draftTargetId.value === "" ? null : draftTargetId.value;
+    // When attached to a target, the literal URL becomes a fallback only.
+    // Send the target's URL as the literal so the row stays useful if the
+    // target is later deleted (FK is ON DELETE SET NULL).
+    const t = target_id ? targetById(target_id) : null;
+    const url = t ? t.url : draftUrl.value.trim();
+
     if (editing.value) {
       const { data, error } = await api.PATCH("/v1/webhooks/{id}", {
         params: { path: { id: editing.value.id } },
         body: {
-          url: draftUrl.value.trim(),
+          url,
           event_types: Array.from(draftEvents.value) as never,
           active: draftActive.value,
+          target_id,
         },
       });
       if (error) throw error;
@@ -103,9 +129,10 @@ const saveMutation = useMutation({
     }
     const { data, error } = await api.POST("/v1/webhooks", {
       body: {
-        url: draftUrl.value.trim(),
+        url,
         event_types: Array.from(draftEvents.value) as never,
         active: draftActive.value,
+        ...(target_id ? { target_id } : {}),
       },
     });
     if (error) throw error;
@@ -163,7 +190,11 @@ async function copySecret() {
   }
 }
 
-const canSave = computed(() => draftUrl.value.trim().length > 0 && draftEvents.value.size > 0);
+const canSave = computed(() => {
+  if (draftEvents.value.size === 0) return false;
+  if (draftTargetId.value) return true;          // target provides the URL
+  return draftUrl.value.trim().length > 0;
+});
 </script>
 
 <template>
@@ -191,6 +222,11 @@ const canSave = computed(() => draftUrl.value.trim().length > 0 && draftEvents.v
             <Webhook class="h-4 w-4 text-muted-foreground shrink-0 mt-1" />
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2">
+                <Badge
+                  v-if="s.target_id"
+                  variant="outline"
+                  class="text-[10px] font-mono"
+                >via {{ targetById(s.target_id)?.name ?? "target" }}</Badge>
                 <span class="font-mono text-sm truncate">{{ s.url }}</span>
                 <Badge v-if="!s.active" variant="secondary" class="text-[10px]">paused</Badge>
               </div>
@@ -260,6 +296,23 @@ const canSave = computed(() => draftUrl.value.trim().length > 0 && draftEvents.v
           </DialogHeader>
           <div class="space-y-3">
             <div class="space-y-1.5">
+              <Label for="hook-target">Target</Label>
+              <select
+                id="hook-target"
+                v-model="draftTargetId"
+                class="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+              >
+                <option value="">Use literal URL below</option>
+                <option v-for="t in targets" :key="t.id" :value="t.id">
+                  {{ t.name }} — {{ t.url }}
+                </option>
+              </select>
+              <p v-if="draftTargetId" class="text-xs text-muted-foreground">
+                URL + headers resolve from the target at delivery time. Updates to
+                the target propagate without re-creating this subscription.
+              </p>
+            </div>
+            <div class="space-y-1.5" v-if="!draftTargetId">
               <Label for="hook-url">URL</Label>
               <Input
                 id="hook-url"

@@ -56,6 +56,16 @@ test.describe("smoke", () => {
     await expect(page.getByRole("button", { name: /new webhook/i }).first()).toBeVisible();
   });
 
+  test("automations rules renders", async ({ page }) => {
+    await page.goto("/automations/rules");
+    await expect(page.getByRole("button", { name: /new rule/i }).first()).toBeVisible();
+  });
+
+  test("automations targets renders", async ({ page }) => {
+    await page.goto("/automations/targets");
+    await expect(page.getByRole("button", { name: /new target/i }).first()).toBeVisible();
+  });
+
   test("settings renders", async ({ page }) => {
     await page.goto("/settings");
     // Default redirect is /settings/profile.
