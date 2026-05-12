@@ -397,6 +397,27 @@ Out of scope (deferred to Phase 5):
 
 No pre-design. Track candidates here as they come up:
 
+- **AI tool integration (skill-first; MCP optional) (SWY-36).** Ship a switchyard skill
+  loadable by Claude Code, plus parallel materials for Gemini CLI and any other
+  shell-capable LLM tool. The skill teaches:
+  - Auth: bearer-token format `sw_<32>`; minting per-tool tokens via `POST /v1/users/{id}/tokens`; the canonical agent users (`claude`, `n8n-cogitation`, `servo-signal`, etc.) and what `rules-engine` is.
+  - Conventions: cursor pagination, idempotency keys, structured error envelope, `Idempotency-Key` header.
+  - Common workflows: create ticket, transition (vs PATCH — PATCH never changes status), comment, query "my open tickets", attach a file.
+  - Webhook + rule signing: how to verify HMAC; Node + Python snippets.
+  - Pointers: `openapi.yaml`, `GET /v1/openapi.json`, the "How agents use this API" README section.
+
+  **MCP server is deferred.** Switchyard's REST API was designed for agent
+  consumption in Phase 1 (cursor pagination, idempotency, error envelope are
+  all locked decisions to that end). A skill loads the conventions into the
+  LLM's working context without adding a new moving part. MCP earns its keep
+  when one of these shows up:
+  - LLM tool that can't shell out (Cursor, Codeium, gated-Bash configs)
+  - Resource subscriptions wanted (live ticket counts in an IDE sidebar)
+  - Cross-client tool catalog where re-loading the skill per client is friction
+
+  If/when MCP lands, it should be a thin wrapper over the existing
+  `openapi.yaml` — generated, not hand-rolled, so it doesn't drift.
+
 - **Multi-user** (project_members + RBAC). Currently single-user + agents; will be needed if anyone else logs in.
 - **S3-compatible attachment storage** — only if filesystem becomes painful (size, sharing across multiple containers, off-host backup).
 - **Sprints / cycles** — only if the workflow benefits from time-boxed planning. Probably not.
