@@ -19,7 +19,8 @@ import { writeEvent } from "../../src/lib/events.js";
 
 process.env.DATABASE_URL = process.env.DATABASE_URL_TEST!;
 
-const { startDispatcher, stopDispatcher } = await import("../../src/lib/rules/dispatcher.js");
+const { startDispatcher, stopDispatcher, _resetForTesting } =
+  await import("../../src/lib/rules/dispatcher.js");
 
 beforeAll(() => {});
 afterAll(async () => {
@@ -28,6 +29,11 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  // See rules-4-1.test.ts for the rationale: stop + reset the dispatcher
+  // so the next startDispatcher() rebootstraps with the freshly-seeded
+  // rules-engine row (TRUNCATE below wipes it).
+  await stopDispatcher(2_000);
+  _resetForTesting();
   await testDb.execute(
     sql`TRUNCATE rule_firings, rules, webhook_deliveries, webhook_subscriptions,
         events, ticket_labels, comments, attachments, tickets,

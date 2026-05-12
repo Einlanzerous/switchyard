@@ -14,6 +14,8 @@ import { and, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { db, schema } from "../../db.js";
 import { env } from "../../env.js";
 import { mapUserRef } from "../mappers.js";
+import { loadTicketSummary } from "../tickets.js";
+import type { TicketSummary as ApiTicketSummary } from "@switchyard/shared";
 import { evaluate } from "./evaluator.js";
 import { runAction } from "./actions.js";
 import type {
@@ -118,6 +120,7 @@ type ClaimedRow = {
   firing_created_at: string;
   rule_id: string;
   event_id: string | null;
+  ticket_id: string | null;
   attempts: number;
   rule_name: string;
   rule_project_id: string | null;
@@ -136,6 +139,7 @@ async function processBatch(): Promise<number> {
         f.created_at    AS firing_created_at,
         f.rule_id       AS rule_id,
         f.event_id      AS event_id,
+        f.ticket_id     AS ticket_id,
         f.attempts      AS attempts,
         r.name          AS rule_name,
         r.project_id    AS rule_project_id,
@@ -180,12 +184,18 @@ async function processOne(row: ClaimedRow): Promise<void> {
       return;
     }
 
-    // Rule disabled mid-flight or its event missing → skipped.
+    // Rule disabled mid-flight or its triggering context missing → skipped.
     if (!row.rule_enabled) {
       await markSkipped(row.firing_id, newAttempts, "rule disabled", { skip_reason: "rule disabled" });
       return;
     }
-    if (!row.event_type || row.event_payload == null) {
+    // Two trigger modes:
+    //   - Event-triggered: row.event_id set, row.event_type + payload populated
+    //     from the JOIN on events.
+    //   - Scheduled (4.2+): row.event_id null, row.ticket_id set. We
+    //     synthesize a payload below from the targeted ticket.
+    const isScheduled = row.event_id === null && row.ticket_id !== null;
+    if (!isScheduled && (!row.event_type || row.event_payload == null)) {
       await markSkipped(row.firing_id, newAttempts, "event missing", { skip_reason: "event missing" });
       return;
     }
@@ -216,7 +226,28 @@ async function processOne(row: ClaimedRow): Promise<void> {
       return;
     }
 
-    const payload = row.event_payload as Record<string, unknown>;
+    // Build the payload the evaluator + actions see. For event-triggered
+    // firings this is just the stored event_payload. For scheduled firings
+    // we synthesize one from the targeted ticket so actions like
+    // `comment` / `assign` / `set_field` can read `ticket.*` paths the
+    // same way they do for event-triggered runs.
+    let payload: Record<string, unknown>;
+    let effectiveEventType: string;
+    if (isScheduled) {
+      const summary = await loadScheduledTicketSummary(row.ticket_id!);
+      if (!summary) {
+        await markSkipped(row.firing_id, newAttempts, "ticket missing", {
+          skip_reason: "scheduled firing target ticket no longer exists",
+        });
+        return;
+      }
+      payload = { actor: rulesEngineActor, ticket: summary };
+      effectiveEventType = "rule.scheduled";
+    } else {
+      payload = row.event_payload as Record<string, unknown>;
+      effectiveEventType = row.event_type!;
+    }
+
     const conditions = (row.rule_conditions ?? {}) as RuleConditions;
     const actions = (row.rule_actions ?? []) as RuleAction[];
 
@@ -231,9 +262,9 @@ async function processOne(row: ClaimedRow): Promise<void> {
 
     const ctx: RuleContext = {
       event_id: row.event_id ?? "",
-      event_type: row.event_type,
+      event_type: effectiveEventType,
       event_payload: payload,
-      rule: { id: row.rule_id, name: row.rule_name, project_id: row.rule_project_id },
+      rule: { id: row.rule_id, name: row.rule_name, project_id: row.rule_project_id ?? "" },
       rules_engine_user_id: rulesEngineUserId,
       rulesEngineActor,
     };
@@ -363,4 +394,13 @@ function readPositiveInt(raw: string | undefined, fallback: number): number {
   if (raw === undefined || raw === "") return fallback;
   const n = Number(raw);
   return Number.isInteger(n) && n > 0 ? n : fallback;
+}
+
+// Build the TicketSummary that scheduled firings hand to the evaluator +
+// actions. Walks the same shape `loadTicketSummary` returns for event-
+// triggered runs so the payload is uniform across both modes.
+async function loadScheduledTicketSummary(ticket_id: string): Promise<ApiTicketSummary | null> {
+  const [ticket] = await db.select().from(schema.tickets).where(eq(schema.tickets.id, ticket_id)).limit(1);
+  if (!ticket) return null;
+  return await loadTicketSummary(ticket);
 }

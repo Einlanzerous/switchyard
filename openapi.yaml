@@ -20289,7 +20289,6 @@ paths:
                           items:
                             type: string
                             enum: *a10
-                          minItems: 1
                         conditions:
                           anyOf:
                             - type: object
@@ -20528,6 +20527,43 @@ paths:
                                   - workflow
                           minItems: 1
                           maxItems: 10
+                        schedule_cron:
+                          type: string
+                          nullable: true
+                          minLength: 1
+                          maxLength: 120
+                        schedule_tz:
+                          type: string
+                          nullable: true
+                          minLength: 1
+                          maxLength: 80
+                        target_query:
+                          type: object
+                          nullable: true
+                          properties:
+                            project:
+                              type: string
+                            status:
+                              type: string
+                            type:
+                              type: string
+                            label:
+                              type: string
+                            assignee:
+                              type: string
+                            reporter:
+                              type: string
+                            parent_id:
+                              type: string
+                              format: uuid
+                            text:
+                              type: string
+                            updated_after:
+                              type: string
+                              format: date-time
+                            updated_before:
+                              type: string
+                              format: date-time
                         last_fired_at:
                           type: string
                           nullable: true
@@ -20546,6 +20582,9 @@ paths:
                         - trigger_event_types
                         - conditions
                         - actions
+                        - schedule_cron
+                        - schedule_tz
+                        - target_query
                         - last_fired_at
                         - created_at
                         - updated_at
@@ -20765,7 +20804,7 @@ paths:
                   items:
                     type: string
                     enum: *a10
-                  minItems: 1
+                  default: []
                 conditions:
                   anyOf:
                     - type: object
@@ -20996,9 +21035,42 @@ paths:
                           - workflow
                   minItems: 1
                   maxItems: 10
+                schedule_cron:
+                  type: string
+                  minLength: 1
+                  maxLength: 120
+                schedule_tz:
+                  type: string
+                  minLength: 1
+                  maxLength: 80
+                target_query:
+                  type: object
+                  properties:
+                    project:
+                      type: string
+                    status:
+                      type: string
+                    type:
+                      type: string
+                    label:
+                      type: string
+                    assignee:
+                      type: string
+                    reporter:
+                      type: string
+                    parent_id:
+                      type: string
+                      format: uuid
+                    text:
+                      type: string
+                    updated_after:
+                      type: string
+                      format: date-time
+                    updated_before:
+                      type: string
+                      format: date-time
               required:
                 - name
-                - trigger_event_types
                 - actions
       responses:
         "201":
@@ -21026,7 +21098,6 @@ paths:
                     items:
                       type: string
                       enum: *a10
-                    minItems: 1
                   conditions:
                     anyOf:
                       - type: object
@@ -21256,6 +21327,43 @@ paths:
                             - workflow
                     minItems: 1
                     maxItems: 10
+                  schedule_cron:
+                    type: string
+                    nullable: true
+                    minLength: 1
+                    maxLength: 120
+                  schedule_tz:
+                    type: string
+                    nullable: true
+                    minLength: 1
+                    maxLength: 80
+                  target_query:
+                    type: object
+                    nullable: true
+                    properties:
+                      project:
+                        type: string
+                      status:
+                        type: string
+                      type:
+                        type: string
+                      label:
+                        type: string
+                      assignee:
+                        type: string
+                      reporter:
+                        type: string
+                      parent_id:
+                        type: string
+                        format: uuid
+                      text:
+                        type: string
+                      updated_after:
+                        type: string
+                        format: date-time
+                      updated_before:
+                        type: string
+                        format: date-time
                   last_fired_at:
                     type: string
                     nullable: true
@@ -21276,6 +21384,9 @@ paths:
                   - trigger_event_types
                   - conditions
                   - actions
+                  - schedule_cron
+                  - schedule_tz
+                  - target_query
                   - last_fired_at
                   - created_at
                   - updated_at
@@ -21486,7 +21597,6 @@ paths:
                     items:
                       type: string
                       enum: *a10
-                    minItems: 1
                   conditions:
                     anyOf:
                       - type: object
@@ -21716,6 +21826,43 @@ paths:
                             - workflow
                     minItems: 1
                     maxItems: 10
+                  schedule_cron:
+                    type: string
+                    nullable: true
+                    minLength: 1
+                    maxLength: 120
+                  schedule_tz:
+                    type: string
+                    nullable: true
+                    minLength: 1
+                    maxLength: 80
+                  target_query:
+                    type: object
+                    nullable: true
+                    properties:
+                      project:
+                        type: string
+                      status:
+                        type: string
+                      type:
+                        type: string
+                      label:
+                        type: string
+                      assignee:
+                        type: string
+                      reporter:
+                        type: string
+                      parent_id:
+                        type: string
+                        format: uuid
+                      text:
+                        type: string
+                      updated_after:
+                        type: string
+                        format: date-time
+                      updated_before:
+                        type: string
+                        format: date-time
                   last_fired_at:
                     type: string
                     nullable: true
@@ -21734,6 +21881,9 @@ paths:
                   - trigger_event_types
                   - conditions
                   - actions
+                  - schedule_cron
+                  - schedule_tz
+                  - target_query
                   - last_fired_at
                   - created_at
                   - updated_at
@@ -21933,7 +22083,6 @@ paths:
                   items:
                     type: string
                     enum: *a10
-                  minItems: 1
                 conditions:
                   anyOf:
                     - type: object
@@ -22163,6 +22312,43 @@ paths:
                           - workflow
                   minItems: 1
                   maxItems: 10
+                schedule_cron:
+                  type: string
+                  nullable: true
+                  minLength: 1
+                  maxLength: 120
+                schedule_tz:
+                  type: string
+                  nullable: true
+                  minLength: 1
+                  maxLength: 80
+                target_query:
+                  type: object
+                  nullable: true
+                  properties:
+                    project:
+                      type: string
+                    status:
+                      type: string
+                    type:
+                      type: string
+                    label:
+                      type: string
+                    assignee:
+                      type: string
+                    reporter:
+                      type: string
+                    parent_id:
+                      type: string
+                      format: uuid
+                    text:
+                      type: string
+                    updated_after:
+                      type: string
+                      format: date-time
+                    updated_before:
+                      type: string
+                      format: date-time
       responses:
         "200":
           description: ok
@@ -22189,7 +22375,6 @@ paths:
                     items:
                       type: string
                       enum: *a10
-                    minItems: 1
                   conditions:
                     anyOf:
                       - type: object
@@ -22419,6 +22604,43 @@ paths:
                             - workflow
                     minItems: 1
                     maxItems: 10
+                  schedule_cron:
+                    type: string
+                    nullable: true
+                    minLength: 1
+                    maxLength: 120
+                  schedule_tz:
+                    type: string
+                    nullable: true
+                    minLength: 1
+                    maxLength: 80
+                  target_query:
+                    type: object
+                    nullable: true
+                    properties:
+                      project:
+                        type: string
+                      status:
+                        type: string
+                      type:
+                        type: string
+                      label:
+                        type: string
+                      assignee:
+                        type: string
+                      reporter:
+                        type: string
+                      parent_id:
+                        type: string
+                        format: uuid
+                      text:
+                        type: string
+                      updated_after:
+                        type: string
+                        format: date-time
+                      updated_before:
+                        type: string
+                        format: date-time
                   last_fired_at:
                     type: string
                     nullable: true
@@ -22437,6 +22659,9 @@ paths:
                   - trigger_event_types
                   - conditions
                   - actions
+                  - schedule_cron
+                  - schedule_tz
+                  - target_query
                   - last_fired_at
                   - created_at
                   - updated_at
@@ -22839,6 +23064,10 @@ paths:
                           type: string
                           nullable: true
                           format: uuid
+                        ticket_id:
+                          type: string
+                          nullable: true
+                          format: uuid
                         status:
                           type: string
                           enum: &a20
@@ -22895,6 +23124,7 @@ paths:
                         - id
                         - rule_id
                         - event_id
+                        - ticket_id
                         - status
                         - attempts
                         - last_error
@@ -23114,6 +23344,10 @@ paths:
                     type: string
                     nullable: true
                     format: uuid
+                  ticket_id:
+                    type: string
+                    nullable: true
+                    format: uuid
                   status:
                     type: string
                     enum: *a20
@@ -23162,6 +23396,7 @@ paths:
                   - id
                   - rule_id
                   - event_id
+                  - ticket_id
                   - status
                   - attempts
                   - last_error

@@ -131,9 +131,14 @@ export function mount(app: OpenAPIHono) {
       project_id: body.project_id ?? null,
       name: body.name,
       enabled: body.enabled ?? true,
-      trigger_event_types: body.trigger_event_types,
+      // Default to empty array when scheduled (zod default already gives
+      // []); shapes the row to match the DB CHECK.
+      trigger_event_types: body.trigger_event_types ?? [],
       conditions: body.conditions as any,
       actions: body.actions as any,
+      schedule_cron: body.schedule_cron ?? null,
+      schedule_tz: body.schedule_tz ?? null,
+      target_query: (body.target_query ?? null) as any,
       webhook_secret,
     }).returning();
     if (!created) throw new Error("rule insert returned nothing");
@@ -164,6 +169,9 @@ export function mount(app: OpenAPIHono) {
     if (body.trigger_event_types !== undefined) sets.trigger_event_types = body.trigger_event_types;
     if (body.conditions !== undefined) sets.conditions = body.conditions as any;
     if (body.actions !== undefined) sets.actions = body.actions as any;
+    if (body.schedule_cron !== undefined) sets.schedule_cron = body.schedule_cron;
+    if (body.schedule_tz !== undefined) sets.schedule_tz = body.schedule_tz;
+    if (body.target_query !== undefined) sets.target_query = body.target_query as any;
 
     if (Object.keys(sets).length === 0) {
       return c.json(mapRule(existing), 200);

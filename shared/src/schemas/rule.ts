@@ -145,6 +145,29 @@ export type RuleAction = z.infer<typeof RuleAction>;
 
 // ─── rule ───────────────────────────────────────────────────────────────────
 
+// ─── scheduled-rule target query (Phase 4.2) ───────────────────────────────
+//
+// Subset of the /v1/tickets list filters that makes sense for "find tickets
+// to operate on at scheduler time". Timestamps are absolute ISO8601 in 4.2 —
+// relative-time helpers (`updated_before: "30d ago"`) can land later when
+// the use case shows up. Cursor/limit are omitted intentionally; the
+// scheduler fires once per matched ticket and the per-rule rate limit
+// (RULE_RATE_LIMIT_PER_HOUR) is the safety net for huge result sets.
+
+export const ScheduledRuleTarget = z.object({
+  project: z.string().optional(),       // project key or comma-separated
+  status: z.string().optional(),        // status id OR category OR comma-separated
+  type: z.string().optional(),
+  label: z.string().optional(),
+  assignee: z.string().optional(),      // user id OR "unassigned"
+  reporter: z.string().optional(),
+  parent_id: Uuid.optional(),
+  text: z.string().optional(),
+  updated_after: Iso8601.optional(),
+  updated_before: Iso8601.optional(),
+});
+export type ScheduledRuleTarget = z.infer<typeof ScheduledRuleTarget>;
+
 export const Rule = z
   .object({
     id: Uuid,
@@ -153,10 +176,16 @@ export const Rule = z
     project_id: Uuid.nullable(),
     name: z.string().min(1).max(200),
     enabled: z.boolean(),
-    // At least one event type; the dispatcher matches on exact equality.
-    trigger_event_types: z.array(EventType).min(1),
+    // Event-triggered: array non-empty + schedule_cron null.
+    // Scheduled:      array empty       + schedule_cron set.
+    // Enforced by DB CHECK + CreateRule refine.
+    trigger_event_types: z.array(EventType),
     conditions: RuleConditions,
     actions: z.array(RuleAction).min(1).max(10),
+    // ─── scheduled-rule fields ──────────────────────────────────────
+    schedule_cron: z.string().min(1).max(120).nullable(),
+    schedule_tz: z.string().min(1).max(80).nullable(),
+    target_query: ScheduledRuleTarget.nullable(),
     last_fired_at: Iso8601.nullable(),
   })
   .merge(Timestamps);
@@ -169,24 +198,66 @@ export const RuleWithSecret = Rule.extend({
 });
 export type RuleWithSecret = z.infer<typeof RuleWithSecret>;
 
-export const CreateRule = z.object({
-  // null = global rule (Phase 4.1+).
-  project_id: Uuid.nullable().optional(),
-  name: z.string().min(1).max(200),
-  enabled: z.boolean().default(true),
-  trigger_event_types: z.array(EventType).min(1),
-  conditions: RuleConditions.default({}),
-  actions: z.array(RuleAction).min(1).max(10),
-});
+// Refine helper: exactly one trigger mode must be set. Used by both
+// CreateRule and UpdateRule (the latter when both fields are present).
+function refineTriggerXor<T extends { trigger_event_types?: unknown[]; schedule_cron?: string | null }>(
+  data: T,
+  ctx: z.RefinementCtx,
+) {
+  const hasEvents = Array.isArray(data.trigger_event_types) && data.trigger_event_types.length > 0;
+  const hasCron = typeof data.schedule_cron === "string" && data.schedule_cron.length > 0;
+  if (hasEvents && hasCron) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "exactly one of trigger_event_types or schedule_cron must be set, not both",
+      path: ["trigger_event_types"],
+    });
+  }
+  if (!hasEvents && !hasCron) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "either trigger_event_types (non-empty) or schedule_cron is required",
+      path: ["trigger_event_types"],
+    });
+  }
+}
+
+export const CreateRule = z
+  .object({
+    // null = global rule (Phase 4.1+).
+    project_id: Uuid.nullable().optional(),
+    name: z.string().min(1).max(200),
+    enabled: z.boolean().default(true),
+    trigger_event_types: z.array(EventType).default([]),
+    conditions: RuleConditions.default({}),
+    actions: z.array(RuleAction).min(1).max(10),
+    // ─── scheduled-rule fields ──────────────────────────────────────
+    schedule_cron: z.string().min(1).max(120).optional(),
+    schedule_tz: z.string().min(1).max(80).optional(),
+    target_query: ScheduledRuleTarget.optional(),
+  })
+  .superRefine(refineTriggerXor);
 export type CreateRule = z.infer<typeof CreateRule>;
 
-export const UpdateRule = z.object({
-  name: z.string().min(1).max(200).optional(),
-  enabled: z.boolean().optional(),
-  trigger_event_types: z.array(EventType).min(1).optional(),
-  conditions: RuleConditions.optional(),
-  actions: z.array(RuleAction).min(1).max(10).optional(),
-});
+export const UpdateRule = z
+  .object({
+    name: z.string().min(1).max(200).optional(),
+    enabled: z.boolean().optional(),
+    trigger_event_types: z.array(EventType).optional(),
+    conditions: RuleConditions.optional(),
+    actions: z.array(RuleAction).min(1).max(10).optional(),
+    schedule_cron: z.string().min(1).max(120).nullable().optional(),
+    schedule_tz: z.string().min(1).max(80).nullable().optional(),
+    target_query: ScheduledRuleTarget.nullable().optional(),
+  })
+  .superRefine((data, ctx) => {
+    // Only validate XOR when both knobs are present in this patch — partial
+    // patches that touch one or neither pass through, and the DB CHECK
+    // catches any resulting inconsistency.
+    if (data.trigger_event_types !== undefined && data.schedule_cron !== undefined) {
+      refineTriggerXor(data, ctx);
+    }
+  });
 export type UpdateRule = z.infer<typeof UpdateRule>;
 
 // ─── firings ────────────────────────────────────────────────────────────────
@@ -214,7 +285,12 @@ export type RuleFiringResultSummary = z.infer<typeof RuleFiringResultSummary>;
 export const RuleFiring = z.object({
   id: Uuid,
   rule_id: Uuid,
+  // event_id set for event-triggered firings (4.0); null for scheduled.
   event_id: Uuid.nullable(),
+  // ticket_id set for scheduled firings (4.2+) — the ticket matched by
+  // the rule's target_query at scheduler-tick time; null for event-
+  // triggered (the ticket comes from the event payload).
+  ticket_id: Uuid.nullable(),
   status: RuleFiringStatus,
   attempts: z.number().int().nonnegative(),
   last_error: z.string().nullable(),

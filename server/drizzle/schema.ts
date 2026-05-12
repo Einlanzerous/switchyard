@@ -537,6 +537,19 @@ export const rules = pgTable(
     // generated at rule creation (cheap; lets users add webhook actions
     // later via PATCH without re-creating the rule).
     webhook_secret: text("webhook_secret"),
+    // ─── scheduled-rule columns (Phase 4.2) ───────────────────────────
+    // Standard 5-field cron (e.g. "0 9 * * MON"). When set, the rule is
+    // a scheduled rule — trigger_event_types must be empty and the
+    // scheduler loop fires it on the cron cadence rather than reacting
+    // to events. Mutually exclusive with trigger_event_types (CHECK).
+    schedule_cron: text("schedule_cron"),
+    // IANA timezone name (e.g. "America/New_York"). NULL = UTC. Lets
+    // "every Monday 9am" mean local 9am for the rule author.
+    schedule_tz: varchar("schedule_tz", { length: 80 }),
+    // Ticket filter shape mirroring /v1/tickets query params. At fire
+    // time the scheduler runs this query, enqueues one rule_firing per
+    // matched ticket. See ScheduledRuleTarget in shared/schemas/rule.ts.
+    target_query: jsonb("target_query"),
     last_fired_at: timestamp("last_fired_at", { withTimezone: true, mode: "string" }),
     created_at: createdAt(),
     updated_at: updatedAt(),
@@ -544,6 +557,20 @@ export const rules = pgTable(
   (t) => ({
     projectIdx: index("rules_project_idx").on(t.project_id),
     enabledIdx: index("rules_enabled_idx").on(t.enabled).where(sql`${t.enabled} = true`),
+    // Exactly one trigger mode per rule. coalesce() handles PG's "empty
+    // array length is NULL" quirk so the constraint works whether
+    // trigger_event_types is '{}' or a populated array.
+    triggerMode: check(
+      "rules_trigger_mode_xor",
+      sql`(
+        (${t.schedule_cron} IS NULL AND coalesce(array_length(${t.trigger_event_types}, 1), 0) > 0)
+        OR
+        (${t.schedule_cron} IS NOT NULL AND coalesce(array_length(${t.trigger_event_types}, 1), 0) = 0)
+      )`,
+    ),
+    scheduledIdx: index("rules_scheduled_idx")
+      .on(t.enabled, t.schedule_cron)
+      .where(sql`${t.enabled} = true AND ${t.schedule_cron} IS NOT NULL`),
   })
 );
 
@@ -556,6 +583,11 @@ export const ruleFirings = pgTable(
       .references(() => rules.id, { onDelete: "cascade" }),
     // Nullable for Phase 4.2 scheduled firings (no triggering event).
     event_id: uuid("event_id").references(() => events.id, { onDelete: "cascade" }),
+    // Set for scheduled firings — the ticket the actions operate on,
+    // pre-matched by the rule's target_query. NULL for event-triggered
+    // firings (the ticket comes from the event payload). Cascade so
+    // deleted tickets don't leave orphan firings.
+    ticket_id: uuid("ticket_id").references(() => tickets.id, { onDelete: "cascade" }),
     status: ruleFiringStatus("status").notNull().default("pending"),
     attempts: integer("attempts").notNull().default(0),
     last_error: text("last_error"),

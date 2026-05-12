@@ -277,6 +277,7 @@ import type {
   RuleFiring as ApiRuleFiring,
   RuleAction as ApiRuleAction, RuleConditions as ApiRuleConditions,
   RuleFiringResultSummary as ApiRuleFiringSummary,
+  ScheduledRuleTarget as ApiScheduledRuleTarget,
 } from "@switchyard/shared";
 
 export function mapRule(r: RuleRow): ApiRule {
@@ -288,6 +289,9 @@ export function mapRule(r: RuleRow): ApiRule {
     trigger_event_types: r.trigger_event_types as ApiRule["trigger_event_types"],
     conditions: (r.conditions ?? {}) as ApiRuleConditions,
     actions: (r.actions ?? []) as ApiRuleAction[],
+    schedule_cron: r.schedule_cron,
+    schedule_tz: r.schedule_tz,
+    target_query: (r.target_query ?? null) as ApiScheduledRuleTarget | null,
     last_fired_at: r.last_fired_at,
     created_at: r.created_at,
     updated_at: r.updated_at,
@@ -309,6 +313,7 @@ export function mapRuleFiring(f: RuleFiringRow): ApiRuleFiring {
     id: f.id,
     rule_id: f.rule_id,
     event_id: f.event_id,
+    ticket_id: f.ticket_id,
     status: f.status as ApiRuleFiring["status"],
     attempts: f.attempts,
     last_error: f.last_error,

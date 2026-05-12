@@ -13834,6 +13834,23 @@ export interface paths {
                                     type: "call_n8n";
                                     workflow: string;
                                 })[];
+                                schedule_cron: string | null;
+                                schedule_tz: string | null;
+                                target_query: {
+                                    project?: string;
+                                    status?: string;
+                                    type?: string;
+                                    label?: string;
+                                    assignee?: string;
+                                    reporter?: string;
+                                    /** Format: uuid */
+                                    parent_id?: string;
+                                    text?: string;
+                                    /** Format: date-time */
+                                    updated_after?: string;
+                                    /** Format: date-time */
+                                    updated_before?: string;
+                                } | null;
                                 /** Format: date-time */
                                 last_fired_at: string | null;
                                 /** Format: date-time */
@@ -13995,7 +14012,8 @@ export interface paths {
                         name: string;
                         /** @default true */
                         enabled?: boolean;
-                        trigger_event_types: ("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted")[];
+                        /** @default [] */
+                        trigger_event_types?: ("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted")[];
                         /** @default {} */
                         conditions?: Record<string, never> | {
                             all: ({
@@ -14072,6 +14090,23 @@ export interface paths {
                             type: "call_n8n";
                             workflow: string;
                         })[];
+                        schedule_cron?: string;
+                        schedule_tz?: string;
+                        target_query?: {
+                            project?: string;
+                            status?: string;
+                            type?: string;
+                            label?: string;
+                            assignee?: string;
+                            reporter?: string;
+                            /** Format: uuid */
+                            parent_id?: string;
+                            text?: string;
+                            /** Format: date-time */
+                            updated_after?: string;
+                            /** Format: date-time */
+                            updated_before?: string;
+                        };
                     };
                 };
             };
@@ -14165,6 +14200,23 @@ export interface paths {
                                 type: "call_n8n";
                                 workflow: string;
                             })[];
+                            schedule_cron: string | null;
+                            schedule_tz: string | null;
+                            target_query: {
+                                project?: string;
+                                status?: string;
+                                type?: string;
+                                label?: string;
+                                assignee?: string;
+                                reporter?: string;
+                                /** Format: uuid */
+                                parent_id?: string;
+                                text?: string;
+                                /** Format: date-time */
+                                updated_after?: string;
+                                /** Format: date-time */
+                                updated_before?: string;
+                            } | null;
                             /** Format: date-time */
                             last_fired_at: string | null;
                             /** Format: date-time */
@@ -14417,6 +14469,23 @@ export interface paths {
                                 type: "call_n8n";
                                 workflow: string;
                             })[];
+                            schedule_cron: string | null;
+                            schedule_tz: string | null;
+                            target_query: {
+                                project?: string;
+                                status?: string;
+                                type?: string;
+                                label?: string;
+                                assignee?: string;
+                                reporter?: string;
+                                /** Format: uuid */
+                                parent_id?: string;
+                                text?: string;
+                                /** Format: date-time */
+                                updated_after?: string;
+                                /** Format: date-time */
+                                updated_before?: string;
+                            } | null;
                             /** Format: date-time */
                             last_fired_at: string | null;
                             /** Format: date-time */
@@ -14796,6 +14865,23 @@ export interface paths {
                             type: "call_n8n";
                             workflow: string;
                         })[];
+                        schedule_cron?: string | null;
+                        schedule_tz?: string | null;
+                        target_query?: {
+                            project?: string;
+                            status?: string;
+                            type?: string;
+                            label?: string;
+                            assignee?: string;
+                            reporter?: string;
+                            /** Format: uuid */
+                            parent_id?: string;
+                            text?: string;
+                            /** Format: date-time */
+                            updated_after?: string;
+                            /** Format: date-time */
+                            updated_before?: string;
+                        } | null;
                     };
                 };
             };
@@ -14889,6 +14975,23 @@ export interface paths {
                                 type: "call_n8n";
                                 workflow: string;
                             })[];
+                            schedule_cron: string | null;
+                            schedule_tz: string | null;
+                            target_query: {
+                                project?: string;
+                                status?: string;
+                                type?: string;
+                                label?: string;
+                                assignee?: string;
+                                reporter?: string;
+                                /** Format: uuid */
+                                parent_id?: string;
+                                text?: string;
+                                /** Format: date-time */
+                                updated_after?: string;
+                                /** Format: date-time */
+                                updated_before?: string;
+                            } | null;
                             /** Format: date-time */
                             last_fired_at: string | null;
                             /** Format: date-time */
@@ -15064,6 +15167,8 @@ export interface paths {
                                 rule_id: string;
                                 /** Format: uuid */
                                 event_id: string | null;
+                                /** Format: uuid */
+                                ticket_id: string | null;
                                 /** @enum {string} */
                                 status: "pending" | "running" | "succeeded" | "failed" | "abandoned" | "skipped";
                                 attempts: number;
@@ -15262,6 +15367,8 @@ export interface paths {
                             rule_id: string;
                             /** Format: uuid */
                             event_id: string | null;
+                            /** Format: uuid */
+                            ticket_id: string | null;
                             /** @enum {string} */
                             status: "pending" | "running" | "succeeded" | "failed" | "abandoned" | "skipped";
                             attempts: number;
