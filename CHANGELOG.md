@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.5.0](https://github.com/Einlanzerous/switchyard/compare/v2.4.0...v2.5.0) (2026-05-12)
+
+
+### Features
+
+* Phase 4.1 native rules — remaining actions + global rules + rate limit ([4752fd6](https://github.com/Einlanzerous/switchyard/commit/4752fd62acb6f21a7cb1110c790dfaddc01d5d5d))
+
 ## [2.4.0](https://github.com/Einlanzerous/switchyard/compare/v2.3.0...v2.4.0) (2026-05-11)
 
 
