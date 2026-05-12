@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.8.0](https://github.com/Einlanzerous/switchyard/compare/v2.7.0...v2.8.0) (2026-05-12)
+
+
+### Features
+
+* Phase 4.3 UI — rules / firings / targets under Automations ([cebbf4e](https://github.com/Einlanzerous/switchyard/commit/cebbf4ee2ce3a11e5346a75e6dc41a85c13b798a))
+
 ## [2.7.0](https://github.com/Einlanzerous/switchyard/compare/v2.6.0...v2.7.0) (2026-05-12)
 
 
