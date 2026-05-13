@@ -36,7 +36,7 @@ function toggleEpics() {
   router.replace({ query: next });
 }
 
-const { columns, isLoading, error, refetch } = useProjectBoard(projectKey, showEpics);
+const { columns, isLoading, error, refetch, closedWindowDays } = useProjectBoard(projectKey, showEpics);
 
 // ─── drop → transition wiring ────────────────────────────────────────────────
 
@@ -374,6 +374,7 @@ const errMessage = computed(() => {
           :column="col"
           :dragging-ticket-id="inflightTicketId"
           :focused-ticket-id="idx === focusedColIdx ? focusedTicketId : null"
+          :hint="col.category === 'closed' ? `last ${closedWindowDays} days` : undefined"
           @open="openTicket"
           @drop="handleDrop"
         />

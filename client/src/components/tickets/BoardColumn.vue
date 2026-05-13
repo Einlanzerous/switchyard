@@ -14,6 +14,10 @@ const props = defineProps<{
   // compare their own id against this and render the focus stripe
   // accordingly.
   focusedTicketId?: string | null;
+  // Optional small grey label rendered next to the column count. The
+  // Closed column uses this to show its visibility window
+  // ("last 14 days") so the truncation is visible.
+  hint?: string;
 }>();
 
 // `drop` fires when the destination has been resolved. The parent gets
@@ -137,8 +141,11 @@ function onCardDrop(
       <span class="text-xs font-medium uppercase tracking-wider text-foreground">
         {{ column.displayName }}
       </span>
-      <span class="text-[11px] text-muted-foreground tabular-nums">
-        {{ column.tickets.length }}
+      <span class="flex items-center gap-1.5">
+        <span v-if="hint" class="text-[10px] text-muted-foreground italic">{{ hint }}</span>
+        <span class="text-[11px] text-muted-foreground tabular-nums">
+          {{ column.tickets.length }}
+        </span>
       </span>
     </header>
     <div class="flex-1 overflow-y-auto p-2 space-y-2">

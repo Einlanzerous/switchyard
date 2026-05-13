@@ -83,6 +83,11 @@ export const projects = pgTable(
     description: text("description"),
     color: varchar("color", { length: 7 }),
     archived_at: timestamp("archived_at", { withTimezone: true, mode: "string" }),
+    // Per-project override for the kanban Closed column window. NULL
+    // means inherit the system setting (`board_closed_window_days`).
+    // Constrained to {7, 14, 30} at the API layer and via a CHECK so
+    // an admin can't accidentally set unbounded values.
+    board_closed_window_days: integer("board_closed_window_days"),
     created_at: createdAt(),
     updated_at: updatedAt(),
     deleted_at: deletedAt(),
@@ -90,6 +95,10 @@ export const projects = pgTable(
   (t) => ({
     keyUnique: uniqueIndex("projects_key_unique").on(t.key),
     keyShape: check("projects_key_shape", sql`${t.key} ~ '^[A-Z][A-Z0-9]{1,9}$'`),
+    closedWindowShape: check(
+      "projects_closed_window_shape",
+      sql`${t.board_closed_window_days} IS NULL OR ${t.board_closed_window_days} IN (7, 14, 30)`,
+    ),
   })
 );
 

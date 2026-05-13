@@ -15,7 +15,7 @@ import { resolve, dirname } from "node:path";
 import { db, schema } from "../db.js";
 import { env } from "../env.js";
 import { generateApiToken, hashToken } from "./id.js";
-import { DEFAULT_STALE_IN_PROGRESS_DAYS } from "@switchyard/shared";
+import { DEFAULT_STALE_IN_PROGRESS_DAYS, DEFAULT_BOARD_CLOSED_WINDOW_DAYS } from "@switchyard/shared";
 
 type CanonicalUser = {
   name: string;
@@ -81,6 +81,7 @@ async function ensureLabels(): Promise<void> {
 async function ensureDefaultSettings(): Promise<void> {
   const defaults = [
     { key: "stale_in_progress_days", value: DEFAULT_STALE_IN_PROGRESS_DAYS },
+    { key: "board_closed_window_days", value: DEFAULT_BOARD_CLOSED_WINDOW_DAYS },
   ];
   for (const d of defaults) {
     const [existing] = await db

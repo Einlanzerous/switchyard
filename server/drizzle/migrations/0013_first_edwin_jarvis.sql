@@ -1,0 +1,2 @@
+ALTER TABLE "projects" ADD COLUMN "board_closed_window_days" integer;--> statement-breakpoint
+ALTER TABLE "projects" ADD CONSTRAINT "projects_closed_window_shape" CHECK ("projects"."board_closed_window_days" IS NULL OR "projects"."board_closed_window_days" IN (7, 14, 30));

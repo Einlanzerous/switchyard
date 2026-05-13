@@ -7,14 +7,15 @@
 // here). Frontend UI is "Settings → System" once we have more than one knob.
 
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { eq } from "drizzle-orm";
 import {
-  SystemSettings, UpdateSystemSettings, DEFAULT_STALE_IN_PROGRESS_DAYS,
+  SystemSettings, UpdateSystemSettings,
+  DEFAULT_STALE_IN_PROGRESS_DAYS, DEFAULT_BOARD_CLOSED_WINDOW_DAYS,
+  type ClosedWindowDays,
 } from "@switchyard/shared";
 import { db } from "../db.js";
 import * as schema from "../../drizzle/schema.js";
 import { requireAuth } from "../auth.js";
-import { errorResponses, okJson, scope, z } from "./_helpers.js";
+import { errorResponses, okJson, checkScope } from "./_helpers.js";
 
 const tag = "Settings";
 
@@ -34,10 +35,12 @@ const patch = createRoute({
 // shipped after deploy is immediately readable without a manual migration.
 export const SETTING_DEFAULTS = {
   stale_in_progress_days: DEFAULT_STALE_IN_PROGRESS_DAYS,
+  board_closed_window_days: DEFAULT_BOARD_CLOSED_WINDOW_DAYS,
 } as const;
 
 type StoredSettings = {
   stale_in_progress_days: number;
+  board_closed_window_days: ClosedWindowDays;
   updated_at: string;
 };
 
@@ -60,6 +63,10 @@ export async function readSettings(): Promise<StoredSettings> {
 
   return {
     stale_in_progress_days: get("stale_in_progress_days", SETTING_DEFAULTS.stale_in_progress_days),
+    board_closed_window_days: get<ClosedWindowDays>(
+      "board_closed_window_days",
+      SETTING_DEFAULTS.board_closed_window_days,
+    ),
     updated_at: latest,
   };
 }
@@ -72,15 +79,20 @@ export function mount(app: OpenAPIHono) {
   }) as any);
 
   // PATCH writes individual keys via upsert. Admin-only — these affect
-  // global behavior (stale threshold flips counts on every dashboard). We
-  // don't accept partial-validation skips: zod has already run.
-  app.openapi(patch, scope("admin"), (async (c: any) => {
+  // global behavior (stale threshold flips counts on every dashboard).
+  // Scope is checked in-handler (the `scope()` middleware form breaks
+  // openapi's c.req.valid binding — see Phase 1.6 pattern note).
+  app.openapi(patch, (async (c: any) => {
+    checkScope(c, "admin");
     const body = c.req.valid("json");
     const nowIso = new Date().toISOString();
 
     const writes: Array<{ key: string; value: unknown }> = [];
     if (body.stale_in_progress_days !== undefined) {
       writes.push({ key: "stale_in_progress_days", value: body.stale_in_progress_days });
+    }
+    if (body.board_closed_window_days !== undefined) {
+      writes.push({ key: "board_closed_window_days", value: body.board_closed_window_days });
     }
 
     for (const w of writes) {

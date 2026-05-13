@@ -102,6 +102,7 @@ export function mount(app: OpenAPIHono) {
           name: body.name,
           description: body.description ?? null,
           color: body.color ?? null,
+          board_closed_window_days: body.board_closed_window_days ?? null,
         }).returning();
         if (!created) throw new Error("project insert returned nothing");
 
@@ -143,6 +144,10 @@ export function mount(app: OpenAPIHono) {
     if (body.name !== undefined) sets.name = body.name;
     if (body.description !== undefined) sets.description = body.description ?? null;
     if (body.color !== undefined) sets.color = body.color ?? null;
+    if (body.board_closed_window_days !== undefined) {
+      // null clears the override; the DB CHECK rejects anything outside {7,14,30}.
+      sets.board_closed_window_days = body.board_closed_window_days;
+    }
     if (body.archived !== undefined) {
       sets.archived_at = body.archived
         ? (existing.archived_at ?? new Date().toISOString())

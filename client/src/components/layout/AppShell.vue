@@ -42,7 +42,11 @@ useShortcuts({
 </script>
 
 <template>
-  <div class="min-h-screen flex bg-background text-foreground">
+  <!-- `h-screen overflow-hidden` keeps the shell exactly viewport-height
+       so the sidebar (and its bottom-pinned version chip) stay in view
+       on tall content like a busy kanban board. The main pane manages
+       its own scrolling. -->
+  <div class="h-screen overflow-hidden flex bg-background text-foreground">
     <AppSidebar />
     <div class="flex flex-1 flex-col min-w-0">
       <AppTopbar />

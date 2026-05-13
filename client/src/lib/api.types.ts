@@ -2210,6 +2210,7 @@ export interface paths {
                                 color: string | null;
                                 /** Format: date-time */
                                 archived_at: string | null;
+                                board_closed_window_days: 7 | 14 | 30 | unknown;
                                 /** Format: date-time */
                                 created_at: string;
                                 /** Format: date-time */
@@ -2368,6 +2369,7 @@ export interface paths {
                         name: string;
                         description?: string;
                         color?: string;
+                        board_closed_window_days?: 7 | 14 | 30;
                     };
                 };
             };
@@ -2387,6 +2389,7 @@ export interface paths {
                             color: string | null;
                             /** Format: date-time */
                             archived_at: string | null;
+                            board_closed_window_days: 7 | 14 | 30 | unknown;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
@@ -2564,6 +2567,7 @@ export interface paths {
                             color: string | null;
                             /** Format: date-time */
                             archived_at: string | null;
+                            board_closed_window_days: 7 | 14 | 30 | unknown;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
@@ -2868,6 +2872,7 @@ export interface paths {
                         name?: string;
                         description?: string;
                         color?: string;
+                        board_closed_window_days?: 7 | 14 | 30 | unknown;
                         archived?: boolean;
                     };
                 };
@@ -2888,6 +2893,7 @@ export interface paths {
                             color: string | null;
                             /** Format: date-time */
                             archived_at: string | null;
+                            board_closed_window_days: 7 | 14 | 30 | unknown;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
@@ -11865,6 +11871,7 @@ export interface paths {
                     content: {
                         "application/json": {
                             stale_in_progress_days: number;
+                            board_closed_window_days: 7 | 14 | 30;
                             /** Format: date-time */
                             updated_at: string;
                         };
@@ -12015,6 +12022,7 @@ export interface paths {
                 content: {
                     "application/json": {
                         stale_in_progress_days?: number;
+                        board_closed_window_days?: 7 | 14 | 30;
                     };
                 };
             };
@@ -12027,6 +12035,7 @@ export interface paths {
                     content: {
                         "application/json": {
                             stale_in_progress_days: number;
+                            board_closed_window_days: 7 | 14 | 30;
                             /** Format: date-time */
                             updated_at: string;
                         };

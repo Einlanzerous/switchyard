@@ -75,6 +75,48 @@ const saveMutation = useMutation({
   },
 });
 
+// ─── board closed-window override ──────────────────────────────────────────
+
+const systemSettingsQuery = useQuery({
+  queryKey: queryKeys.systemSettings(),
+  staleTime: 60 * 60 * 1000,
+  queryFn: async () => {
+    const { data, error } = await api.GET("/v1/settings", {});
+    if (error) throw error;
+    return data;
+  },
+});
+
+const systemClosedWindow = computed<number>(() => {
+  const v = systemSettingsQuery.data.value?.board_closed_window_days;
+  return typeof v === "number" ? v : 14;
+});
+
+// "" = use system default; "7"/"14"/"30" = override.
+const closedWindowValue = computed<string>({
+  get: () => {
+    const v = project.value?.board_closed_window_days;
+    return typeof v === "number" ? String(v) : "";
+  },
+  set: () => { /* controlled by mutation below */ },
+});
+
+const closedWindowMutation = useMutation({
+  mutationFn: async (raw: string) => {
+    const next = raw === "" ? null : (Number(raw) as 7 | 14 | 30);
+    const { error } = await api.PATCH("/v1/projects/{key}", {
+      params: { path: { key: projectKey.value } },
+      body: { board_closed_window_days: next as never },
+    });
+    if (error) throw error;
+  },
+  onSuccess: () => {
+    qc.invalidateQueries({ queryKey: queryKeys.project(projectKey.value) });
+    qc.invalidateQueries({ queryKey: ["sw", "projects"] });
+    toast.success("Board override updated");
+  },
+});
+
 const archiveMutation = useMutation({
   mutationFn: async () => {
     if (!project.value) return;
@@ -157,6 +199,33 @@ const deleteMutation = useMutation({
           <ChevronRight class="h-4 w-4 text-muted-foreground self-center" />
         </RouterLink>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle class="text-base">Board</CardTitle>
+          <CardDescription>
+            How the Closed column on this project's kanban behaves. Leave on
+            "system default" to inherit; override here when this project
+            needs a different window than the rest of switchyard.
+          </CardDescription>
+        </CardHeader>
+        <CardContent class="space-y-2">
+          <div class="flex items-center gap-3">
+            <Label for="proj-closed-window" class="shrink-0 w-44">Closed column window</Label>
+            <select
+              id="proj-closed-window"
+              :value="closedWindowValue"
+              class="rounded-md border bg-background px-2 py-1.5 text-sm"
+              @change="(e) => closedWindowMutation.mutate((e.target as HTMLSelectElement).value)"
+            >
+              <option value="">System default ({{ systemClosedWindow }}d)</option>
+              <option value="7">7 days</option>
+              <option value="14">14 days</option>
+              <option value="30">30 days</option>
+            </select>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

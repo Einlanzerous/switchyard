@@ -47,6 +47,34 @@ export function useProjectBoard(
 ) {
   const enabled = computed(() => projectKey.value !== null);
 
+  // Settings + project metadata feed the effective Closed-column
+  // window. The project's `board_closed_window_days` override (when
+  // set) wins; otherwise we use the system default. Both refetch
+  // once-per-mount and stick around — these change rarely.
+  const settingsQuery = useQuery({
+    queryKey: queryKeys.systemSettings(),
+    enabled,
+    staleTime: 60 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await api.GET("/v1/settings", {});
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const projectQuery = useQuery({
+    queryKey: computed(() => queryKeys.project(projectKey.value ?? "__none__")),
+    enabled,
+    staleTime: 60 * 60 * 1000,
+    queryFn: async () => {
+      const k = projectKey.value;
+      if (!k) throw new Error("no project");
+      const { data, error } = await api.GET("/v1/projects/{key}", { params: { path: { key: k } } });
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const statusesQuery = useQuery({
     queryKey: computed(() => queryKeys.projectStatuses(projectKey.value ?? "__none__")),
     enabled,
@@ -84,6 +112,19 @@ export function useProjectBoard(
   const statuses = computed<Status[]>(() => statusesQuery.data.value?.items ?? []);
   const tickets = computed<TicketSummary[]>(() => ticketsQuery.data.value?.items ?? []);
 
+  // Effective Closed-column window: per-project override > system default.
+  // Returned to consumers so the UI can render a "Closed (last X days)"
+  // hint alongside the column header.
+  const closedWindowDays = computed<number>(() => {
+    // openapi-typescript emits `7 | 14 | 30 | unknown` for the
+    // nullable literal-union (a known quirk with zod-openapi); narrow
+    // by typeof here so the union resolves cleanly.
+    const projOverride = projectQuery.data.value?.board_closed_window_days;
+    if (typeof projOverride === "number") return projOverride;
+    const sysDefault = settingsQuery.data.value?.board_closed_window_days;
+    return typeof sysDefault === "number" ? sysDefault : 14;
+  });
+
   // Build the column array. We materialize columns for every category that has
   // at least one status in the project, in canonical order. Categories the
   // project has no statuses for (e.g. a project that deleted Planning) are
@@ -100,6 +141,12 @@ export function useProjectBoard(
       arr.sort((a, b) => a.position - b.position);
     }
 
+    // Closed column: drop tickets whose updated_at is older than the
+    // effective window. Approximates "recently closed" — switchyard
+    // doesn't track a separate closed_at, but the status transition
+    // bumps updated_at via the trigger so it's accurate in practice.
+    const closedCutoffMs = Date.now() - closedWindowDays.value * 24 * 60 * 60 * 1000;
+
     return CATEGORY_ORDER.flatMap((cat) => {
       const inCat = byCategory.get(cat);
       if (!inCat || inCat.length === 0) return [];
@@ -110,6 +157,10 @@ export function useProjectBoard(
       const ticketsInCol = tickets.value
         .filter((t) => t.status.category === cat)
         .filter((t) => showEpics.value || t.type !== "epic")
+        .filter((t) => {
+          if (cat !== "closed") return true;
+          return new Date(t.updated_at).getTime() >= closedCutoffMs;
+        })
         .sort((a, b) => effectivePosition(b) - effectivePosition(a));
       return [{
         category: cat,
@@ -124,6 +175,7 @@ export function useProjectBoard(
     statuses,
     tickets,
     columns,
+    closedWindowDays,
     isLoading: computed(() => statusesQuery.isLoading.value || ticketsQuery.isLoading.value),
     error: computed(() => statusesQuery.error.value ?? ticketsQuery.error.value),
     refetch: async () => {
