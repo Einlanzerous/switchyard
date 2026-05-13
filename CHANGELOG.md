@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.11.0](https://github.com/Einlanzerous/switchyard/compare/v2.10.0...v2.11.0) (2026-05-13)
+
+
+### Features
+
+* Phase 4.5.3 GitHub webhook receiver + auto-detect from PR convention ([4eab6e7](https://github.com/Einlanzerous/switchyard/commit/4eab6e70bbde50c458bb5421bf8c5ccf243b02ee))
+
 ## [2.10.0](https://github.com/Einlanzerous/switchyard/compare/v2.9.0...v2.10.0) (2026-05-13)
 
 
