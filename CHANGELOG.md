@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.9.0](https://github.com/Einlanzerous/switchyard/compare/v2.8.0...v2.9.0) (2026-05-13)
+
+
+### Features
+
+* Phase 4.5 closeout plan + ready-for-agent label + labels route fix ([15b6996](https://github.com/Einlanzerous/switchyard/commit/15b699651050eb25049dda5c082356cc819423f6))
+* Phase 4.5.0 ticket links — blocks / relates_to / duplicates ([f351daf](https://github.com/Einlanzerous/switchyard/commit/f351daf1ef45ee35c64f32f7212b5f6d5d21a03a))
+* Phase 4.5.1 custom field schemas — typed views over metadata JSONB ([fd7161d](https://github.com/Einlanzerous/switchyard/commit/fd7161dba3de5bf7fdf682f4181c2cd0fb5d66ad))
+* Phase 4.5.2 external refs (manual attach + polling) + board polish ([dd6694c](https://github.com/Einlanzerous/switchyard/commit/dd6694c238b9a948d01c8c6c72b86d699fa0d0a5))
+
 ## [2.8.0](https://github.com/Einlanzerous/switchyard/compare/v2.7.0...v2.8.0) (2026-05-12)
 
 
