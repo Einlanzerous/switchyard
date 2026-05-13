@@ -17,6 +17,7 @@ import * as targets from "./targets.js";
 import * as ticketLinks from "./ticketLinks.js";
 import * as customFields from "./customFields.js";
 import * as ticketExternalRefs from "./ticketExternalRefs.js";
+import * as external from "./external.js";
 
 export function mountRoutes(app: OpenAPIHono) {
   users.mount(app);
@@ -37,4 +38,5 @@ export function mountRoutes(app: OpenAPIHono) {
   ticketLinks.mount(app);
   customFields.mount(app);
   ticketExternalRefs.mount(app);
+  external.mount(app);
 }

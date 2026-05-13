@@ -214,6 +214,24 @@ GET /v1/tickets?project=FLOW,DEMO&status=in_progress,blocked&type=bug,task&label
 
 Every response carries an `X-Request-ID` header. Agents that log API calls should include this in their logs so server-side logs can be cross-referenced.
 
+### GitHub webhook receiver (auto-attach PR/issue refs)
+
+`POST /v1/external/github` accepts GitHub's webhook deliveries. When a PR title or branch name mentions a switchyard ticket key (`SWY-42`, `[SWY-7]`, `magos/SWY-12-foo`), the receiver auto-creates a `ticket_external_refs` row pointing at the PR — same shape as a manual attach. Subsequent `closed` / `merged` events transition the ref's `state`, emitting `ticket.external_ref_state_changed` so rules and subscriptions can react.
+
+**Setup:**
+
+1. Set `GITHUB_WEBHOOK_SECRET` in the backend's environment (any opaque string ≥ 8 chars). Without it the route responds 503 — the receiver is opt-in.
+2. Optionally set `EXTERNAL_REF_KEY_PREFIX` (default `SWY`) to limit which project keys match. `*` matches any project key shape (`FOO-42`, `BAR-13`, etc.).
+3. In the GitHub repo settings → Webhooks, add:
+   - **Payload URL:** `https://<switchyard-host>/v1/external/github`
+   - **Content type:** `application/json`
+   - **Secret:** same value as `GITHUB_WEBHOOK_SECRET`
+   - **Events:** "Let me select individual events" → check **Pull requests**. Other events return 200 silently.
+
+The receiver is auth-by-HMAC only (no bearer token); the signature in `X-Hub-Signature-256` is verified against the configured secret. A bad signature returns 401 and GitHub stops retrying.
+
+Polling (4.5.2) stays active as the reconciliation backstop, so a missed webhook delivery doesn't strand a ref at a stale state.
+
 ## Deployment notes
 
 - Reads `DATABASE_URL` once at startup; if Postgres is unreachable, the process exits non-zero so Docker reports the failure cleanly (no silent restart-loop into a broken state).

@@ -56,6 +56,17 @@ const Env = z.object({
   EXTERNAL_REF_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(5 * 60_000),
   EXTERNAL_REF_POLL_BATCH_SIZE: z.coerce.number().int().positive().default(20),
 
+  // Phase 4.5.3 — GitHub push-mode webhook receiver. Unset →
+  // /v1/external/github responds 503 with a clear "not configured"
+  // message; polling still works for refs attached via the manual API.
+  GITHUB_WEBHOOK_SECRET: z.string().min(8).optional(),
+  // Project-key prefix the auto-detector matches against. Default
+  // "SWY" matches `SWY-42` shapes; "*" relaxes the regex to match
+  // any uppercase-prefixed key (`FOO-1`, `BAR-13`). The regex still
+  // enforces the rest of the project-key shape (one letter then
+  // 1–9 uppercase alphanumerics).
+  EXTERNAL_REF_KEY_PREFIX: z.string().min(1).max(10).default("SWY"),
+
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 });
 
