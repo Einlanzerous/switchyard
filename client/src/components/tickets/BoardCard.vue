@@ -8,6 +8,7 @@ import UserAvatar from "@/components/UserAvatar.vue";
 import { cn } from "@/lib/utils";
 import TypeIcon from "./TypeIcon.vue";
 import PriorityBadge from "./PriorityBadge.vue";
+import DueDateBadge from "./DueDateBadge.vue";
 import LabelChip from "./LabelChip.vue";
 import DropIndicator from "./DropIndicator.vue";
 import ExternalRefBadge from "./ExternalRefBadge.vue";
@@ -104,6 +105,12 @@ const visibleRefs = computed(() => (props.ticket.external_refs ?? []).slice(0, 4
 const extraRefCount = computed(() =>
   Math.max(0, (props.ticket.external_refs ?? []).length - 4),
 );
+
+const ticketOpen = computed(() => props.ticket.status.category !== "closed");
+const isOverdue = computed(() => {
+  if (!props.ticket.due_date || !ticketOpen.value) return false;
+  return new Date(props.ticket.due_date).getTime() < Date.now();
+});
 </script>
 
 <template>
@@ -116,6 +123,7 @@ const extraRefCount = computed(() =>
       'rounded-md border bg-card p-2.5 text-sm shadow-sm',
       'hover:border-primary/50 hover:shadow-md transition-shadow',
       dragging && 'opacity-40',
+      isOverdue && 'border-l-2 border-l-red-400/70',
     )"
     @click="emit('open', ticket.key)"
     @keydown.enter="emit('open', ticket.key)"
@@ -139,14 +147,20 @@ const extraRefCount = computed(() =>
       {{ ticket.title }}
     </p>
     <div
-      v-if="visibleLabels.length > 0 || ticket.assignee"
+      v-if="visibleLabels.length > 0 || ticket.assignee || ticket.due_date"
       class="flex items-center gap-1.5 mt-2"
     >
-      <div class="flex flex-wrap gap-1 flex-1 min-w-0">
+      <div class="flex flex-wrap gap-1 flex-1 min-w-0 items-center">
         <LabelChip v-for="lbl in visibleLabels" :key="lbl.id" :label="lbl" />
         <span v-if="extraLabelCount > 0" class="text-[10px] text-muted-foreground self-center">
           +{{ extraLabelCount }}
         </span>
+        <DueDateBadge
+          v-if="ticket.due_date"
+          :due-date="ticket.due_date"
+          :is-open="ticketOpen"
+          show-label
+        />
       </div>
       <UserAvatar v-if="ticket.assignee" :user="ticket.assignee" size="xs" class="shrink-0" />
     </div>

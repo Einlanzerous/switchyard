@@ -6922,6 +6922,15 @@ paths:
           name: updated_before
           in: query
         - schema:
+            type: string
+            enum:
+              - overdue
+              - this_week
+              - none
+          required: false
+          name: due
+          in: query
+        - schema:
             type: boolean
             nullable: true
             default: false
@@ -18666,6 +18675,12 @@ paths:
                   stale_in_progress:
                     type: integer
                     minimum: 0
+                  overdue:
+                    type: integer
+                    minimum: 0
+                  completed_late:
+                    type: integer
+                    minimum: 0
                   most_recent_activity:
                     type: string
                     nullable: true
@@ -18678,6 +18693,8 @@ paths:
                   - by_type
                   - by_assignee
                   - stale_in_progress
+                  - overdue
+                  - completed_late
                   - most_recent_activity
         "400":
           description: bad request
@@ -20426,6 +20443,13 @@ paths:
                             text:
                               type: string
                               nullable: true
+                            due:
+                              type: string
+                              nullable: true
+                              enum: &a22
+                                - overdue
+                                - this_week
+                                - none
                         created_at:
                           type: string
                           format: date-time
@@ -20657,6 +20681,10 @@ paths:
                     text:
                       type: string
                       nullable: true
+                    due:
+                      type: string
+                      nullable: true
+                      enum: *a22
               required:
                 - name
                 - filters
@@ -20729,6 +20757,10 @@ paths:
                       text:
                         type: string
                         nullable: true
+                      due:
+                        type: string
+                        nullable: true
+                        enum: *a22
                   created_at:
                     type: string
                     format: date-time
@@ -20965,6 +20997,10 @@ paths:
                     text:
                       type: string
                       nullable: true
+                    due:
+                      type: string
+                      nullable: true
+                      enum: *a22
       responses:
         "200":
           description: ok
@@ -21034,6 +21070,10 @@ paths:
                       text:
                         type: string
                         nullable: true
+                      due:
+                        type: string
+                        nullable: true
+                        enum: *a22
                   created_at:
                     type: string
                     format: date-time
@@ -21473,7 +21513,7 @@ paths:
                                             maxLength: 200
                                           op:
                                             type: string
-                                            enum: &a22
+                                            enum: &a23
                                               - eq
                                               - ne
                                               - in
@@ -21499,7 +21539,7 @@ paths:
                                                   maxLength: 200
                                                 op:
                                                   type: string
-                                                  enum: *a22
+                                                  enum: *a23
                                                 value:
                                                   nullable: true
                                               required:
@@ -21525,7 +21565,7 @@ paths:
                                             maxLength: 200
                                           op:
                                             type: string
-                                            enum: *a22
+                                            enum: *a23
                                           value:
                                             nullable: true
                                         required:
@@ -21544,7 +21584,7 @@ paths:
                                                   maxLength: 200
                                                 op:
                                                   type: string
-                                                  enum: *a22
+                                                  enum: *a23
                                                 value:
                                                   nullable: true
                                               required:
@@ -21673,7 +21713,7 @@ paths:
                                     maxLength: 500
                                   method:
                                     type: string
-                                    enum: &a23
+                                    enum: &a24
                                       - POST
                                       - PUT
                                     default: POST
@@ -21995,7 +22035,7 @@ paths:
                                     maxLength: 200
                                   op:
                                     type: string
-                                    enum: *a22
+                                    enum: *a23
                                   value:
                                     nullable: true
                                 required:
@@ -22014,7 +22054,7 @@ paths:
                                           maxLength: 200
                                         op:
                                           type: string
-                                          enum: *a22
+                                          enum: *a23
                                         value:
                                           nullable: true
                                       required:
@@ -22040,7 +22080,7 @@ paths:
                                     maxLength: 200
                                   op:
                                     type: string
-                                    enum: *a22
+                                    enum: *a23
                                   value:
                                     nullable: true
                                 required:
@@ -22059,7 +22099,7 @@ paths:
                                           maxLength: 200
                                         op:
                                           type: string
-                                          enum: *a22
+                                          enum: *a23
                                         value:
                                           nullable: true
                                       required:
@@ -22189,7 +22229,7 @@ paths:
                             maxLength: 500
                           method:
                             type: string
-                            enum: *a23
+                            enum: *a24
                             default: POST
                           headers:
                             type: object
@@ -22294,7 +22334,7 @@ paths:
                                       maxLength: 200
                                     op:
                                       type: string
-                                      enum: *a22
+                                      enum: *a23
                                     value:
                                       nullable: true
                                   required:
@@ -22313,7 +22353,7 @@ paths:
                                             maxLength: 200
                                           op:
                                             type: string
-                                            enum: *a22
+                                            enum: *a23
                                           value:
                                             nullable: true
                                         required:
@@ -22339,7 +22379,7 @@ paths:
                                       maxLength: 200
                                     op:
                                       type: string
-                                      enum: *a22
+                                      enum: *a23
                                     value:
                                       nullable: true
                                   required:
@@ -22358,7 +22398,7 @@ paths:
                                             maxLength: 200
                                           op:
                                             type: string
-                                            enum: *a22
+                                            enum: *a23
                                           value:
                                             nullable: true
                                         required:
@@ -22487,7 +22527,7 @@ paths:
                               maxLength: 500
                             method:
                               type: string
-                              enum: *a23
+                              enum: *a24
                               default: POST
                             headers:
                               type: object
@@ -22799,7 +22839,7 @@ paths:
                                       maxLength: 200
                                     op:
                                       type: string
-                                      enum: *a22
+                                      enum: *a23
                                     value:
                                       nullable: true
                                   required:
@@ -22818,7 +22858,7 @@ paths:
                                             maxLength: 200
                                           op:
                                             type: string
-                                            enum: *a22
+                                            enum: *a23
                                           value:
                                             nullable: true
                                         required:
@@ -22844,7 +22884,7 @@ paths:
                                       maxLength: 200
                                     op:
                                       type: string
-                                      enum: *a22
+                                      enum: *a23
                                     value:
                                       nullable: true
                                   required:
@@ -22863,7 +22903,7 @@ paths:
                                             maxLength: 200
                                           op:
                                             type: string
-                                            enum: *a22
+                                            enum: *a23
                                           value:
                                             nullable: true
                                         required:
@@ -22992,7 +23032,7 @@ paths:
                               maxLength: 500
                             method:
                               type: string
-                              enum: *a23
+                              enum: *a24
                               default: POST
                             headers:
                               type: object
@@ -23291,7 +23331,7 @@ paths:
                                     maxLength: 200
                                   op:
                                     type: string
-                                    enum: *a22
+                                    enum: *a23
                                   value:
                                     nullable: true
                                 required:
@@ -23310,7 +23350,7 @@ paths:
                                           maxLength: 200
                                         op:
                                           type: string
-                                          enum: *a22
+                                          enum: *a23
                                         value:
                                           nullable: true
                                       required:
@@ -23336,7 +23376,7 @@ paths:
                                     maxLength: 200
                                   op:
                                     type: string
-                                    enum: *a22
+                                    enum: *a23
                                   value:
                                     nullable: true
                                 required:
@@ -23355,7 +23395,7 @@ paths:
                                           maxLength: 200
                                         op:
                                           type: string
-                                          enum: *a22
+                                          enum: *a23
                                         value:
                                           nullable: true
                                       required:
@@ -23484,7 +23524,7 @@ paths:
                             maxLength: 500
                           method:
                             type: string
-                            enum: *a23
+                            enum: *a24
                             default: POST
                           headers:
                             type: object
@@ -23589,7 +23629,7 @@ paths:
                                       maxLength: 200
                                     op:
                                       type: string
-                                      enum: *a22
+                                      enum: *a23
                                     value:
                                       nullable: true
                                   required:
@@ -23608,7 +23648,7 @@ paths:
                                             maxLength: 200
                                           op:
                                             type: string
-                                            enum: *a22
+                                            enum: *a23
                                           value:
                                             nullable: true
                                         required:
@@ -23634,7 +23674,7 @@ paths:
                                       maxLength: 200
                                     op:
                                       type: string
-                                      enum: *a22
+                                      enum: *a23
                                     value:
                                       nullable: true
                                   required:
@@ -23653,7 +23693,7 @@ paths:
                                             maxLength: 200
                                           op:
                                             type: string
-                                            enum: *a22
+                                            enum: *a23
                                           value:
                                             nullable: true
                                         required:
@@ -23782,7 +23822,7 @@ paths:
                               maxLength: 500
                             method:
                               type: string
-                              enum: *a23
+                              enum: *a24
                               default: POST
                             headers:
                               type: object
@@ -24271,7 +24311,7 @@ paths:
                           format: uuid
                         status:
                           type: string
-                          enum: &a24
+                          enum: &a25
                             - pending
                             - running
                             - succeeded
@@ -24307,7 +24347,7 @@ paths:
                                     type: string
                                   status:
                                     type: string
-                                    enum: &a25
+                                    enum: &a26
                                       - ok
                                       - error
                                   error:
@@ -24551,7 +24591,7 @@ paths:
                     format: uuid
                   status:
                     type: string
-                    enum: *a24
+                    enum: *a25
                   attempts:
                     type: integer
                     minimum: 0
@@ -24581,7 +24621,7 @@ paths:
                               type: string
                             status:
                               type: string
-                              enum: *a25
+                              enum: *a26
                             error:
                               type: string
                               nullable: true
@@ -26666,7 +26706,7 @@ paths:
                           maxLength: 200
                         type:
                           type: string
-                          enum: &a26
+                          enum: &a27
                             - text
                             - number
                             - boolean
@@ -26905,7 +26945,7 @@ paths:
                   maxLength: 200
                 type:
                   type: string
-                  enum: *a26
+                  enum: *a27
                 options:
                   type: object
                   properties:
@@ -26958,7 +26998,7 @@ paths:
                     maxLength: 200
                   type:
                     type: string
-                    enum: *a26
+                    enum: *a27
                   options:
                     type: object
                     nullable: true
@@ -27203,7 +27243,7 @@ paths:
                     maxLength: 200
                   type:
                     type: string
-                    enum: *a26
+                    enum: *a27
                   options:
                     type: object
                     nullable: true
@@ -27477,7 +27517,7 @@ paths:
                     maxLength: 200
                   type:
                     type: string
-                    enum: *a26
+                    enum: *a27
                   options:
                     type: object
                     nullable: true
