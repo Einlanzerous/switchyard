@@ -12,6 +12,7 @@ import { requireAuth } from "../auth.js";
 import { idempotency } from "../lib/idempotency.js";
 import { errorResponses, okJson, createdJson, noContent, checkScope, z } from "./_helpers.js";
 import { mapTicketSummary, mapProjectRef } from "../lib/mappers.js";
+import { fetchExternalRefsByTicket } from "../lib/tickets.js";
 import { buildPage, cursorOrderBy, cursorWhere, decodeCursor } from "../lib/pagination.js";
 import { badRequest, notFound } from "../errors.js";
 
@@ -190,6 +191,8 @@ export function mount(app: OpenAPIHono) {
       labelsByTicket.set(r.ticket_id, arr);
     }
 
+    const refsByTicket = await fetchExternalRefsByTicket(rows.map((r) => r.t.id));
+
     const summaries = rows.map((r) =>
       mapTicketSummary(r.t, {
         project: r.project,
@@ -198,6 +201,7 @@ export function mount(app: OpenAPIHono) {
         reporter: r.reporter,
         labels: labelsByTicket.get(r.t.id) ?? [],
         number: r.t.number,
+        externalRefs: refsByTicket.get(r.t.id) ?? [],
       })
     );
 

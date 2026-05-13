@@ -7,6 +7,7 @@ import { LabelRef } from "./label.js";
 import { Comment } from "./comment.js";
 import { Attachment } from "./attachment.js";
 import { TicketLink } from "./ticketLink.js";
+import { ExternalRef } from "./externalRef.js";
 
 export const TicketType = z.enum(["spike", "task", "bug", "epic"]);
 export type TicketType = z.infer<typeof TicketType>;
@@ -35,6 +36,11 @@ export const TicketSummary = z
     // Newly-created tickets get epoch-ms-at-create; manual drag reorders
     // overwrite via fractional indexing.
     position: z.number().nullable(),
+    // External refs (GitHub PR / issue / commit / Actions / generic).
+    // Embedded so kanban cards can render badges without a follow-up
+    // fetch. Typical ticket has 0-3 refs; the list endpoint batches
+    // the fan-out so the cost is one extra query per page, not N+1.
+    external_refs: z.array(ExternalRef),
   })
   .merge(SoftDeletable);
 export type TicketSummary = z.infer<typeof TicketSummary>;

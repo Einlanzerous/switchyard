@@ -1,0 +1,117 @@
+<script setup lang="ts">
+import { ref, computed } from "vue";
+import { Link2, Plus, X, Loader2 } from "lucide-vue-next";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import ExternalRefBadge from "./ExternalRefBadge.vue";
+import type { ExternalRef } from "@switchyard/shared";
+
+const props = defineProps<{
+  refs: ExternalRef[];
+  adding?: boolean;
+  removingId?: string | null;
+}>();
+
+const emit = defineEmits<{
+  add: [url: string];
+  remove: [id: string];
+}>();
+
+const formOpen = ref(false);
+const formUrl = ref("");
+
+const canSubmit = computed(() => formUrl.value.trim().length > 0 && !props.adding);
+
+function submit() {
+  if (!canSubmit.value) return;
+  emit("add", formUrl.value.trim());
+  formUrl.value = "";
+}
+
+function reset() {
+  formOpen.value = false;
+  formUrl.value = "";
+}
+
+// Title fallback: pretty-shorten the URL when no fetched title is set.
+function displayTitle(r: ExternalRef): string {
+  if (r.title) return r.title;
+  try {
+    const u = new URL(r.url);
+    return u.hostname + u.pathname;
+  } catch {
+    return r.url;
+  }
+}
+</script>
+
+<template>
+  <section class="space-y-2">
+    <div class="flex items-center gap-2 text-xs text-muted-foreground">
+      <Link2 class="h-3.5 w-3.5" />
+      <span>External references ({{ refs.length }})</span>
+      <Button
+        v-if="!formOpen"
+        type="button"
+        variant="ghost"
+        size="sm"
+        class="ml-auto -my-1 h-6 px-1.5 text-xs"
+        @click="formOpen = true"
+      >
+        <Plus class="h-3 w-3 mr-1" /> Add
+      </Button>
+    </div>
+
+    <ul v-if="refs.length > 0" class="space-y-1">
+      <li v-for="r in refs" :key="r.id" class="group">
+        <div class="flex w-full items-center gap-2 rounded-md border bg-card px-2.5 py-1.5 text-sm">
+          <ExternalRefBadge :value="r" />
+          <a
+            :href="r.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="flex-1 min-w-0 truncate text-left hover:text-foreground transition-colors"
+          >{{ displayTitle(r) }}</a>
+          <span v-if="r.state" class="text-[10px] uppercase tracking-wider text-muted-foreground">
+            {{ r.state }}
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            class="opacity-0 group-hover:opacity-100 -my-1 h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+            :disabled="removingId === r.id"
+            :title="`Detach ${r.url}`"
+            @click="$emit('remove', r.id)"
+          >
+            <Loader2 v-if="removingId === r.id" class="h-3 w-3 animate-spin" />
+            <X v-else class="h-3 w-3" />
+          </Button>
+        </div>
+      </li>
+    </ul>
+    <p v-else-if="!formOpen" class="text-xs text-muted-foreground italic">
+      No external references. Paste a GitHub PR / issue / commit / Actions URL to attach one.
+    </p>
+
+    <form
+      v-if="formOpen"
+      class="grid grid-cols-[1fr_auto_auto] gap-2 items-center"
+      @submit.prevent="submit"
+    >
+      <Input
+        v-model="formUrl"
+        placeholder="https://github.com/owner/repo/pull/42"
+        class="text-xs font-mono"
+        autofocus
+      />
+      <Button type="submit" size="sm" :disabled="!canSubmit" class="h-8">
+        <Loader2 v-if="adding" class="h-3 w-3 mr-1 animate-spin" />
+        Attach
+      </Button>
+      <Button type="button" variant="ghost" size="sm" class="h-8 px-2 text-muted-foreground" @click="reset">
+        Cancel
+      </Button>
+    </form>
+  </section>
+</template>

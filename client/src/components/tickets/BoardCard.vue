@@ -10,6 +10,7 @@ import TypeIcon from "./TypeIcon.vue";
 import PriorityBadge from "./PriorityBadge.vue";
 import LabelChip from "./LabelChip.vue";
 import DropIndicator from "./DropIndicator.vue";
+import ExternalRefBadge from "./ExternalRefBadge.vue";
 import type { TicketSummary } from "@switchyard/shared";
 
 const props = defineProps<{
@@ -97,6 +98,12 @@ onBeforeUnmount(() => {
 
 const visibleLabels = computed(() => props.ticket.labels.slice(0, 3));
 const extraLabelCount = computed(() => Math.max(0, props.ticket.labels.length - 3));
+// Cap visible badges so a ticket with many refs doesn't blow out the
+// card. Extras show as a count.
+const visibleRefs = computed(() => (props.ticket.external_refs ?? []).slice(0, 4));
+const extraRefCount = computed(() =>
+  Math.max(0, (props.ticket.external_refs ?? []).length - 4),
+);
 </script>
 
 <template>
@@ -119,7 +126,14 @@ const extraLabelCount = computed(() => Math.max(0, props.ticket.labels.length - 
     <div class="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
       <TypeIcon :type="ticket.type" class="h-3.5 w-3.5" />
       <span class="font-mono">{{ ticket.key }}</span>
-      <PriorityBadge :priority="ticket.priority" class="ml-auto" />
+      <span
+        v-if="visibleRefs.length > 0"
+        class="ml-auto flex items-center gap-1"
+      >
+        <ExternalRefBadge v-for="r in visibleRefs" :key="r.id" :value="r" size="xs" />
+        <span v-if="extraRefCount > 0" class="text-[10px]">+{{ extraRefCount }}</span>
+      </span>
+      <PriorityBadge :priority="ticket.priority" :class="visibleRefs.length > 0 ? 'ml-2' : 'ml-auto'" />
     </div>
     <p class="font-medium leading-snug line-clamp-3 text-foreground">
       {{ ticket.title }}

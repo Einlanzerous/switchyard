@@ -949,6 +949,84 @@ paths:
                             position:
                               type: number
                               nullable: true
+                            external_refs:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  id:
+                                    type: string
+                                    format: uuid
+                                  ticket_id:
+                                    type: string
+                                    format: uuid
+                                  kind:
+                                    type: string
+                                    enum: &a8
+                                      - github_pr
+                                      - github_issue
+                                      - github_commit
+                                      - github_action
+                                      - generic
+                                  url:
+                                    type: string
+                                    format: uri
+                                  state:
+                                    type: string
+                                    nullable: true
+                                    enum: &a9
+                                      - open
+                                      - closed
+                                      - merged
+                                      - success
+                                      - failed
+                                  title:
+                                    type: string
+                                    nullable: true
+                                  polled_at:
+                                    type: string
+                                    nullable: true
+                                    format: date-time
+                                  polled_state_changed_at:
+                                    type: string
+                                    nullable: true
+                                    format: date-time
+                                  created_at:
+                                    type: string
+                                    format: date-time
+                                  created_by:
+                                    type: object
+                                    properties:
+                                      id:
+                                        type: string
+                                        format: uuid
+                                      name:
+                                        type: string
+                                        minLength: 1
+                                        maxLength: 100
+                                      icon:
+                                        type: string
+                                        nullable: true
+                                        maxLength: 500
+                                      type:
+                                        type: string
+                                        enum: *a2
+                                    required:
+                                      - id
+                                      - name
+                                      - icon
+                                      - type
+                                required:
+                                  - id
+                                  - ticket_id
+                                  - kind
+                                  - url
+                                  - state
+                                  - title
+                                  - polled_at
+                                  - polled_state_changed_at
+                                  - created_at
+                                  - created_by
                             created_at:
                               type: string
                               format: date-time
@@ -975,6 +1053,7 @@ paths:
                             - due_date
                             - labels
                             - position
+                            - external_refs
                             - created_at
                             - updated_at
                             - deleted_at
@@ -6940,6 +7019,74 @@ paths:
                         position:
                           type: number
                           nullable: true
+                        external_refs:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              id:
+                                type: string
+                                format: uuid
+                              ticket_id:
+                                type: string
+                                format: uuid
+                              kind:
+                                type: string
+                                enum: *a8
+                              url:
+                                type: string
+                                format: uri
+                              state:
+                                type: string
+                                nullable: true
+                                enum: *a9
+                              title:
+                                type: string
+                                nullable: true
+                              polled_at:
+                                type: string
+                                nullable: true
+                                format: date-time
+                              polled_state_changed_at:
+                                type: string
+                                nullable: true
+                                format: date-time
+                              created_at:
+                                type: string
+                                format: date-time
+                              created_by:
+                                type: object
+                                properties:
+                                  id:
+                                    type: string
+                                    format: uuid
+                                  name:
+                                    type: string
+                                    minLength: 1
+                                    maxLength: 100
+                                  icon:
+                                    type: string
+                                    nullable: true
+                                    maxLength: 500
+                                  type:
+                                    type: string
+                                    enum: *a2
+                                required:
+                                  - id
+                                  - name
+                                  - icon
+                                  - type
+                            required:
+                              - id
+                              - ticket_id
+                              - kind
+                              - url
+                              - state
+                              - title
+                              - polled_at
+                              - polled_state_changed_at
+                              - created_at
+                              - created_by
                         created_at:
                           type: string
                           format: date-time
@@ -6966,6 +7113,7 @@ paths:
                         - due_date
                         - labels
                         - position
+                        - external_refs
                         - created_at
                         - updated_at
                         - deleted_at
@@ -7357,6 +7505,74 @@ paths:
                   position:
                     type: number
                     nullable: true
+                  external_refs:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        ticket_id:
+                          type: string
+                          format: uuid
+                        kind:
+                          type: string
+                          enum: *a8
+                        url:
+                          type: string
+                          format: uri
+                        state:
+                          type: string
+                          nullable: true
+                          enum: *a9
+                        title:
+                          type: string
+                          nullable: true
+                        polled_at:
+                          type: string
+                          nullable: true
+                          format: date-time
+                        polled_state_changed_at:
+                          type: string
+                          nullable: true
+                          format: date-time
+                        created_at:
+                          type: string
+                          format: date-time
+                        created_by:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            name:
+                              type: string
+                              minLength: 1
+                              maxLength: 100
+                            icon:
+                              type: string
+                              nullable: true
+                              maxLength: 500
+                            type:
+                              type: string
+                              enum: *a2
+                          required:
+                            - id
+                            - name
+                            - icon
+                            - type
+                      required:
+                        - id
+                        - ticket_id
+                        - kind
+                        - url
+                        - state
+                        - title
+                        - polled_at
+                        - polled_state_changed_at
+                        - created_at
+                        - created_by
                   created_at:
                     type: string
                     format: date-time
@@ -7428,7 +7644,7 @@ paths:
                                 format: uuid
                               kind:
                                 type: string
-                                enum: &a8
+                                enum: &a10
                                   - image
                                   - audio
                                   - text
@@ -7522,7 +7738,7 @@ paths:
                           format: uuid
                         kind:
                           type: string
-                          enum: *a8
+                          enum: *a10
                         mime_type:
                           type: string
                           maxLength: 200
@@ -7594,7 +7810,7 @@ paths:
                           format: uuid
                         kind:
                           type: string
-                          enum: *a8
+                          enum: *a10
                         mime_type:
                           type: string
                           maxLength: 200
@@ -7658,13 +7874,13 @@ paths:
                           format: uuid
                         type:
                           type: string
-                          enum: &a9
+                          enum: &a11
                             - blocks
                             - relates_to
                             - duplicates
                         direction:
                           type: string
-                          enum: &a10
+                          enum: &a12
                             - outgoing
                             - incoming
                         other_ticket:
@@ -7730,6 +7946,7 @@ paths:
                   - due_date
                   - labels
                   - position
+                  - external_refs
                   - created_at
                   - updated_at
                   - deleted_at
@@ -8066,6 +8283,74 @@ paths:
                   position:
                     type: number
                     nullable: true
+                  external_refs:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        ticket_id:
+                          type: string
+                          format: uuid
+                        kind:
+                          type: string
+                          enum: *a8
+                        url:
+                          type: string
+                          format: uri
+                        state:
+                          type: string
+                          nullable: true
+                          enum: *a9
+                        title:
+                          type: string
+                          nullable: true
+                        polled_at:
+                          type: string
+                          nullable: true
+                          format: date-time
+                        polled_state_changed_at:
+                          type: string
+                          nullable: true
+                          format: date-time
+                        created_at:
+                          type: string
+                          format: date-time
+                        created_by:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            name:
+                              type: string
+                              minLength: 1
+                              maxLength: 100
+                            icon:
+                              type: string
+                              nullable: true
+                              maxLength: 500
+                            type:
+                              type: string
+                              enum: *a2
+                          required:
+                            - id
+                            - name
+                            - icon
+                            - type
+                      required:
+                        - id
+                        - ticket_id
+                        - kind
+                        - url
+                        - state
+                        - title
+                        - polled_at
+                        - polled_state_changed_at
+                        - created_at
+                        - created_by
                   created_at:
                     type: string
                     format: date-time
@@ -8137,7 +8422,7 @@ paths:
                                 format: uuid
                               kind:
                                 type: string
-                                enum: *a8
+                                enum: *a10
                               mime_type:
                                 type: string
                                 maxLength: 200
@@ -8228,7 +8513,7 @@ paths:
                           format: uuid
                         kind:
                           type: string
-                          enum: *a8
+                          enum: *a10
                         mime_type:
                           type: string
                           maxLength: 200
@@ -8300,7 +8585,7 @@ paths:
                           format: uuid
                         kind:
                           type: string
-                          enum: *a8
+                          enum: *a10
                         mime_type:
                           type: string
                           maxLength: 200
@@ -8364,10 +8649,10 @@ paths:
                           format: uuid
                         type:
                           type: string
-                          enum: *a9
+                          enum: *a11
                         direction:
                           type: string
-                          enum: *a10
+                          enum: *a12
                         other_ticket:
                           type: object
                           properties:
@@ -8431,6 +8716,7 @@ paths:
                   - due_date
                   - labels
                   - position
+                  - external_refs
                   - created_at
                   - updated_at
                   - deleted_at
@@ -8809,6 +9095,74 @@ paths:
                   position:
                     type: number
                     nullable: true
+                  external_refs:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        ticket_id:
+                          type: string
+                          format: uuid
+                        kind:
+                          type: string
+                          enum: *a8
+                        url:
+                          type: string
+                          format: uri
+                        state:
+                          type: string
+                          nullable: true
+                          enum: *a9
+                        title:
+                          type: string
+                          nullable: true
+                        polled_at:
+                          type: string
+                          nullable: true
+                          format: date-time
+                        polled_state_changed_at:
+                          type: string
+                          nullable: true
+                          format: date-time
+                        created_at:
+                          type: string
+                          format: date-time
+                        created_by:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            name:
+                              type: string
+                              minLength: 1
+                              maxLength: 100
+                            icon:
+                              type: string
+                              nullable: true
+                              maxLength: 500
+                            type:
+                              type: string
+                              enum: *a2
+                          required:
+                            - id
+                            - name
+                            - icon
+                            - type
+                      required:
+                        - id
+                        - ticket_id
+                        - kind
+                        - url
+                        - state
+                        - title
+                        - polled_at
+                        - polled_state_changed_at
+                        - created_at
+                        - created_by
                   created_at:
                     type: string
                     format: date-time
@@ -8880,7 +9234,7 @@ paths:
                                 format: uuid
                               kind:
                                 type: string
-                                enum: *a8
+                                enum: *a10
                               mime_type:
                                 type: string
                                 maxLength: 200
@@ -8971,7 +9325,7 @@ paths:
                           format: uuid
                         kind:
                           type: string
-                          enum: *a8
+                          enum: *a10
                         mime_type:
                           type: string
                           maxLength: 200
@@ -9043,7 +9397,7 @@ paths:
                           format: uuid
                         kind:
                           type: string
-                          enum: *a8
+                          enum: *a10
                         mime_type:
                           type: string
                           maxLength: 200
@@ -9107,10 +9461,10 @@ paths:
                           format: uuid
                         type:
                           type: string
-                          enum: *a9
+                          enum: *a11
                         direction:
                           type: string
-                          enum: *a10
+                          enum: *a12
                         other_ticket:
                           type: object
                           properties:
@@ -9174,6 +9528,7 @@ paths:
                   - due_date
                   - labels
                   - position
+                  - external_refs
                   - created_at
                   - updated_at
                   - deleted_at
@@ -9718,6 +10073,74 @@ paths:
                   position:
                     type: number
                     nullable: true
+                  external_refs:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        ticket_id:
+                          type: string
+                          format: uuid
+                        kind:
+                          type: string
+                          enum: *a8
+                        url:
+                          type: string
+                          format: uri
+                        state:
+                          type: string
+                          nullable: true
+                          enum: *a9
+                        title:
+                          type: string
+                          nullable: true
+                        polled_at:
+                          type: string
+                          nullable: true
+                          format: date-time
+                        polled_state_changed_at:
+                          type: string
+                          nullable: true
+                          format: date-time
+                        created_at:
+                          type: string
+                          format: date-time
+                        created_by:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            name:
+                              type: string
+                              minLength: 1
+                              maxLength: 100
+                            icon:
+                              type: string
+                              nullable: true
+                              maxLength: 500
+                            type:
+                              type: string
+                              enum: *a2
+                          required:
+                            - id
+                            - name
+                            - icon
+                            - type
+                      required:
+                        - id
+                        - ticket_id
+                        - kind
+                        - url
+                        - state
+                        - title
+                        - polled_at
+                        - polled_state_changed_at
+                        - created_at
+                        - created_by
                   created_at:
                     type: string
                     format: date-time
@@ -9789,7 +10212,7 @@ paths:
                                 format: uuid
                               kind:
                                 type: string
-                                enum: *a8
+                                enum: *a10
                               mime_type:
                                 type: string
                                 maxLength: 200
@@ -9880,7 +10303,7 @@ paths:
                           format: uuid
                         kind:
                           type: string
-                          enum: *a8
+                          enum: *a10
                         mime_type:
                           type: string
                           maxLength: 200
@@ -9952,7 +10375,7 @@ paths:
                           format: uuid
                         kind:
                           type: string
-                          enum: *a8
+                          enum: *a10
                         mime_type:
                           type: string
                           maxLength: 200
@@ -10016,10 +10439,10 @@ paths:
                           format: uuid
                         type:
                           type: string
-                          enum: *a9
+                          enum: *a11
                         direction:
                           type: string
-                          enum: *a10
+                          enum: *a12
                         other_ticket:
                           type: object
                           properties:
@@ -10083,6 +10506,7 @@ paths:
                   - due_date
                   - labels
                   - position
+                  - external_refs
                   - created_at
                   - updated_at
                   - deleted_at
@@ -10304,7 +10728,7 @@ paths:
                           format: uuid
                         event:
                           type: string
-                          enum: &a12
+                          enum: &a14
                             - ticket.created
                             - ticket.updated
                             - ticket.status_changed
@@ -10314,6 +10738,9 @@ paths:
                             - ticket.deleted
                             - ticket.link_added
                             - ticket.link_removed
+                            - ticket.external_ref_added
+                            - ticket.external_ref_removed
+                            - ticket.external_ref_state_changed
                             - comment.created
                             - comment.updated
                             - comment.deleted
@@ -10491,6 +10918,74 @@ paths:
                             position:
                               type: number
                               nullable: true
+                            external_refs:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  id:
+                                    type: string
+                                    format: uuid
+                                  ticket_id:
+                                    type: string
+                                    format: uuid
+                                  kind:
+                                    type: string
+                                    enum: *a8
+                                  url:
+                                    type: string
+                                    format: uri
+                                  state:
+                                    type: string
+                                    nullable: true
+                                    enum: *a9
+                                  title:
+                                    type: string
+                                    nullable: true
+                                  polled_at:
+                                    type: string
+                                    nullable: true
+                                    format: date-time
+                                  polled_state_changed_at:
+                                    type: string
+                                    nullable: true
+                                    format: date-time
+                                  created_at:
+                                    type: string
+                                    format: date-time
+                                  created_by:
+                                    type: object
+                                    properties:
+                                      id:
+                                        type: string
+                                        format: uuid
+                                      name:
+                                        type: string
+                                        minLength: 1
+                                        maxLength: 100
+                                      icon:
+                                        type: string
+                                        nullable: true
+                                        maxLength: 500
+                                      type:
+                                        type: string
+                                        enum: *a2
+                                    required:
+                                      - id
+                                      - name
+                                      - icon
+                                      - type
+                                required:
+                                  - id
+                                  - ticket_id
+                                  - kind
+                                  - url
+                                  - state
+                                  - title
+                                  - polled_at
+                                  - polled_state_changed_at
+                                  - created_at
+                                  - created_by
                             created_at:
                               type: string
                               format: date-time
@@ -10517,6 +11012,7 @@ paths:
                             - due_date
                             - labels
                             - position
+                            - external_refs
                             - created_at
                             - updated_at
                             - deleted_at
@@ -10951,6 +11447,74 @@ paths:
                         position:
                           type: number
                           nullable: true
+                        external_refs:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              id:
+                                type: string
+                                format: uuid
+                              ticket_id:
+                                type: string
+                                format: uuid
+                              kind:
+                                type: string
+                                enum: *a8
+                              url:
+                                type: string
+                                format: uri
+                              state:
+                                type: string
+                                nullable: true
+                                enum: *a9
+                              title:
+                                type: string
+                                nullable: true
+                              polled_at:
+                                type: string
+                                nullable: true
+                                format: date-time
+                              polled_state_changed_at:
+                                type: string
+                                nullable: true
+                                format: date-time
+                              created_at:
+                                type: string
+                                format: date-time
+                              created_by:
+                                type: object
+                                properties:
+                                  id:
+                                    type: string
+                                    format: uuid
+                                  name:
+                                    type: string
+                                    minLength: 1
+                                    maxLength: 100
+                                  icon:
+                                    type: string
+                                    nullable: true
+                                    maxLength: 500
+                                  type:
+                                    type: string
+                                    enum: *a2
+                                required:
+                                  - id
+                                  - name
+                                  - icon
+                                  - type
+                            required:
+                              - id
+                              - ticket_id
+                              - kind
+                              - url
+                              - state
+                              - title
+                              - polled_at
+                              - polled_state_changed_at
+                              - created_at
+                              - created_by
                         created_at:
                           type: string
                           format: date-time
@@ -10977,6 +11541,7 @@ paths:
                         - due_date
                         - labels
                         - position
+                        - external_refs
                         - created_at
                         - updated_at
                         - deleted_at
@@ -11251,7 +11816,7 @@ paths:
                                 format: uuid
                               kind:
                                 type: string
-                                enum: *a8
+                                enum: *a10
                               mime_type:
                                 type: string
                                 maxLength: 200
@@ -11594,7 +12159,7 @@ paths:
                           format: uuid
                         kind:
                           type: string
-                          enum: *a8
+                          enum: *a10
                         mime_type:
                           type: string
                           maxLength: 200
@@ -11915,7 +12480,7 @@ paths:
                           format: uuid
                         kind:
                           type: string
-                          enum: *a8
+                          enum: *a10
                         mime_type:
                           type: string
                           maxLength: 200
@@ -12371,7 +12936,7 @@ paths:
                     format: uuid
                   kind:
                     type: string
-                    enum: *a8
+                    enum: *a10
                   mime_type:
                     type: string
                     maxLength: 200
@@ -12615,7 +13180,7 @@ paths:
                   nullable: true
                 kind:
                   type: string
-                  enum: *a8
+                  enum: *a10
                 comment_id:
                   type: string
                   format: uuid
@@ -12644,7 +13209,7 @@ paths:
                     format: uuid
                   kind:
                     type: string
-                    enum: *a8
+                    enum: *a10
                   mime_type:
                     type: string
                     maxLength: 200
@@ -13277,7 +13842,7 @@ paths:
                           maxLength: 200
                         layout:
                           type: string
-                          enum: &a11
+                          enum: &a13
                             - kanban
                             - list
                         projects:
@@ -13543,7 +14108,7 @@ paths:
                   maxLength: 200
                 layout:
                   type: string
-                  enum: *a11
+                  enum: *a13
                   default: kanban
                 project_ids:
                   type: array
@@ -13598,7 +14163,7 @@ paths:
                     maxLength: 200
                   layout:
                     type: string
-                    enum: *a11
+                    enum: *a13
                   projects:
                     type: array
                     items:
@@ -13861,7 +14426,7 @@ paths:
                     maxLength: 200
                   layout:
                     type: string
-                    enum: *a11
+                    enum: *a13
                   projects:
                     type: array
                     items:
@@ -14118,7 +14683,7 @@ paths:
                   maxLength: 200
                 layout:
                   type: string
-                  enum: *a11
+                  enum: *a13
                   default: kanban
                 project_ids:
                   type: array
@@ -14170,7 +14735,7 @@ paths:
                     maxLength: 200
                   layout:
                     type: string
-                    enum: *a11
+                    enum: *a13
                   projects:
                     type: array
                     items:
@@ -14618,7 +15183,7 @@ paths:
                         maxLength: 200
                       layout:
                         type: string
-                        enum: *a11
+                        enum: *a13
                       projects:
                         type: array
                         items:
@@ -14836,6 +15401,74 @@ paths:
                               position:
                                 type: number
                                 nullable: true
+                              external_refs:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    id:
+                                      type: string
+                                      format: uuid
+                                    ticket_id:
+                                      type: string
+                                      format: uuid
+                                    kind:
+                                      type: string
+                                      enum: *a8
+                                    url:
+                                      type: string
+                                      format: uri
+                                    state:
+                                      type: string
+                                      nullable: true
+                                      enum: *a9
+                                    title:
+                                      type: string
+                                      nullable: true
+                                    polled_at:
+                                      type: string
+                                      nullable: true
+                                      format: date-time
+                                    polled_state_changed_at:
+                                      type: string
+                                      nullable: true
+                                      format: date-time
+                                    created_at:
+                                      type: string
+                                      format: date-time
+                                    created_by:
+                                      type: object
+                                      properties:
+                                        id:
+                                          type: string
+                                          format: uuid
+                                        name:
+                                          type: string
+                                          minLength: 1
+                                          maxLength: 100
+                                        icon:
+                                          type: string
+                                          nullable: true
+                                          maxLength: 500
+                                        type:
+                                          type: string
+                                          enum: *a2
+                                      required:
+                                        - id
+                                        - name
+                                        - icon
+                                        - type
+                                  required:
+                                    - id
+                                    - ticket_id
+                                    - kind
+                                    - url
+                                    - state
+                                    - title
+                                    - polled_at
+                                    - polled_state_changed_at
+                                    - created_at
+                                    - created_by
                               created_at:
                                 type: string
                                 format: date-time
@@ -14862,6 +15495,7 @@ paths:
                               - due_date
                               - labels
                               - position
+                              - external_refs
                               - created_at
                               - updated_at
                               - deleted_at
@@ -15083,7 +15717,7 @@ paths:
                           items:
                             anyOf:
                               - type: string
-                                enum: *a12
+                                enum: *a14
                               - type: string
                                 enum:
                                   - "*"
@@ -15321,7 +15955,7 @@ paths:
                   items:
                     anyOf:
                       - type: string
-                        enum: *a12
+                        enum: *a14
                       - type: string
                         enum:
                           - "*"
@@ -15365,7 +15999,7 @@ paths:
                     items:
                       anyOf:
                         - type: string
-                          enum: *a12
+                          enum: *a14
                         - type: string
                           enum:
                             - "*"
@@ -15605,7 +16239,7 @@ paths:
                     items:
                       anyOf:
                         - type: string
-                          enum: *a12
+                          enum: *a14
                         - type: string
                           enum:
                             - "*"
@@ -15836,7 +16470,7 @@ paths:
                   items:
                     anyOf:
                       - type: string
-                        enum: *a12
+                        enum: *a14
                       - type: string
                         enum:
                           - "*"
@@ -15878,7 +16512,7 @@ paths:
                     items:
                       anyOf:
                         - type: string
-                          enum: *a12
+                          enum: *a14
                         - type: string
                           enum:
                             - "*"
@@ -16316,7 +16950,7 @@ paths:
                           format: uuid
                         status:
                           type: string
-                          enum: &a13
+                          enum: &a15
                             - pending
                             - delivering
                             - succeeded
@@ -16570,7 +17204,7 @@ paths:
                     format: uuid
                   status:
                     type: string
-                    enum: *a13
+                    enum: *a15
                   response_code:
                     type: integer
                     nullable: true
@@ -16847,7 +17481,7 @@ paths:
                           format: uuid
                         event:
                           type: string
-                          enum: *a12
+                          enum: *a14
                         occurred_at:
                           type: string
                           format: date-time
@@ -17017,6 +17651,74 @@ paths:
                             position:
                               type: number
                               nullable: true
+                            external_refs:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  id:
+                                    type: string
+                                    format: uuid
+                                  ticket_id:
+                                    type: string
+                                    format: uuid
+                                  kind:
+                                    type: string
+                                    enum: *a8
+                                  url:
+                                    type: string
+                                    format: uri
+                                  state:
+                                    type: string
+                                    nullable: true
+                                    enum: *a9
+                                  title:
+                                    type: string
+                                    nullable: true
+                                  polled_at:
+                                    type: string
+                                    nullable: true
+                                    format: date-time
+                                  polled_state_changed_at:
+                                    type: string
+                                    nullable: true
+                                    format: date-time
+                                  created_at:
+                                    type: string
+                                    format: date-time
+                                  created_by:
+                                    type: object
+                                    properties:
+                                      id:
+                                        type: string
+                                        format: uuid
+                                      name:
+                                        type: string
+                                        minLength: 1
+                                        maxLength: 100
+                                      icon:
+                                        type: string
+                                        nullable: true
+                                        maxLength: 500
+                                      type:
+                                        type: string
+                                        enum: *a2
+                                    required:
+                                      - id
+                                      - name
+                                      - icon
+                                      - type
+                                required:
+                                  - id
+                                  - ticket_id
+                                  - kind
+                                  - url
+                                  - state
+                                  - title
+                                  - polled_at
+                                  - polled_state_changed_at
+                                  - created_at
+                                  - created_by
                             created_at:
                               type: string
                               format: date-time
@@ -17043,6 +17745,7 @@ paths:
                             - due_date
                             - labels
                             - position
+                            - external_refs
                             - created_at
                             - updated_at
                             - deleted_at
@@ -18313,7 +19016,7 @@ paths:
           in: query
         - schema:
             type: string
-            enum: &a14
+            enum: &a16
               - day
               - week
           required: false
@@ -18329,7 +19032,7 @@ paths:
                 properties:
                   bucket:
                     type: string
-                    enum: *a14
+                    enum: *a16
                   points:
                     type: array
                     items:
@@ -18544,7 +19247,7 @@ paths:
           in: query
         - schema:
             type: string
-            enum: *a14
+            enum: *a16
           required: false
           name: bucket
           in: query
@@ -18853,7 +19556,7 @@ paths:
           in: query
         - schema:
             type: string
-            enum: *a14
+            enum: *a16
           required: false
           name: bucket
           in: query
@@ -18867,7 +19570,7 @@ paths:
                 properties:
                   bucket:
                     type: string
-                    enum: *a14
+                    enum: *a16
                   points:
                     type: array
                     items:
@@ -19260,6 +19963,74 @@ paths:
                             position:
                               type: number
                               nullable: true
+                            external_refs:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  id:
+                                    type: string
+                                    format: uuid
+                                  ticket_id:
+                                    type: string
+                                    format: uuid
+                                  kind:
+                                    type: string
+                                    enum: *a8
+                                  url:
+                                    type: string
+                                    format: uri
+                                  state:
+                                    type: string
+                                    nullable: true
+                                    enum: *a9
+                                  title:
+                                    type: string
+                                    nullable: true
+                                  polled_at:
+                                    type: string
+                                    nullable: true
+                                    format: date-time
+                                  polled_state_changed_at:
+                                    type: string
+                                    nullable: true
+                                    format: date-time
+                                  created_at:
+                                    type: string
+                                    format: date-time
+                                  created_by:
+                                    type: object
+                                    properties:
+                                      id:
+                                        type: string
+                                        format: uuid
+                                      name:
+                                        type: string
+                                        minLength: 1
+                                        maxLength: 100
+                                      icon:
+                                        type: string
+                                        nullable: true
+                                        maxLength: 500
+                                      type:
+                                        type: string
+                                        enum: *a2
+                                    required:
+                                      - id
+                                      - name
+                                      - icon
+                                      - type
+                                required:
+                                  - id
+                                  - ticket_id
+                                  - kind
+                                  - url
+                                  - state
+                                  - title
+                                  - polled_at
+                                  - polled_state_changed_at
+                                  - created_at
+                                  - created_by
                             created_at:
                               type: string
                               format: date-time
@@ -19286,6 +20057,7 @@ paths:
                             - due_date
                             - labels
                             - position
+                            - external_refs
                             - created_at
                             - updated_at
                             - deleted_at
@@ -19512,7 +20284,7 @@ paths:
                             - type
                         scope:
                           type: string
-                          enum: &a15
+                          enum: &a17
                             - personal
                             - shared
                         filters:
@@ -19522,22 +20294,22 @@ paths:
                               type: array
                               items:
                                 type: string
-                              default: &a16 []
+                              default: &a18 []
                             status:
                               type: array
                               items:
                                 type: string
-                              default: &a17 []
+                              default: &a19 []
                             type:
                               type: array
                               items:
                                 type: string
-                              default: &a18 []
+                              default: &a20 []
                             priority:
                               type: array
                               items:
                                 type: string
-                              default: &a19 []
+                              default: &a21 []
                             assignee:
                               type: string
                               nullable: true
@@ -19744,7 +20516,7 @@ paths:
                   maxLength: 100
                 scope:
                   type: string
-                  enum: *a15
+                  enum: *a17
                   default: personal
                 filters:
                   type: object
@@ -19753,22 +20525,22 @@ paths:
                       type: array
                       items:
                         type: string
-                      default: *a16
+                      default: *a18
                     status:
                       type: array
                       items:
                         type: string
-                      default: *a17
+                      default: *a19
                     type:
                       type: array
                       items:
                         type: string
-                      default: *a18
+                      default: *a20
                     priority:
                       type: array
                       items:
                         type: string
-                      default: *a19
+                      default: *a21
                     assignee:
                       type: string
                       nullable: true
@@ -19817,7 +20589,7 @@ paths:
                       - type
                   scope:
                     type: string
-                    enum: *a15
+                    enum: *a17
                   filters:
                     type: object
                     properties:
@@ -19825,22 +20597,22 @@ paths:
                         type: array
                         items:
                           type: string
-                        default: *a16
+                        default: *a18
                       status:
                         type: array
                         items:
                           type: string
-                        default: *a17
+                        default: *a19
                       type:
                         type: array
                         items:
                           type: string
-                        default: *a18
+                        default: *a20
                       priority:
                         type: array
                         items:
                           type: string
-                        default: *a19
+                        default: *a21
                       assignee:
                         type: string
                         nullable: true
@@ -20053,7 +20825,7 @@ paths:
                   maxLength: 100
                 scope:
                   type: string
-                  enum: *a15
+                  enum: *a17
                 filters:
                   type: object
                   properties:
@@ -20061,22 +20833,22 @@ paths:
                       type: array
                       items:
                         type: string
-                      default: *a16
+                      default: *a18
                     status:
                       type: array
                       items:
                         type: string
-                      default: *a17
+                      default: *a19
                     type:
                       type: array
                       items:
                         type: string
-                      default: *a18
+                      default: *a20
                     priority:
                       type: array
                       items:
                         type: string
-                      default: *a19
+                      default: *a21
                     assignee:
                       type: string
                       nullable: true
@@ -20122,7 +20894,7 @@ paths:
                       - type
                   scope:
                     type: string
-                    enum: *a15
+                    enum: *a17
                   filters:
                     type: object
                     properties:
@@ -20130,22 +20902,22 @@ paths:
                         type: array
                         items:
                           type: string
-                        default: *a16
+                        default: *a18
                       status:
                         type: array
                         items:
                           type: string
-                        default: *a17
+                        default: *a19
                       type:
                         type: array
                         items:
                           type: string
-                        default: *a18
+                        default: *a20
                       priority:
                         type: array
                         items:
                           type: string
-                        default: *a19
+                        default: *a21
                       assignee:
                         type: string
                         nullable: true
@@ -20571,7 +21343,7 @@ paths:
                           type: array
                           items:
                             type: string
-                            enum: *a12
+                            enum: *a14
                         conditions:
                           anyOf:
                             - type: object
@@ -20591,7 +21363,7 @@ paths:
                                             maxLength: 200
                                           op:
                                             type: string
-                                            enum: &a20
+                                            enum: &a22
                                               - eq
                                               - ne
                                               - in
@@ -20617,7 +21389,7 @@ paths:
                                                   maxLength: 200
                                                 op:
                                                   type: string
-                                                  enum: *a20
+                                                  enum: *a22
                                                 value:
                                                   nullable: true
                                               required:
@@ -20643,7 +21415,7 @@ paths:
                                             maxLength: 200
                                           op:
                                             type: string
-                                            enum: *a20
+                                            enum: *a22
                                           value:
                                             nullable: true
                                         required:
@@ -20662,7 +21434,7 @@ paths:
                                                   maxLength: 200
                                                 op:
                                                   type: string
-                                                  enum: *a20
+                                                  enum: *a22
                                                 value:
                                                   nullable: true
                                               required:
@@ -20791,7 +21563,7 @@ paths:
                                     maxLength: 500
                                   method:
                                     type: string
-                                    enum: &a21
+                                    enum: &a23
                                       - POST
                                       - PUT
                                     default: POST
@@ -21092,7 +21864,7 @@ paths:
                   type: array
                   items:
                     type: string
-                    enum: *a12
+                    enum: *a14
                   default: []
                 conditions:
                   anyOf:
@@ -21113,7 +21885,7 @@ paths:
                                     maxLength: 200
                                   op:
                                     type: string
-                                    enum: *a20
+                                    enum: *a22
                                   value:
                                     nullable: true
                                 required:
@@ -21132,7 +21904,7 @@ paths:
                                           maxLength: 200
                                         op:
                                           type: string
-                                          enum: *a20
+                                          enum: *a22
                                         value:
                                           nullable: true
                                       required:
@@ -21158,7 +21930,7 @@ paths:
                                     maxLength: 200
                                   op:
                                     type: string
-                                    enum: *a20
+                                    enum: *a22
                                   value:
                                     nullable: true
                                 required:
@@ -21177,7 +21949,7 @@ paths:
                                           maxLength: 200
                                         op:
                                           type: string
-                                          enum: *a20
+                                          enum: *a22
                                         value:
                                           nullable: true
                                       required:
@@ -21307,7 +22079,7 @@ paths:
                             maxLength: 500
                           method:
                             type: string
-                            enum: *a21
+                            enum: *a23
                             default: POST
                           headers:
                             type: object
@@ -21392,7 +22164,7 @@ paths:
                     type: array
                     items:
                       type: string
-                      enum: *a12
+                      enum: *a14
                   conditions:
                     anyOf:
                       - type: object
@@ -21412,7 +22184,7 @@ paths:
                                       maxLength: 200
                                     op:
                                       type: string
-                                      enum: *a20
+                                      enum: *a22
                                     value:
                                       nullable: true
                                   required:
@@ -21431,7 +22203,7 @@ paths:
                                             maxLength: 200
                                           op:
                                             type: string
-                                            enum: *a20
+                                            enum: *a22
                                           value:
                                             nullable: true
                                         required:
@@ -21457,7 +22229,7 @@ paths:
                                       maxLength: 200
                                     op:
                                       type: string
-                                      enum: *a20
+                                      enum: *a22
                                     value:
                                       nullable: true
                                   required:
@@ -21476,7 +22248,7 @@ paths:
                                             maxLength: 200
                                           op:
                                             type: string
-                                            enum: *a20
+                                            enum: *a22
                                           value:
                                             nullable: true
                                         required:
@@ -21605,7 +22377,7 @@ paths:
                               maxLength: 500
                             method:
                               type: string
-                              enum: *a21
+                              enum: *a23
                               default: POST
                             headers:
                               type: object
@@ -21897,7 +22669,7 @@ paths:
                     type: array
                     items:
                       type: string
-                      enum: *a12
+                      enum: *a14
                   conditions:
                     anyOf:
                       - type: object
@@ -21917,7 +22689,7 @@ paths:
                                       maxLength: 200
                                     op:
                                       type: string
-                                      enum: *a20
+                                      enum: *a22
                                     value:
                                       nullable: true
                                   required:
@@ -21936,7 +22708,7 @@ paths:
                                             maxLength: 200
                                           op:
                                             type: string
-                                            enum: *a20
+                                            enum: *a22
                                           value:
                                             nullable: true
                                         required:
@@ -21962,7 +22734,7 @@ paths:
                                       maxLength: 200
                                     op:
                                       type: string
-                                      enum: *a20
+                                      enum: *a22
                                     value:
                                       nullable: true
                                   required:
@@ -21981,7 +22753,7 @@ paths:
                                             maxLength: 200
                                           op:
                                             type: string
-                                            enum: *a20
+                                            enum: *a22
                                           value:
                                             nullable: true
                                         required:
@@ -22110,7 +22882,7 @@ paths:
                               maxLength: 500
                             method:
                               type: string
-                              enum: *a21
+                              enum: *a23
                               default: POST
                             headers:
                               type: object
@@ -22389,7 +23161,7 @@ paths:
                   type: array
                   items:
                     type: string
-                    enum: *a12
+                    enum: *a14
                 conditions:
                   anyOf:
                     - type: object
@@ -22409,7 +23181,7 @@ paths:
                                     maxLength: 200
                                   op:
                                     type: string
-                                    enum: *a20
+                                    enum: *a22
                                   value:
                                     nullable: true
                                 required:
@@ -22428,7 +23200,7 @@ paths:
                                           maxLength: 200
                                         op:
                                           type: string
-                                          enum: *a20
+                                          enum: *a22
                                         value:
                                           nullable: true
                                       required:
@@ -22454,7 +23226,7 @@ paths:
                                     maxLength: 200
                                   op:
                                     type: string
-                                    enum: *a20
+                                    enum: *a22
                                   value:
                                     nullable: true
                                 required:
@@ -22473,7 +23245,7 @@ paths:
                                           maxLength: 200
                                         op:
                                           type: string
-                                          enum: *a20
+                                          enum: *a22
                                         value:
                                           nullable: true
                                       required:
@@ -22602,7 +23374,7 @@ paths:
                             maxLength: 500
                           method:
                             type: string
-                            enum: *a21
+                            enum: *a23
                             default: POST
                           headers:
                             type: object
@@ -22687,7 +23459,7 @@ paths:
                     type: array
                     items:
                       type: string
-                      enum: *a12
+                      enum: *a14
                   conditions:
                     anyOf:
                       - type: object
@@ -22707,7 +23479,7 @@ paths:
                                       maxLength: 200
                                     op:
                                       type: string
-                                      enum: *a20
+                                      enum: *a22
                                     value:
                                       nullable: true
                                   required:
@@ -22726,7 +23498,7 @@ paths:
                                             maxLength: 200
                                           op:
                                             type: string
-                                            enum: *a20
+                                            enum: *a22
                                           value:
                                             nullable: true
                                         required:
@@ -22752,7 +23524,7 @@ paths:
                                       maxLength: 200
                                     op:
                                       type: string
-                                      enum: *a20
+                                      enum: *a22
                                     value:
                                       nullable: true
                                   required:
@@ -22771,7 +23543,7 @@ paths:
                                             maxLength: 200
                                           op:
                                             type: string
-                                            enum: *a20
+                                            enum: *a22
                                           value:
                                             nullable: true
                                         required:
@@ -22900,7 +23672,7 @@ paths:
                               maxLength: 500
                             method:
                               type: string
-                              enum: *a21
+                              enum: *a23
                               default: POST
                             headers:
                               type: object
@@ -23389,7 +24161,7 @@ paths:
                           format: uuid
                         status:
                           type: string
-                          enum: &a22
+                          enum: &a24
                             - pending
                             - running
                             - succeeded
@@ -23425,7 +24197,7 @@ paths:
                                     type: string
                                   status:
                                     type: string
-                                    enum: &a23
+                                    enum: &a25
                                       - ok
                                       - error
                                   error:
@@ -23669,7 +24441,7 @@ paths:
                     format: uuid
                   status:
                     type: string
-                    enum: *a22
+                    enum: *a24
                   attempts:
                     type: integer
                     minimum: 0
@@ -23699,7 +24471,7 @@ paths:
                               type: string
                             status:
                               type: string
-                              enum: *a23
+                              enum: *a25
                             error:
                               type: string
                               nullable: true
@@ -25072,10 +25844,10 @@ paths:
                           format: uuid
                         type:
                           type: string
-                          enum: *a9
+                          enum: *a11
                         direction:
                           type: string
-                          enum: *a10
+                          enum: *a12
                         other_ticket:
                           type: object
                           properties:
@@ -25319,7 +26091,7 @@ paths:
               properties:
                 type:
                   type: string
-                  enum: *a9
+                  enum: *a11
                 target:
                   type: string
                   minLength: 1
@@ -25340,10 +26112,10 @@ paths:
                     format: uuid
                   type:
                     type: string
-                    enum: *a9
+                    enum: *a11
                   direction:
                     type: string
-                    enum: *a10
+                    enum: *a12
                   other_ticket:
                     type: object
                     properties:
@@ -25784,7 +26556,7 @@ paths:
                           maxLength: 200
                         type:
                           type: string
-                          enum: &a24
+                          enum: &a26
                             - text
                             - number
                             - boolean
@@ -26023,7 +26795,7 @@ paths:
                   maxLength: 200
                 type:
                   type: string
-                  enum: *a24
+                  enum: *a26
                 options:
                   type: object
                   properties:
@@ -26076,7 +26848,7 @@ paths:
                     maxLength: 200
                   type:
                     type: string
-                    enum: *a24
+                    enum: *a26
                   options:
                     type: object
                     nullable: true
@@ -26321,7 +27093,7 @@ paths:
                     maxLength: 200
                   type:
                     type: string
-                    enum: *a24
+                    enum: *a26
                   options:
                     type: object
                     nullable: true
@@ -26595,7 +27367,7 @@ paths:
                     maxLength: 200
                   type:
                     type: string
-                    enum: *a24
+                    enum: *a26
                   options:
                     type: object
                     nullable: true
@@ -26806,6 +27578,718 @@ paths:
       tags:
         - Custom Fields
       summary: Delete a custom field (metadata.<key> data on tickets is left intact)
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "204":
+          description: no content
+        "400":
+          description: bad request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "401":
+          description: unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "403":
+          description: forbidden
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "404":
+          description: not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "409":
+          description: conflict
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "422":
+          description: unprocessable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "500":
+          description: internal
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+  /v1/tickets/{idOrKey}/external-refs:
+    get:
+      tags:
+        - External Refs
+      summary: List external refs attached to this ticket
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+          required: true
+          name: idOrKey
+          in: path
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        ticket_id:
+                          type: string
+                          format: uuid
+                        kind:
+                          type: string
+                          enum: *a8
+                        url:
+                          type: string
+                          format: uri
+                        state:
+                          type: string
+                          nullable: true
+                          enum: *a9
+                        title:
+                          type: string
+                          nullable: true
+                        polled_at:
+                          type: string
+                          nullable: true
+                          format: date-time
+                        polled_state_changed_at:
+                          type: string
+                          nullable: true
+                          format: date-time
+                        created_at:
+                          type: string
+                          format: date-time
+                        created_by:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            name:
+                              type: string
+                              minLength: 1
+                              maxLength: 100
+                            icon:
+                              type: string
+                              nullable: true
+                              maxLength: 500
+                            type:
+                              type: string
+                              enum: *a2
+                          required:
+                            - id
+                            - name
+                            - icon
+                            - type
+                      required:
+                        - id
+                        - ticket_id
+                        - kind
+                        - url
+                        - state
+                        - title
+                        - polled_at
+                        - polled_state_changed_at
+                        - created_at
+                        - created_by
+                required:
+                  - items
+        "400":
+          description: bad request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "401":
+          description: unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "403":
+          description: forbidden
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "404":
+          description: not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "409":
+          description: conflict
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "422":
+          description: unprocessable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "500":
+          description: internal
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+    post:
+      tags:
+        - External Refs
+      summary: Attach an external ref (kind inferred from URL when omitted)
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+          required: true
+          name: idOrKey
+          in: path
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 128
+          required: false
+          name: idempotency-key
+          in: header
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                kind:
+                  type: string
+                  enum: *a8
+                url:
+                  type: string
+                  format: uri
+              required:
+                - url
+      responses:
+        "201":
+          description: created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  ticket_id:
+                    type: string
+                    format: uuid
+                  kind:
+                    type: string
+                    enum: *a8
+                  url:
+                    type: string
+                    format: uri
+                  state:
+                    type: string
+                    nullable: true
+                    enum: *a9
+                  title:
+                    type: string
+                    nullable: true
+                  polled_at:
+                    type: string
+                    nullable: true
+                    format: date-time
+                  polled_state_changed_at:
+                    type: string
+                    nullable: true
+                    format: date-time
+                  created_at:
+                    type: string
+                    format: date-time
+                  created_by:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      name:
+                        type: string
+                        minLength: 1
+                        maxLength: 100
+                      icon:
+                        type: string
+                        nullable: true
+                        maxLength: 500
+                      type:
+                        type: string
+                        enum: *a2
+                    required:
+                      - id
+                      - name
+                      - icon
+                      - type
+                required:
+                  - id
+                  - ticket_id
+                  - kind
+                  - url
+                  - state
+                  - title
+                  - polled_at
+                  - polled_state_changed_at
+                  - created_at
+                  - created_by
+        "400":
+          description: bad request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "401":
+          description: unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "403":
+          description: forbidden
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "404":
+          description: not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "409":
+          description: conflict
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "422":
+          description: unprocessable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "500":
+          description: internal
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+  /v1/tickets/external-refs/{id}:
+    delete:
+      tags:
+        - External Refs
+      summary: Detach an external ref
       parameters:
         - schema:
             type: string

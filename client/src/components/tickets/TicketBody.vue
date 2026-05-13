@@ -13,6 +13,7 @@ import TransitionButton from "./TransitionButton.vue";
 import ActivityList from "./ActivityList.vue";
 import AttachmentLink from "./AttachmentLink.vue";
 import LinkedWork from "./LinkedWork.vue";
+import ExternalRefsSection from "./ExternalRefsSection.vue";
 import PriorityEditor from "./PriorityEditor.vue";
 import AssigneeEditor from "./AssigneeEditor.vue";
 import LabelEditor from "./LabelEditor.vue";
@@ -92,6 +93,45 @@ const addLinkMutation = useMutation({
     const msg = (err as { error?: { message?: string } })?.error?.message ?? "Failed to add link";
     toast.error(msg);
   },
+});
+
+// ─── External refs mutations ────────────────────────────────────────────────
+
+const addExternalRefMutation = useMutation({
+  mutationFn: async (url: string) => {
+    if (!ticket.value) throw new Error("no ticket loaded");
+    const { error } = await api.POST("/v1/tickets/{idOrKey}/external-refs", {
+      params: { path: { idOrKey: ticket.value.key } },
+      body: { url },
+    });
+    if (error) throw error;
+  },
+  onSuccess: () => {
+    qc.invalidateQueries({ queryKey: queryKeys.ticket(idOrKey.value) });
+    toast.success("External reference attached");
+  },
+  onError: (err: unknown) => {
+    const msg = (err as { error?: { message?: string } })?.error?.message ?? "Failed to attach";
+    toast.error(msg);
+  },
+});
+
+const removingRefId = ref<string | null>(null);
+const removeExternalRefMutation = useMutation({
+  mutationFn: async (refId: string) => {
+    removingRefId.value = refId;
+    const { error } = await api.DELETE("/v1/tickets/external-refs/{id}", { params: { path: { id: refId } } });
+    if (error) throw error;
+  },
+  onSuccess: () => {
+    qc.invalidateQueries({ queryKey: queryKeys.ticket(idOrKey.value) });
+    toast.success("External reference detached");
+  },
+  onError: (err: unknown) => {
+    const msg = (err as { error?: { message?: string } })?.error?.message ?? "Failed to detach";
+    toast.error(msg);
+  },
+  onSettled: () => { removingRefId.value = null; },
 });
 
 const removingLinkId = ref<string | null>(null);
@@ -206,6 +246,15 @@ const removeLinkMutation = useMutation({
       @navigate="navigateToLinked"
       @add-link="(p) => addLinkMutation.mutate(p)"
       @remove-link="(id) => removeLinkMutation.mutate(id)"
+    />
+
+    <!-- External references (GitHub PR / issue / commit / Actions / generic) -->
+    <ExternalRefsSection
+      :refs="ticket.external_refs ?? []"
+      :adding="addExternalRefMutation.isPending.value"
+      :removing-id="removingRefId"
+      @add="(url) => addExternalRefMutation.mutate(url)"
+      @remove="(id) => removeExternalRefMutation.mutate(id)"
     />
 
     <!-- Tabs -->

@@ -49,6 +49,13 @@ const Env = z.object({
   // path. Unset = call_n8n actions fail with a clear error at runtime.
   N8N_BASE_URL: z.string().url().optional(),
 
+  // External ref polling (Phase 4.5.2). Unset GITHUB_TOKEN → polling
+  // loop is a no-op (logs once at startup); attached refs still
+  // display but state stays at whatever it was last polled to.
+  GITHUB_TOKEN: z.string().min(8).optional(),
+  EXTERNAL_REF_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(5 * 60_000),
+  EXTERNAL_REF_POLL_BATCH_SIZE: z.coerce.number().int().positive().default(20),
+
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 });
 

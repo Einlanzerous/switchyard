@@ -10,6 +10,9 @@ import {
   stopDispatcher as stopRulesDispatcher,
 } from "./lib/rules/dispatcher.js";
 import { startScheduler, stopScheduler } from "./lib/rules/scheduler.js";
+import {
+  startExternalRefPoller, stopExternalRefPoller,
+} from "./lib/externalRefs/poller.js";
 import { cleanupExpiredIdempotencyKeys } from "./lib/idempotency.js";
 import { accessLog } from "./lib/access-log.js";
 import { buildHealthReport } from "./lib/health.js";
@@ -66,6 +69,7 @@ const server = Bun.serve({
 startDispatcher();
 startRulesDispatcher();
 startScheduler();
+startExternalRefPoller();
 const idempotencyCleanup = setInterval(
   () => void cleanupExpiredIdempotencyKeys().catch((e) => console.warn("[idempotency cleanup]", e)),
   60 * 60 * 1000
@@ -85,9 +89,13 @@ const shutdown = async (signal: string) => {
   clearInterval(idempotencyCleanup);
 
   const dispatcherBudget = Math.max(1_000, deadline - Date.now() - 1_000);
-  // Stop the scheduler first (just stops the interval; no inflight work)
-  // then drain both dispatchers in parallel within the budget.
-  await stopScheduler();
+  // Stop the scheduler + external-ref poller first (just interval stops,
+  // light inflight work) then drain both dispatchers in parallel within
+  // the budget.
+  await Promise.all([
+    stopScheduler(),
+    stopExternalRefPoller(Math.min(2_000, dispatcherBudget)),
+  ]);
   await Promise.all([
     stopDispatcher(dispatcherBudget),
     stopRulesDispatcher(dispatcherBudget),

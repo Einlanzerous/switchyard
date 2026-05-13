@@ -10,6 +10,8 @@ import type {
   ApiToken, TicketLink, TicketLinkType, TicketLinkDirection,
   CustomField as ApiCustomField, CustomFieldType as ApiCustomFieldType,
   CustomFieldOptions as ApiCustomFieldOptions,
+  ExternalRef as ApiExternalRef, ExternalRefKind as ApiExternalRefKind,
+  ExternalRefState as ApiExternalRefState,
 } from "@switchyard/shared";
 import * as schema from "../../drizzle/schema.js";
 import { env } from "../env.js";
@@ -166,6 +168,25 @@ export function mapTicketLink(row: TicketLinkRow, deps: TicketLinkDeps): TicketL
   };
 }
 
+// ─── external refs ─────────────────────────────────────────────────────────
+
+type ExternalRefRow = typeof schema.ticketExternalRefs.$inferSelect;
+
+export function mapExternalRef(row: ExternalRefRow, creator: UserRow): ApiExternalRef {
+  return {
+    id: row.id,
+    ticket_id: row.ticket_id,
+    kind: row.kind as ApiExternalRefKind,
+    url: row.url,
+    state: (row.state ?? null) as ApiExternalRefState | null,
+    title: row.title,
+    polled_at: row.polled_at,
+    polled_state_changed_at: row.polled_state_changed_at,
+    created_at: row.created_at,
+    created_by: mapUserRef(creator),
+  };
+}
+
 // ─── tickets ───────────────────────────────────────────────────────────────
 
 export type TicketSummaryDeps = {
@@ -175,6 +196,10 @@ export type TicketSummaryDeps = {
   reporter: UserRow;
   labels: LabelRow[];
   number: number;
+  // External refs touching this ticket. List endpoints batch-fetch
+  // these and feed them in per-ticket; single-ticket loads call
+  // `loadTicketLinks`-style helpers. Empty when no refs are attached.
+  externalRefs: ApiExternalRef[];
 };
 
 export function mapTicketSummary(t: TicketRow, deps: TicketSummaryDeps): TicketSummary {
@@ -194,6 +219,7 @@ export function mapTicketSummary(t: TicketRow, deps: TicketSummaryDeps): TicketS
     due_date: t.due_date,
     labels: deps.labels.map(mapLabelRef),
     position: t.position,
+    external_refs: deps.externalRefs,
     created_at: t.created_at,
     updated_at: t.updated_at,
     deleted_at: t.deleted_at,

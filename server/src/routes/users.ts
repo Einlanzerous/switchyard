@@ -219,6 +219,9 @@ export function mount(app: OpenAPIHono) {
           project, status, assignee, reporter,
           labels: labelsByTicket.get(ticket.id) ?? [],
           number: ticket.number,
+          // Notifications dropdown context — refs not needed here; skip
+          // the fan-out so this stays a cheap render.
+          externalRefs: [],
         });
       })();
       const actor = n.actor_id ? userById.get(n.actor_id) ?? null : null;

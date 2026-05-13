@@ -25,7 +25,18 @@ const projectKey = computed(() => {
   return typeof v === "string" ? v : null;
 });
 
-const { columns, isLoading, error, refetch } = useProjectBoard(projectKey);
+// Board view toggle: hide epics by default (they rarely move column-to-
+// column and add visual noise). `?epics=1` opts in. Persisted via URL so
+// refresh/share carries it.
+const showEpics = computed(() => route.query.epics === "1");
+function toggleEpics() {
+  const next = { ...route.query };
+  if (showEpics.value) delete next.epics;
+  else next.epics = "1";
+  router.replace({ query: next });
+}
+
+const { columns, isLoading, error, refetch } = useProjectBoard(projectKey, showEpics);
 
 // ─── drop → transition wiring ────────────────────────────────────────────────
 
@@ -299,6 +310,18 @@ const errMessage = computed(() => {
             <span class="font-mono text-muted-foreground">{{ projectKey }}</span>
           </h1>
         </div>
+        <label
+          class="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none"
+          title="Epics rarely move column-to-column; hidden by default to keep the board focused on actionable work."
+        >
+          <input
+            type="checkbox"
+            :checked="showEpics"
+            class="h-3 w-3"
+            @change="toggleEpics"
+          />
+          Show epics
+        </label>
         <Button variant="outline" size="sm" class="h-8" @click="viewAsList">
           <List class="h-3.5 w-3.5 mr-1.5" /> List
         </Button>

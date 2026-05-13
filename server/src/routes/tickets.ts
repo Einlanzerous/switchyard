@@ -19,7 +19,9 @@ import { mapEvent, mapTicketSummary, mapStatusRef, mapUserRef } from "../lib/map
 import { resolveTicket, getProjectByKey, getStatusById, getUserById } from "../lib/lookups.js";
 import { buildPage, cursorOrderBy, cursorWhere, decodeCursor } from "../lib/pagination.js";
 import { writeEvent } from "../lib/events.js";
-import { loadTicketDetail, loadTicketSummary, allocateTicketNumber } from "../lib/tickets.js";
+import {
+  loadTicketDetail, loadTicketSummary, allocateTicketNumber, fetchExternalRefsByTicket,
+} from "../lib/tickets.js";
 import { detectAndNotify, detectAndNotifyOnEdit } from "../lib/mentions.js";
 import { badRequest, unprocessable } from "../errors.js";
 
@@ -215,7 +217,10 @@ export function mount(app: OpenAPIHono) {
       .limit(limit + 1);
 
     const ticketIds = rows.map((r) => r.t.id);
-    const labelsByTicket = await fetchLabelsByTicket(ticketIds);
+    const [labelsByTicket, refsByTicket] = await Promise.all([
+      fetchLabelsByTicket(ticketIds),
+      fetchExternalRefsByTicket(ticketIds),
+    ]);
 
     const summaries: ApiTicketSummary[] = rows.map((r) =>
       mapTicketSummary(r.t, {
@@ -225,6 +230,7 @@ export function mount(app: OpenAPIHono) {
         reporter: r.reporter,
         labels: labelsByTicket.get(r.t.id) ?? [],
         number: r.t.number,
+        externalRefs: refsByTicket.get(r.t.id) ?? [],
       })
     );
 
@@ -674,7 +680,10 @@ export function mount(app: OpenAPIHono) {
       .limit(limit + 1);
 
     const ticketIds = rows.map((r) => r.t.id);
-    const labelsByTicket = await fetchLabelsByTicket(ticketIds);
+    const [labelsByTicket, refsByTicket] = await Promise.all([
+      fetchLabelsByTicket(ticketIds),
+      fetchExternalRefsByTicket(ticketIds),
+    ]);
 
     const summaries = rows.map((r) =>
       mapTicketSummary(r.t, {
@@ -684,6 +693,7 @@ export function mount(app: OpenAPIHono) {
         reporter: r.reporter,
         labels: labelsByTicket.get(r.t.id) ?? [],
         number: r.t.number,
+        externalRefs: refsByTicket.get(r.t.id) ?? [],
       })
     );
 

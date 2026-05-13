@@ -594,6 +594,9 @@ export function mount(app: OpenAPIHono) {
             reporter: projRows[0]!.reporter,
             labels: labelsByTicket.get(projRows[0]!.t.id) ?? [],
             number: projRows[0]!.t.number,
+            // Stats sample summaries are render-only context; skip the
+            // refs fan-out to keep this endpoint cheap.
+            externalRefs: [],
           })
         : null;
       return {

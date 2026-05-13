@@ -41,7 +41,10 @@ export type BoardColumn = {
 
 const PAGE_LIMIT = 200;
 
-export function useProjectBoard(projectKey: ComputedRef<string | null>) {
+export function useProjectBoard(
+  projectKey: ComputedRef<string | null>,
+  showEpics: ComputedRef<boolean> = computed(() => false),
+) {
   const enabled = computed(() => projectKey.value !== null);
 
   const statusesQuery = useQuery({
@@ -106,6 +109,7 @@ export function useProjectBoard(projectKey: ComputedRef<string | null>) {
       // so all cards live on the same numeric axis.
       const ticketsInCol = tickets.value
         .filter((t) => t.status.category === cat)
+        .filter((t) => showEpics.value || t.type !== "epic")
         .sort((a, b) => effectivePosition(b) - effectivePosition(a));
       return [{
         category: cat,

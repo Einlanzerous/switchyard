@@ -346,6 +346,57 @@ export const ticketLinks = pgTable(
   })
 );
 
+// ─── ticket external refs (links to GitHub PRs / issues / commits / Actions) ─
+//
+// First-class display of external state on tickets. 4.5.2 lands manual
+// attach + state polling; 4.5.3 (separate ticket) adds the github-side
+// webhook receiver for push-mode updates + auto-detect from PR title /
+// branch convention.
+
+export const externalRefKind = pgEnum("external_ref_kind", [
+  "github_pr", "github_issue", "github_commit", "github_action", "generic",
+]);
+
+export const externalRefState = pgEnum("external_ref_state", [
+  "open", "closed", "merged", "success", "failed",
+]);
+
+export const ticketExternalRefs = pgTable(
+  "ticket_external_refs",
+  {
+    id: id(),
+    ticket_id: uuid("ticket_id")
+      .notNull()
+      .references(() => tickets.id, { onDelete: "cascade" }),
+    kind: externalRefKind("kind").notNull(),
+    url: text("url").notNull(),
+    // Null = state unknown (e.g. polling disabled, kind=generic, or
+    // never polled yet). UI renders as a neutral chip.
+    state: externalRefState("state"),
+    title: text("title"),
+    polled_at: timestamp("polled_at", { withTimezone: true, mode: "string" }),
+    // Stamped when the poller detects a state transition vs the prior
+    // polled value. Lets event consumers gate on "this just changed"
+    // rather than "this was last polled".
+    polled_state_changed_at: timestamp("polled_state_changed_at", { withTimezone: true, mode: "string" }),
+    created_at: createdAt(),
+    created_by: uuid("created_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+  },
+  (t) => ({
+    // Same URL can't be attached twice to one ticket. Different tickets
+    // CAN reference the same URL (one PR fixes multiple linked tickets).
+    urlUnique: uniqueIndex("ticket_external_refs_url_unique").on(t.ticket_id, t.url),
+    ticketIdx: index("ticket_external_refs_ticket_idx").on(t.ticket_id),
+    // Polling loop reads stale rows oldest-first; `generic` has no
+    // pollable provider so it's excluded from the partial index.
+    polledIdx: index("ticket_external_refs_polled_idx")
+      .on(t.polled_at)
+      .where(sql`${t.kind} <> 'generic'`),
+  })
+);
+
 // ─── comments ───────────────────────────────────────────────────────────────
 
 export const comments = pgTable(

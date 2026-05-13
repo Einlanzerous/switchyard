@@ -7,13 +7,13 @@ import { and, asc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import * as schema from "../../drizzle/schema.js";
 import { db } from "../db.js";
 import {
-  mapTicket, mapTicketSummary, mapComment, mapAttachment, mapTicketLink,
+  mapTicket, mapTicketSummary, mapComment, mapAttachment, mapTicketLink, mapExternalRef,
   type TicketSummaryDeps,
 } from "./mappers.js";
 import type {
   Ticket as ApiTicket, TicketSummary as ApiTicketSummary,
   Comment as ApiComment, Attachment as ApiAttachment,
-  TicketLink as ApiTicketLink,
+  TicketLink as ApiTicketLink, ExternalRef as ApiExternalRef,
 } from "@switchyard/shared";
 import { badRequest, notFound } from "../errors.js";
 
@@ -51,11 +51,61 @@ async function loadTicketSummaryDeps(ticket: TicketRow, tx?: Tx): Promise<Ticket
     .innerJoin(schema.labels, eq(schema.ticketLabels.label_id, schema.labels.id))
     .where(eq(schema.ticketLabels.ticket_id, ticket.id));
 
+  const externalRefs = await loadExternalRefsForTicket(ticket.id, tx);
+
   return {
     project, status, assignee, reporter,
     labels: labels.map((r) => r.label),
     number: ticket.number,
+    externalRefs,
   };
+}
+
+// External refs for a single ticket. Fans out creators in one query so
+// the response includes the UserRef inline. Used by single-ticket loads
+// (create, update, transition, detail); the list endpoint uses its own
+// batched fan-out below.
+async function loadExternalRefsForTicket(ticketId: string, tx?: Tx): Promise<ApiExternalRef[]> {
+  const q = tx ?? db;
+  const rows = await q.select().from(schema.ticketExternalRefs)
+    .where(eq(schema.ticketExternalRefs.ticket_id, ticketId))
+    .orderBy(asc(schema.ticketExternalRefs.created_at));
+  if (rows.length === 0) return [];
+  const creatorIds = [...new Set(rows.map((r) => r.created_by))];
+  const creators = await q.select().from(schema.users)
+    .where(inArray(schema.users.id, creatorIds));
+  const byId = new Map(creators.map((u) => [u.id, u]));
+  return rows
+    .map((r) => {
+      const u = byId.get(r.created_by);
+      return u ? mapExternalRef(r, u) : null;
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null);
+}
+
+// Batched version for the tickets list. Returns a Map<ticket_id, ExternalRef[]>
+// so callers can plug it into per-ticket deps without an N+1.
+export async function fetchExternalRefsByTicket(
+  ticketIds: string[],
+): Promise<Map<string, ApiExternalRef[]>> {
+  const result = new Map<string, ApiExternalRef[]>();
+  if (ticketIds.length === 0) return result;
+  const rows = await db.select().from(schema.ticketExternalRefs)
+    .where(inArray(schema.ticketExternalRefs.ticket_id, ticketIds))
+    .orderBy(asc(schema.ticketExternalRefs.created_at));
+  if (rows.length === 0) return result;
+  const creatorIds = [...new Set(rows.map((r) => r.created_by))];
+  const creators = await db.select().from(schema.users)
+    .where(inArray(schema.users.id, creatorIds));
+  const userById = new Map(creators.map((u) => [u.id, u]));
+  for (const r of rows) {
+    const u = userById.get(r.created_by);
+    if (!u) continue;
+    const arr = result.get(r.ticket_id) ?? [];
+    arr.push(mapExternalRef(r, u));
+    result.set(r.ticket_id, arr);
+  }
+  return result;
 }
 
 export async function loadTicketSummary(ticket: TicketRow, tx?: Tx): Promise<ApiTicketSummary> {
