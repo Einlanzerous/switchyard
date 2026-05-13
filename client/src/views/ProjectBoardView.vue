@@ -6,6 +6,8 @@ import { ArrowLeft, List, Loader2, AlertCircle, Inbox, Plus } from "lucide-vue-n
 import { toast } from "vue-sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import BoardColumn from "@/components/tickets/BoardColumn.vue";
 import InsightsTabs from "@/components/dashboard/InsightsTabs.vue";
 import { api } from "@/lib/api";
@@ -29,11 +31,11 @@ const projectKey = computed(() => {
 // column and add visual noise). `?epics=1` opts in. Persisted via URL so
 // refresh/share carries it.
 const showEpics = computed(() => route.query.epics === "1");
-function toggleEpics() {
-  const next = { ...route.query };
-  if (showEpics.value) delete next.epics;
-  else next.epics = "1";
-  router.replace({ query: next });
+function setShowEpics(next: boolean) {
+  const q = { ...route.query };
+  if (next) q.epics = "1";
+  else delete q.epics;
+  router.replace({ query: q });
 }
 
 const { columns, isLoading, error, refetch, closedWindowDays } = useProjectBoard(projectKey, showEpics);
@@ -299,26 +301,30 @@ const errMessage = computed(() => {
 
 <template>
   <div class="flex flex-col h-full">
-    <!-- Header -->
+    <!-- Header. Single row: back · | · tabs · | · project · (filler) · controls.
+         Tabs' underline overlaps the wrapper border-b via `-mb-[2px]`, so
+         we keep the wrapper's border-b and skip vertical padding on the
+         row — every child sits flush with the bottom border. -->
     <div class="border-b bg-background/95 backdrop-blur sticky top-0 z-10">
-      <div class="px-4 py-2 flex items-center gap-3">
+      <div class="px-4 h-12 flex items-center gap-2">
         <Button variant="ghost" size="sm" class="h-8 -ml-2" @click="viewAsList">
           <ArrowLeft class="h-3.5 w-3.5 mr-1" /> Back
         </Button>
-        <div class="flex-1 min-w-0">
-          <h1 class="font-semibold text-base flex items-center gap-2">
-            <span class="font-mono text-muted-foreground">{{ projectKey }}</span>
-          </h1>
-        </div>
+        <Separator orientation="vertical" class="h-5" />
+        <InsightsTabs
+          :board-path="`/projects/${projectKey}/board`"
+          :insights-path="`/projects/${projectKey}/insights`"
+        />
+        <Separator orientation="vertical" class="h-5" />
+        <span class="font-mono text-sm text-muted-foreground">{{ projectKey }}</span>
+        <div class="flex-1 min-w-0" />
         <label
-          class="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none"
+          class="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none"
           title="Epics rarely move column-to-column; hidden by default to keep the board focused on actionable work."
         >
-          <input
-            type="checkbox"
-            :checked="showEpics"
-            class="h-3 w-3"
-            @change="toggleEpics"
+          <Switch
+            :model-value="showEpics"
+            @update:model-value="setShowEpics"
           />
           Show epics
         </label>
@@ -331,12 +337,6 @@ const errMessage = computed(() => {
         <Loader2
           v-if="transitionMutation.isPending.value"
           class="h-4 w-4 text-muted-foreground animate-spin"
-        />
-      </div>
-      <div class="px-4">
-        <InsightsTabs
-          :board-path="`/projects/${projectKey}/board`"
-          :insights-path="`/projects/${projectKey}/insights`"
         />
       </div>
     </div>
