@@ -8,6 +8,7 @@ import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { ArrowLeft, Plus, BarChart2, PieChart, Clock, Users as UsersIcon } from "lucide-vue-next";
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import { useUiStore } from "@/stores/ui";
 import { useProjectStats } from "@/composables/useProjectStats";
 import { useThroughput } from "@/composables/useDashboardData";
@@ -58,28 +59,28 @@ function back() { router.push("/projects"); }
 
 <template>
   <div class="flex flex-col h-full">
-    <!-- Header — mirrors the board header so the tab swap is seamless. -->
+    <!-- Header — same shell as ProjectBoardView so the tab swap leaves the
+         surrounding chrome untouched. Back returns to /projects. -->
     <div class="border-b bg-background/95 backdrop-blur sticky top-0 z-10">
-      <div class="px-4 py-2 flex items-center gap-3">
+      <div class="px-4 h-12 flex items-center gap-2">
         <Button variant="ghost" size="sm" class="h-8 -ml-2" @click="back">
           <ArrowLeft class="h-3.5 w-3.5 mr-1" /> Back
         </Button>
-        <div class="flex-1 min-w-0">
-          <h1 class="font-semibold text-base flex items-center gap-2">
-            <span class="font-mono text-muted-foreground">{{ projectKey }}</span>
-            <span class="text-muted-foreground/40">·</span>
-            <span>{{ stats.data.value?.project.name ?? "" }}</span>
-          </h1>
-        </div>
-        <Button size="sm" class="h-8" @click="ui.openCreateTicket(projectKey)">
-          <Plus class="h-3.5 w-3.5 mr-1.5" /> New ticket
-        </Button>
-      </div>
-      <div class="px-4">
+        <Separator orientation="vertical" class="h-5" />
+        <span class="font-mono text-sm text-muted-foreground">{{ projectKey }}</span>
+        <span v-if="stats.data.value?.project.name" class="text-muted-foreground/40">—</span>
+        <span v-if="stats.data.value?.project.name" class="text-sm font-medium truncate">
+          {{ stats.data.value.project.name }}
+        </span>
+        <Separator orientation="vertical" class="h-5" />
         <InsightsTabs
           :board-path="`/projects/${projectKey}/board`"
           :insights-path="`/projects/${projectKey}/insights`"
         />
+        <div class="flex-1 min-w-0" />
+        <Button size="sm" class="h-8" @click="ui.openCreateTicket(projectKey)">
+          <Plus class="h-3.5 w-3.5 mr-1.5" /> New ticket
+        </Button>
       </div>
     </div>
 

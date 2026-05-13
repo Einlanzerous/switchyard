@@ -8,6 +8,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useQuery } from "@tanstack/vue-query";
 import { ArrowLeft, BarChart2, Layers, PieChart, Plus, Clock } from "lucide-vue-next";
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import { useUiStore } from "@/stores/ui";
 import { useBoardDetail } from "@/composables/useBoards";
 import { useThroughput } from "@/composables/useDashboardData";
@@ -148,18 +149,23 @@ function back() { router.push("/boards"); }
 
 <template>
   <div class="flex flex-col h-full">
-    <!-- Header — same shell as BoardView so the tab swap is visually identical. -->
+    <!-- Header — mirrors BoardView so the tab swap leaves chrome untouched. -->
     <div class="border-b bg-background/95 backdrop-blur sticky top-0 z-10">
-      <div class="px-4 py-2 flex items-center gap-3">
+      <div class="px-4 h-12 flex items-center gap-2">
         <Button variant="ghost" size="sm" class="h-8 -ml-2" @click="back">
-          <ArrowLeft class="h-3.5 w-3.5 mr-1" /> Boards
+          <ArrowLeft class="h-3.5 w-3.5 mr-1" /> Back
         </Button>
-        <div class="flex-1 min-w-0">
-          <h1 class="font-semibold text-base truncate">{{ board?.name ?? "Board" }}</h1>
-          <p v-if="board" class="text-[11px] text-muted-foreground truncate">
-            {{ board.projects.length }} project{{ board.projects.length === 1 ? "" : "s" }}
-          </p>
-        </div>
+        <Separator orientation="vertical" class="h-5" />
+        <span class="text-sm font-medium truncate">{{ board?.name ?? "Board" }}</span>
+        <span v-if="board" class="text-[11px] text-muted-foreground whitespace-nowrap">
+          · {{ board.projects.length }} project{{ board.projects.length === 1 ? "" : "s" }}
+        </span>
+        <Separator orientation="vertical" class="h-5" />
+        <InsightsTabs
+          :board-path="`/boards/${boardId}`"
+          :insights-path="`/boards/${boardId}/insights`"
+        />
+        <div class="flex-1 min-w-0" />
         <Button
           size="sm"
           class="h-8"
@@ -168,12 +174,6 @@ function back() { router.push("/boards"); }
         >
           <Plus class="h-3.5 w-3.5 mr-1.5" /> New ticket
         </Button>
-      </div>
-      <div class="px-4">
-        <InsightsTabs
-          :board-path="`/boards/${boardId}`"
-          :insights-path="`/boards/${boardId}/insights`"
-        />
       </div>
     </div>
 

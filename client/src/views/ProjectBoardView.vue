@@ -38,7 +38,7 @@ function setShowEpics(next: boolean) {
   router.replace({ query: q });
 }
 
-const { columns, isLoading, error, refetch, closedWindowDays } = useProjectBoard(projectKey, showEpics);
+const { project, columns, isLoading, error, refetch, closedWindowDays } = useProjectBoard(projectKey, showEpics);
 
 // ─── drop → transition wiring ────────────────────────────────────────────────
 
@@ -292,6 +292,10 @@ function viewAsList() {
   router.push({ path: "/tickets", query: { project: projectKey.value } });
 }
 
+function backToProjects() {
+  router.push("/projects");
+}
+
 const errMessage = computed(() => {
   const e = error.value;
   if (!e) return null;
@@ -301,28 +305,34 @@ const errMessage = computed(() => {
 
 <template>
   <div class="flex flex-col h-full">
-    <!-- Header. Single row: back · | · tabs · | · project · (filler) · controls.
+    <!-- Header. Single row: back · | · KEY — name · | · tabs · (filler) · controls.
+         Back returns to /projects (the directory); the Board/Insights tabs
+         swap the body within this same shell so the surrounding chrome
+         doesn't shift on tab change.
          Tabs' underline overlaps the wrapper border-b via `-mb-[2px]`, so
          we keep the wrapper's border-b and skip vertical padding on the
          row — every child sits flush with the bottom border. -->
     <div class="border-b bg-background/95 backdrop-blur sticky top-0 z-10">
       <div class="px-4 h-12 flex items-center gap-2">
-        <Button variant="ghost" size="sm" class="h-8 -ml-2" @click="viewAsList">
+        <Button variant="ghost" size="sm" class="h-8 -ml-2" @click="backToProjects">
           <ArrowLeft class="h-3.5 w-3.5 mr-1" /> Back
         </Button>
+        <Separator orientation="vertical" class="h-5" />
+        <span class="font-mono text-sm text-muted-foreground">{{ projectKey }}</span>
+        <span v-if="project?.name" class="text-muted-foreground/40">—</span>
+        <span v-if="project?.name" class="text-sm font-medium truncate">{{ project.name }}</span>
         <Separator orientation="vertical" class="h-5" />
         <InsightsTabs
           :board-path="`/projects/${projectKey}/board`"
           :insights-path="`/projects/${projectKey}/insights`"
         />
-        <Separator orientation="vertical" class="h-5" />
-        <span class="font-mono text-sm text-muted-foreground">{{ projectKey }}</span>
         <div class="flex-1 min-w-0" />
         <label
           class="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none"
           title="Epics rarely move column-to-column; hidden by default to keep the board focused on actionable work."
         >
           <Switch
+            class="scale-90"
             :model-value="showEpics"
             @update:model-value="setShowEpics"
           />

@@ -172,6 +172,7 @@ export function useProjectBoard(
   });
 
   return {
+    project: computed(() => projectQuery.data.value ?? null),
     statuses,
     tickets,
     columns,

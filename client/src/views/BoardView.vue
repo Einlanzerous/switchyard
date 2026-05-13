@@ -6,6 +6,7 @@ import { ArrowLeft, AlertCircle, Inbox, Loader2, Pencil, Plus } from "lucide-vue
 import { toast } from "vue-sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
 import BoardCell from "@/components/boards/BoardCell.vue";
 import SwimlaneSelector, { type SwimlaneBy } from "@/components/boards/SwimlaneSelector.vue";
 import EditBoardDialog from "@/components/boards/EditBoardDialog.vue";
@@ -305,24 +306,25 @@ const errMessage = computed(() => {
 
 <template>
   <div class="flex flex-col h-full">
-    <!-- Header -->
+    <!-- Header. Single row: back · | · board name · | · tabs · (filler) · controls.
+         Back returns to /boards; tabs swap body within the same shell so the
+         surrounding chrome stays put on tab change. -->
     <div class="border-b bg-background/95 backdrop-blur sticky top-0 z-10">
-      <div class="px-4 py-2 flex items-center gap-3">
+      <div class="px-4 h-12 flex items-center gap-2">
         <Button variant="ghost" size="sm" class="h-8 -ml-2" @click="router.push('/boards')">
-          <ArrowLeft class="h-3.5 w-3.5 mr-1" /> Boards
+          <ArrowLeft class="h-3.5 w-3.5 mr-1" /> Back
         </Button>
-        <div class="flex-1 min-w-0">
-          <h1 class="font-semibold text-base truncate">{{ board?.name ?? "Board" }}</h1>
-          <p v-if="board" class="text-[11px] text-muted-foreground truncate">
-            {{ board.projects.length }} project{{ board.projects.length === 1 ? "" : "s" }}:
-            <span
-              v-for="(p, idx) in board.projects.slice(0, 8)"
-              :key="p.id"
-              class="font-mono ml-1"
-            >{{ p.key }}{{ idx < Math.min(board.projects.length, 8) - 1 ? "," : "" }}</span>
-            <span v-if="board.projects.length > 8">…</span>
-          </p>
-        </div>
+        <Separator orientation="vertical" class="h-5" />
+        <span class="text-sm font-medium truncate">{{ board?.name ?? "Board" }}</span>
+        <span v-if="board" class="text-[11px] text-muted-foreground whitespace-nowrap">
+          · {{ board.projects.length }} project{{ board.projects.length === 1 ? "" : "s" }}
+        </span>
+        <Separator orientation="vertical" class="h-5" />
+        <InsightsTabs
+          :board-path="`/boards/${boardId}`"
+          :insights-path="`/boards/${boardId}/insights`"
+        />
+        <div class="flex-1 min-w-0" />
         <SwimlaneSelector v-model="swimlaneBy" />
         <Button variant="outline" size="sm" class="h-8" :disabled="!board" @click="showEdit = true">
           <Pencil class="h-3.5 w-3.5 mr-1.5" /> Edit
@@ -333,12 +335,6 @@ const errMessage = computed(() => {
         <Loader2
           v-if="transitionMutation.isPending.value"
           class="h-4 w-4 text-muted-foreground animate-spin"
-        />
-      </div>
-      <div class="px-4">
-        <InsightsTabs
-          :board-path="`/boards/${boardId}`"
-          :insights-path="`/boards/${boardId}/insights`"
         />
       </div>
     </div>
