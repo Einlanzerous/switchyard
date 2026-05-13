@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.11.1](https://github.com/Einlanzerous/switchyard/compare/v2.11.0...v2.11.1) (2026-05-13)
+
+
+### Bug Fixes
+
+* Phase 4.4 polish — unified Board/Insights header, smaller switch, empty-board cleanup ([d8b8ff7](https://github.com/Einlanzerous/switchyard/commit/d8b8ff755e101a11ab5ef87ad6651bfb011525c0))
+
 ## [2.11.0](https://github.com/Einlanzerous/switchyard/compare/v2.10.0...v2.11.0) (2026-05-13)
 
 
