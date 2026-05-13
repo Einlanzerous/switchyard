@@ -64,6 +64,20 @@ const PRIORITY_OPTIONS = [
   { value: "high", label: "High" },
   { value: "critical", label: "Critical" },
 ];
+const DUE_OPTIONS = [
+  { value: "overdue", label: "Overdue" },
+  { value: "this_week", label: "Due this week" },
+  { value: "none", label: "No due date" },
+];
+
+// Due is single-select. ChipGroup is multi by design, so we adapt: render the
+// active value as a one-element selected array; clicking the active chip
+// clears it, clicking a different chip switches to it.
+const dueSelected = computed(() => (filters.value.due ? [filters.value.due] : []));
+function toggleDue(value: string) {
+  const next = filters.value.due === value ? undefined : (value as "overdue" | "this_week" | "none");
+  set("due", next);
+}
 
 // ─── input ↔ filter sync ─────────────────────────────────────────────────────
 //
@@ -253,6 +267,7 @@ function assigneeLabel(idOrSentinel: string): string {
                  @toggle="(v) => toggle('type', v)" />
       <ChipGroup label="Priority" :options="PRIORITY_OPTIONS" :selected="filters.priority"
                  @toggle="(v) => toggle('priority', v)" />
+      <ChipGroup label="Due" :options="DUE_OPTIONS" :selected="dueSelected" @toggle="toggleDue" />
 
       <Button
         v-if="isAnySet"

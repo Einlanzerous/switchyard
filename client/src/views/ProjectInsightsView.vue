@@ -87,7 +87,7 @@ function back() { router.push("/projects"); }
     <!-- Body -->
     <div class="flex-1 overflow-auto px-4 py-4 space-y-4">
       <!-- KPI strip — scoped to project. -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
         <KpiCard
           label="Open"
           :value="stats.data.value?.totals.open ?? 0"
@@ -103,6 +103,18 @@ function back() { router.push("/projects"); }
           :warning="(stats.data.value?.stale_in_progress ?? 0) > 0
             ? `${stats.data.value!.stale_in_progress} stale`
             : null"
+        />
+        <KpiCard
+          label="Overdue"
+          :value="stats.data.value?.overdue ?? 0"
+          :loading="stats.isLoading.value"
+          :warning="(stats.data.value?.overdue ?? 0) > 0 ? 'past due, still open' : null"
+        />
+        <KpiCard
+          label="Completed late"
+          :value="stats.data.value?.completed_late ?? 0"
+          :loading="stats.isLoading.value"
+          :subline="(stats.data.value?.completed_late ?? 0) > 0 ? 'shipped past due date' : 'all on time'"
         />
         <KpiCard
           label="Closed this week"

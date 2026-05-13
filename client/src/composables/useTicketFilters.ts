@@ -9,6 +9,8 @@
 import { computed } from "vue";
 import { useRoute, useRouter, type LocationQuery } from "vue-router";
 
+export type DueFilter = "overdue" | "this_week" | "none";
+
 export type TicketFilters = {
   project: string[];           // project keys, e.g. ["FLOW", "DEMO"]
   status: string[];            // canonical category names or status UUIDs
@@ -16,6 +18,9 @@ export type TicketFilters = {
   priority: string[];          // priorities
   assignee: string | undefined; // user UUID OR "unassigned"
   text: string | undefined;    // ILIKE search
+  // Single-select due-date filter. `overdue` and `this_week` only match
+  // open tickets; `none` matches null due_date regardless of status.
+  due: DueFilter | undefined;
   // Custom field equality filters: `metadata.<key> = <value>`. URL form
   // is `?cf.<key>=<value>`; multiple keys are independent ANDs. Last
   // write per key wins.
@@ -35,6 +40,11 @@ function parseString(v: LocationQuery[string] | undefined): string | undefined {
   return undefined;
 }
 
+function parseDue(v: LocationQuery[string] | undefined): DueFilter | undefined {
+  if (typeof v !== "string") return undefined;
+  return v === "overdue" || v === "this_week" || v === "none" ? v : undefined;
+}
+
 export function useTicketFilters() {
   const route = useRoute();
   const router = useRouter();
@@ -52,13 +62,14 @@ export function useTicketFilters() {
       priority: parseList(route.query.priority),
       assignee: parseString(route.query.assignee),
       text: parseString(route.query.text),
+      due: parseDue(route.query.due),
       customFields: cf,
     };
   });
 
   // Strip filter keys we manage so we can rebuild the query without dropping
   // the drawer's `focus` param or future ones. `cf.*` keys are also ours.
-  const KEYS: FilterKey[] = ["project", "status", "type", "priority", "assignee", "text"];
+  const KEYS: FilterKey[] = ["project", "status", "type", "priority", "assignee", "text", "due"];
 
   function writeQuery(next: TicketFilters) {
     const query: Record<string, string> = {};
@@ -73,6 +84,7 @@ export function useTicketFilters() {
     if (next.priority.length > 0) query.priority = next.priority.join(",");
     if (next.assignee) query.assignee = next.assignee;
     if (next.text) query.text = next.text;
+    if (next.due) query.due = next.due;
     for (const [k, v] of Object.entries(next.customFields)) {
       if (v.length > 0) query[`cf.${k}`] = v;
     }
@@ -92,14 +104,14 @@ export function useTicketFilters() {
   function clear() {
     writeQuery({
       project: [], status: [], type: [], priority: [],
-      assignee: undefined, text: undefined, customFields: {},
+      assignee: undefined, text: undefined, due: undefined, customFields: {},
     });
   }
 
   const isAnySet = computed(() => {
     const f = filters.value;
     return f.project.length + f.status.length + f.type.length + f.priority.length > 0
-      || !!f.assignee || !!f.text || Object.keys(f.customFields).length > 0;
+      || !!f.assignee || !!f.text || !!f.due || Object.keys(f.customFields).length > 0;
   });
 
   // Replace the entire filter set in one router push. Used by saved views
@@ -113,6 +125,7 @@ export function useTicketFilters() {
       priority: next.priority ?? [],
       assignee: next.assignee ?? undefined,
       text: next.text ?? undefined,
+      due: next.due ?? undefined,
       customFields: next.customFields ?? {},
     });
   }

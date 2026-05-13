@@ -174,6 +174,22 @@ export function mount(app: OpenAPIHono) {
     if (q.updated_after) conds.push(gt(schema.tickets.updated_at, q.updated_after));
     if (q.updated_before) conds.push(lt(schema.tickets.updated_at, q.updated_before));
 
+    if (q.due) {
+      // `overdue` / `this_week` only count open tickets — a ticket that closed
+      // with a past due_date isn't "still overdue", it just shipped late. The
+      // completed-late count lives on the stats endpoint.
+      const openCond = sql`EXISTS (SELECT 1 FROM statuses s WHERE s.id = ${schema.tickets.status_id} AND s.category <> 'closed')`;
+      if (q.due === "overdue") {
+        conds.push(sql`${schema.tickets.due_date} IS NOT NULL AND ${schema.tickets.due_date} < NOW()`);
+        conds.push(openCond);
+      } else if (q.due === "this_week") {
+        conds.push(sql`${schema.tickets.due_date} IS NOT NULL AND ${schema.tickets.due_date} >= NOW() AND ${schema.tickets.due_date} < NOW() + INTERVAL '7 days'`);
+        conds.push(openCond);
+      } else {
+        conds.push(isNull(schema.tickets.due_date));
+      }
+    }
+
     // Custom field filters: any query param matching `cf.<key>` matches
     // `metadata -> '<key>'` on the ticket. JSONB equality is text-based
     // here — we cast both sides to text so the param works regardless

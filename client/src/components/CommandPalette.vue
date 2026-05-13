@@ -126,6 +126,7 @@ function applySavedView(v: SavedView) {
         priority: v.filters.priority ?? [],
         assignee: v.filters.assignee ?? undefined,
         text: v.filters.text ?? undefined,
+        due: v.filters.due ?? undefined,
       });
     });
     return;
@@ -137,6 +138,7 @@ function applySavedView(v: SavedView) {
     priority: v.filters.priority ?? [],
     assignee: v.filters.assignee ?? undefined,
     text: v.filters.text ?? undefined,
+    due: v.filters.due ?? undefined,
   });
 }
 

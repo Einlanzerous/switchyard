@@ -58,6 +58,12 @@ export const ProjectStats = z.object({
   by_type: TypeCounts,
   by_assignee: z.array(AssigneeCount),       // sorted by count desc
   stale_in_progress: z.number().int().nonnegative(),
+  // Currently-open tickets whose due_date has passed.
+  overdue: z.number().int().nonnegative(),
+  // All-time count of closed tickets where the close-out event fired after
+  // the due_date — i.e. shipped late. Separate from `overdue` (which is a
+  // live snapshot of work that's still open and past due).
+  completed_late: z.number().int().nonnegative(),
   most_recent_activity: Iso8601.nullable(),
 });
 export type ProjectStats = z.infer<typeof ProjectStats>;

@@ -15,6 +15,7 @@ export const SavedViewFilters = z.object({
   priority: z.array(z.string()).default([]),
   assignee: z.string().nullable().optional(),
   text: z.string().nullable().optional(),
+  due: z.enum(["overdue", "this_week", "none"]).nullable().optional(),
 });
 export type SavedViewFilters = z.infer<typeof SavedViewFilters>;
 

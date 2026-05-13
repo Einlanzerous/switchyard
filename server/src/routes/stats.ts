@@ -132,6 +132,8 @@ type AggRow = {
   prio_low: number; prio_medium: number; prio_high: number; prio_critical: number; prio_none: number;
   type_task: number; type_bug: number; type_spike: number; type_epic: number;
   stale: number;
+  overdue: number;
+  completed_late: number;
   recent: string | null;
 };
 
@@ -159,6 +161,25 @@ async function fetchProjectAgg(projectId: string, staleDays: number): Promise<Ag
         WHERE s.category = 'in_progress'
           AND t.updated_at < (NOW() - (${staleDays} * INTERVAL '1 day'))
       )::int AS stale,
+      COUNT(*) FILTER (
+        WHERE s.category <> 'closed'
+          AND t.due_date IS NOT NULL
+          AND t.due_date < NOW()
+      )::int AS overdue,
+      -- Closed tickets whose latest close-out event fired after the due_date.
+      -- EXISTS keeps this cheap; events_ticket_idx covers (ticket_id, created_at).
+      -- A reopen+reclose cycle where ANY close was late still counts as late,
+      -- which matches "did we ship past the deadline" intent.
+      COUNT(*) FILTER (
+        WHERE s.category = 'closed'
+          AND t.due_date IS NOT NULL
+          AND EXISTS (
+            SELECT 1 FROM events e
+            WHERE e.ticket_id = t.id
+              AND e.event_type = 'ticket.closed'
+              AND e.created_at > t.due_date
+          )
+      )::int AS completed_late,
       MAX(t.updated_at)::text AS recent
     FROM tickets t
     JOIN statuses s ON s.id = t.status_id
@@ -174,7 +195,7 @@ async function fetchProjectAgg(projectId: string, staleDays: number): Promise<Ag
       cat_backlog: 0, cat_planning: 0, cat_in_progress: 0, cat_blocked: 0, cat_closed: 0,
       prio_low: 0, prio_medium: 0, prio_high: 0, prio_critical: 0, prio_none: 0,
       type_task: 0, type_bug: 0, type_spike: 0, type_epic: 0,
-      stale: 0, recent: null,
+      stale: 0, overdue: 0, completed_late: 0, recent: null,
     };
   }
   return row as AggRow;
@@ -249,6 +270,8 @@ export function mount(app: OpenAPIHono) {
         },
         by_assignee,
         stale_in_progress: agg.stale,
+        overdue: agg.overdue,
+        completed_late: agg.completed_late,
         most_recent_activity: agg.recent,
       },
       200
