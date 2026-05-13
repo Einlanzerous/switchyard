@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.12.0](https://github.com/Einlanzerous/switchyard/compare/v2.11.1...v2.12.0) (2026-05-13)
+
+
+### Features
+
+* SWY-42 Phase 4.6 — surface due_date in the UI + overdue/late stats ([3148a39](https://github.com/Einlanzerous/switchyard/commit/3148a399ce72c8c086d2b08b0040a23c708f3f3d))
+* SWY-42 Phase 4.6 — surface due_date in the UI + overdue/late stats ([b674327](https://github.com/Einlanzerous/switchyard/commit/b67432731856660dbd19e2512a72a668be412635))
+
 ## [2.11.1](https://github.com/Einlanzerous/switchyard/compare/v2.11.0...v2.11.1) (2026-05-13)
 
 
