@@ -8,6 +8,8 @@ import type {
   Label, LabelRef, TicketSummary, Ticket, Comment, Attachment, Event as ApiEvent,
   Resolution, TicketType, Priority, EventType, AttachmentKind, StatusCategory,
   ApiToken, TicketLink, TicketLinkType, TicketLinkDirection,
+  CustomField as ApiCustomField, CustomFieldType as ApiCustomFieldType,
+  CustomFieldOptions as ApiCustomFieldOptions,
 } from "@switchyard/shared";
 import * as schema from "../../drizzle/schema.js";
 import { env } from "../env.js";
@@ -369,5 +371,25 @@ export function mapApiToken(t: TokenRow): ApiToken {
     revoked_at: t.revoked_at,
     created_at: t.created_at,
     updated_at: t.updated_at,
+  };
+}
+
+// ─── custom fields ─────────────────────────────────────────────────────────
+
+type CustomFieldRow = typeof schema.customFields.$inferSelect;
+
+export function mapCustomField(f: CustomFieldRow): ApiCustomField {
+  return {
+    id: f.id,
+    project_id: f.project_id,
+    key: f.key,
+    label: f.label,
+    type: f.type as ApiCustomFieldType,
+    options: (f.options ?? null) as ApiCustomFieldOptions | null,
+    show_on_card: f.show_on_card,
+    show_on_create_form: f.show_on_create_form,
+    show_on_filter_bar: f.show_on_filter_bar,
+    created_at: f.created_at,
+    updated_at: f.updated_at,
   };
 }

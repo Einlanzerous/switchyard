@@ -72,6 +72,11 @@ test.describe("smoke", () => {
     await expect(page.getByRole("heading", { name: /^Profile$/i })).toBeVisible();
   });
 
+  test("settings custom fields renders", async ({ page }) => {
+    await page.goto("/settings/custom-fields");
+    await expect(page.getByRole("button", { name: /new field/i }).first()).toBeVisible();
+  });
+
   test("health page renders", async ({ page }) => {
     await page.goto("/health");
     await expect(page.getByRole("heading", { name: /^Health$/i })).toBeVisible();

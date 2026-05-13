@@ -172,6 +172,23 @@ export function mount(app: OpenAPIHono) {
     if (q.updated_after) conds.push(gt(schema.tickets.updated_at, q.updated_after));
     if (q.updated_before) conds.push(lt(schema.tickets.updated_at, q.updated_before));
 
+    // Custom field filters: any query param matching `cf.<key>` matches
+    // `metadata -> '<key>'` on the ticket. JSONB equality is text-based
+    // here — we cast both sides to text so the param works regardless
+    // of whether the stored value is a string, number, or boolean. Keep
+    // this past the Zod parse so unknown params don't 400.
+    const rawUrl = new URL(c.req.url);
+    for (const [param, value] of rawUrl.searchParams) {
+      if (!param.startsWith("cf.")) continue;
+      const key = param.slice(3);
+      if (!/^[a-z][a-z0-9_]*$/.test(key)) {
+        throw badRequest(`invalid custom field key in filter: ${param}`);
+      }
+      conds.push(
+        sql`${schema.tickets.metadata}->>${key} = ${value}`,
+      );
+    }
+
     if (q.cursor) {
       const cur = decodeCursor(q.cursor);
       if (!cur) throw badRequest("invalid cursor");

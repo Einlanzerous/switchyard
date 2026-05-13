@@ -45,6 +45,9 @@ export const queryKeys = {
   targets: () => ["sw", "targets"] as const,
   target: (id: string) => ["sw", "targets", id] as const,
 
+  customFields: () => ["sw", "custom-fields"] as const,
+  customField: (id: string) => ["sw", "custom-fields", id] as const,
+
   systemSettings: () => ["sw", "settings"] as const,
 
   // Stats endpoints. Bulk projects-stats is keyed without parameters since

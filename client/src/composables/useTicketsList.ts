@@ -22,6 +22,12 @@ export function useTicketsList(filters: ComputedRef<TicketFilters>) {
       // priority isn't a top-level filter on the API today; client-filtered later.
       if (f.assignee) q.assignee = f.assignee;
       if (f.text) q.text = f.text;
+      // Custom field filters: forward each as a `cf.<key>` param. The
+      // openapi-fetch generated types don't know about these (they're
+      // dynamic), so they ride through as-is on the query record.
+      for (const [k, v] of Object.entries(f.customFields)) {
+        q[`cf.${k}`] = v;
+      }
       if (pageParam) q.cursor = pageParam;
 
       const { data, error } = await api.GET("/v1/tickets", {

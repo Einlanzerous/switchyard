@@ -190,6 +190,58 @@ export const labels = pgTable(
   })
 );
 
+// ─── custom fields (typed views over metadata JSONB) ───────────────────────
+//
+// A custom_fields row declares that `metadata.<key>` on tickets in a given
+// project (or globally, when project_id is null) should be surfaced as a
+// typed input/display + filterable. The underlying storage is still the
+// metadata jsonb column on tickets — defining a field doesn't migrate
+// existing data; deleting a field doesn't drop any data either.
+
+export const customFieldType = pgEnum("custom_field_type", [
+  "text", "number", "boolean", "url", "select",
+]);
+
+export const customFields = pgTable(
+  "custom_fields",
+  {
+    id: id(),
+    // NULL = global (applies to every project). Project-scoped fields
+    // shadow a same-keyed global field for tickets in that project.
+    project_id: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }),
+    // Identifier matched against `metadata.<key>`. lowercase + digits +
+    // underscores; must start with a letter.
+    key: varchar("key", { length: 80 }).notNull(),
+    label: varchar("label", { length: 200 }).notNull(),
+    type: customFieldType("type").notNull(),
+    // For type=select, `{ values: ["high","medium","low"] }`. Null for
+    // every other type. Validated at the API layer (Zod superRefine).
+    options: jsonb("options"),
+    show_on_card: boolean("show_on_card").notNull().default(false),
+    show_on_create_form: boolean("show_on_create_form").notNull().default(false),
+    show_on_filter_bar: boolean("show_on_filter_bar").notNull().default(false),
+    created_at: createdAt(),
+    updated_at: updatedAt(),
+  },
+  (t) => ({
+    // Split into two partial indexes — postgres treats NULL as distinct
+    // for uniqueness, so a single (project_id, key) index would allow
+    // duplicate global rows with the same key. PG 15+ has NULLS NOT
+    // DISTINCT but we don't want to depend on it.
+    projectKeyUnique: uniqueIndex("custom_fields_project_key_unique")
+      .on(t.project_id, t.key)
+      .where(sql`${t.project_id} IS NOT NULL`),
+    globalKeyUnique: uniqueIndex("custom_fields_global_key_unique")
+      .on(t.key)
+      .where(sql`${t.project_id} IS NULL`),
+    keyShape: check(
+      "custom_fields_key_shape",
+      sql`${t.key} ~ '^[a-z][a-z0-9_]*$'`,
+    ),
+    projectIdx: index("custom_fields_project_idx").on(t.project_id),
+  })
+);
+
 // ─── tickets ────────────────────────────────────────────────────────────────
 
 export const tickets = pgTable(

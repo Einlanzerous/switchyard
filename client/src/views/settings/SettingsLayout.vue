@@ -2,7 +2,7 @@
 import { computed } from "vue";
 import { RouterLink, RouterView, useRoute } from "vue-router";
 import {
-  User as UserIcon, Key, Tag, FolderKanban, Users,
+  User as UserIcon, Key, Tag, FolderKanban, Users, Database,
 } from "lucide-vue-next";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +22,7 @@ const groups: NavGroup[] = [
     items: [
       { to: "/settings/labels", label: "Labels", icon: Tag },
       { to: "/settings/projects", label: "Projects", icon: FolderKanban },
+      { to: "/settings/custom-fields", label: "Custom fields", icon: Database },
     ],
   },
   {

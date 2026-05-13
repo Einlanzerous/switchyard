@@ -22,6 +22,11 @@ export type ParsedQuery = {
   text: string | undefined;
   project: string[];
   assignee: string | undefined;
+  // Custom field equality filters. `cf.<key>=<value>` tokens land here
+  // and the consumer forwards them to the API as the same `cf.*` query
+  // params the tickets list handler accepts directly. Last write wins
+  // per key.
+  customFields: Record<string, string>;
 };
 
 const VALUE_KEYS = new Set(["project", "assignee"]);
@@ -61,6 +66,7 @@ export function parseSearchQuery(input: string): ParsedQuery {
     text: undefined,
     project: [],
     assignee: undefined,
+    customFields: {},
   };
   const textParts: string[] = [];
 
@@ -73,6 +79,20 @@ export function parseSearchQuery(input: string): ParsedQuery {
     }
     const key = tok.slice(0, eq).toLowerCase();
     const rawValue = tok.slice(eq + 1);
+
+    // Custom-field filter: `cf.<key>=<value>`. Single value; no comma
+    // expansion for now — the underlying API only supports equality
+    // on metadata->><key>, not IN. Last write wins.
+    if (key.startsWith("cf.") && rawValue.length > 0) {
+      const cfKey = key.slice(3);
+      if (/^[a-z][a-z0-9_]*$/.test(cfKey)) {
+        result.customFields[cfKey] = rawValue;
+        continue;
+      }
+      // Invalid key shape → fall through to bare text rather than silently drop.
+      textParts.push(tok);
+      continue;
+    }
 
     if (!VALUE_KEYS.has(key) || rawValue.length === 0) {
       textParts.push(tok);
@@ -106,5 +126,9 @@ export function stringifySearchQuery(q: ParsedQuery): string {
   if (q.text) parts.push(/\s/.test(q.text) ? `"${q.text.replace(/"/g, '\\"')}"` : q.text);
   if (q.project.length) parts.push(`project=${q.project.join(",")}`);
   if (q.assignee) parts.push(`assignee=${q.assignee}`);
+  for (const [k, v] of Object.entries(q.customFields)) {
+    const needsQuote = /\s/.test(v);
+    parts.push(`cf.${k}=${needsQuote ? `"${v.replace(/"/g, '\\"')}"` : v}`);
+  }
   return parts.join(" ");
 }

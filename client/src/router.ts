@@ -22,6 +22,7 @@ import SettingsProject from "./views/settings/SettingsProject.vue";
 import SettingsProjectStatuses from "./views/settings/SettingsProjectStatuses.vue";
 import SettingsProjectTransitions from "./views/settings/SettingsProjectTransitions.vue";
 import SettingsUsers from "./views/settings/SettingsUsers.vue";
+import SettingsCustomFields from "./views/settings/SettingsCustomFields.vue";
 
 // Automations is its own top-level area; webhooks (and Phase-4 rules) live
 // under it rather than under /settings, since they're a primary integration
@@ -72,6 +73,7 @@ export const router = createRouter({
           component: SettingsProjectTransitions,
         },
         { path: "users", name: "settings-users", component: SettingsUsers },
+        { path: "custom-fields", name: "settings-custom-fields", component: SettingsCustomFields },
       ],
     },
 

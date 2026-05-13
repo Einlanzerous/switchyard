@@ -16,6 +16,10 @@ export type TicketFilters = {
   priority: string[];          // priorities
   assignee: string | undefined; // user UUID OR "unassigned"
   text: string | undefined;    // ILIKE search
+  // Custom field equality filters: `metadata.<key> = <value>`. URL form
+  // is `?cf.<key>=<value>`; multiple keys are independent ANDs. Last
+  // write per key wins.
+  customFields: Record<string, string>;
 };
 
 type FilterKey = keyof TicketFilters;
@@ -35,23 +39,32 @@ export function useTicketFilters() {
   const route = useRoute();
   const router = useRouter();
 
-  const filters = computed<TicketFilters>(() => ({
-    project: parseList(route.query.project),
-    status: parseList(route.query.status),
-    type: parseList(route.query.type),
-    priority: parseList(route.query.priority),
-    assignee: parseString(route.query.assignee),
-    text: parseString(route.query.text),
-  }));
+  const filters = computed<TicketFilters>(() => {
+    const cf: Record<string, string> = {};
+    for (const [k, v] of Object.entries(route.query)) {
+      if (!k.startsWith("cf.")) continue;
+      if (typeof v === "string" && v.length > 0) cf[k.slice(3)] = v;
+    }
+    return {
+      project: parseList(route.query.project),
+      status: parseList(route.query.status),
+      type: parseList(route.query.type),
+      priority: parseList(route.query.priority),
+      assignee: parseString(route.query.assignee),
+      text: parseString(route.query.text),
+      customFields: cf,
+    };
+  });
 
   // Strip filter keys we manage so we can rebuild the query without dropping
-  // the drawer's `focus` param or future ones.
+  // the drawer's `focus` param or future ones. `cf.*` keys are also ours.
   const KEYS: FilterKey[] = ["project", "status", "type", "priority", "assignee", "text"];
 
   function writeQuery(next: TicketFilters) {
     const query: Record<string, string> = {};
     for (const [k, v] of Object.entries(route.query)) {
       if ((KEYS as string[]).includes(k)) continue;
+      if (k.startsWith("cf.")) continue; // cf.* are rewritten below
       if (typeof v === "string") query[k] = v;
     }
     if (next.project.length > 0) query.project = next.project.join(",");
@@ -60,6 +73,9 @@ export function useTicketFilters() {
     if (next.priority.length > 0) query.priority = next.priority.join(",");
     if (next.assignee) query.assignee = next.assignee;
     if (next.text) query.text = next.text;
+    for (const [k, v] of Object.entries(next.customFields)) {
+      if (v.length > 0) query[`cf.${k}`] = v;
+    }
     router.replace({ query });
   }
 
@@ -74,13 +90,16 @@ export function useTicketFilters() {
   }
 
   function clear() {
-    writeQuery({ project: [], status: [], type: [], priority: [], assignee: undefined, text: undefined });
+    writeQuery({
+      project: [], status: [], type: [], priority: [],
+      assignee: undefined, text: undefined, customFields: {},
+    });
   }
 
   const isAnySet = computed(() => {
     const f = filters.value;
     return f.project.length + f.status.length + f.type.length + f.priority.length > 0
-      || !!f.assignee || !!f.text;
+      || !!f.assignee || !!f.text || Object.keys(f.customFields).length > 0;
   });
 
   // Replace the entire filter set in one router push. Used by saved views
@@ -94,6 +113,7 @@ export function useTicketFilters() {
       priority: next.priority ?? [],
       assignee: next.assignee ?? undefined,
       text: next.text ?? undefined,
+      customFields: next.customFields ?? {},
     });
   }
 

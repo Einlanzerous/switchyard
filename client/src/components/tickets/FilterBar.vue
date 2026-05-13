@@ -98,7 +98,8 @@ function resolveAssignee(raw: string | undefined): string | undefined {
 let inputTimer: ReturnType<typeof setTimeout> | null = null;
 
 // User-typed input → parsed query → filter state. Only project/assignee/text
-// are written so chip-toggled status/type/priority stay intact.
+// /customFields are written from the parser so chip-toggled status/type/
+// priority stay intact.
 function applyParsed() {
   const parsed = parseSearchQuery(localText.value);
   const next = {
@@ -106,11 +107,13 @@ function applyParsed() {
     text: parsed.text,
     project: parsed.project,
     assignee: resolveAssignee(parsed.assignee),
+    customFields: parsed.customFields,
   };
   // Avoid no-op writes that would still trigger a router.replace.
   if (next.text === filters.value.text
     && JSON.stringify(next.project) === JSON.stringify(filters.value.project)
-    && next.assignee === filters.value.assignee) return;
+    && next.assignee === filters.value.assignee
+    && JSON.stringify(next.customFields) === JSON.stringify(filters.value.customFields)) return;
   // Single router push. Calling `set` per key here would race: each
   // call reads `filters.value` (a computed off route.query), but
   // router.replace doesn't sync route.query in the same tick — so the
@@ -140,6 +143,7 @@ function rebuildLocalText() {
     text: f.text,
     project: f.project,
     assignee: assigneeLabel,
+    customFields: f.customFields,
   });
 }
 
