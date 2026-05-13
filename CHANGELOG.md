@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.10.0](https://github.com/Einlanzerous/switchyard/compare/v2.9.0...v2.10.0) (2026-05-13)
+
+
+### Features
+
+* viewport-locked sidebar + Closed-column window (global + per-project) ([a8fbbac](https://github.com/Einlanzerous/switchyard/commit/a8fbbac61d192ed3e43d753383e9aaac866fe321))
+
 ## [2.9.0](https://github.com/Einlanzerous/switchyard/compare/v2.8.0...v2.9.0) (2026-05-13)
 
 
