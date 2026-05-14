@@ -40,6 +40,17 @@ export const webhookDeliveryStatus = pgEnum("webhook_delivery_status", [
   "abandoned",
 ]);
 
+// Overlap policy controls what happens when a scheduled fire would create
+// a new instance while a prior instance is still open. `skip` is the safe
+// default; `always` is the "weekly notes" pattern (each cycle is its own
+// thing); `reuse_open` bumps the open instance's due_date forward instead
+// of stacking a second one.
+export const ticketTemplateOverlapPolicy = pgEnum("ticket_template_overlap_policy", [
+  "skip",
+  "always",
+  "reuse_open",
+]);
+
 // ─── Common columns ─────────────────────────────────────────────────────────
 
 const id = () => uuid("id").primaryKey().defaultRandom();
@@ -275,6 +286,10 @@ export const tickets = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
     due_date: timestamp("due_date", { withTimezone: true, mode: "string" }),
+    // Back-pointer to the ticket_template that materialized this ticket.
+    // NULL = hand-created. The template is the source of truth for FUTURE
+    // instances; editing the template never touches past instances.
+    template_id: uuid("template_id").references((): any => ticketTemplates.id, { onDelete: "set null" }),
     // Manual sort order within a column. Higher number = higher in column.
     // Backfilled to epoch_ms(updated_at) on first migrate (see triggers.sql)
     // so existing tickets keep their date-descending order without any
@@ -292,6 +307,7 @@ export const tickets = pgTable(
     parentIdx: index("tickets_parent_idx").on(t.parent_id),
     updatedIdx: index("tickets_updated_idx").on(t.updated_at),
     positionIdx: index("tickets_position_idx").on(t.status_id, t.position),
+    templateIdx: index("tickets_template_idx").on(t.template_id).where(sql`${t.template_id} IS NOT NULL`),
     noSelfParent: check("tickets_no_self_parent", sql`${t.id} <> ${t.parent_id}`),
   })
 );
@@ -821,5 +837,90 @@ export const idempotencyKeys = pgTable(
   (t) => ({
     pk: primaryKey({ columns: [t.user_id, t.method, t.path, t.key] }),
     expiresIdx: index("idempotency_keys_expires_idx").on(t.expires_at),
+  })
+);
+
+// One row per recurring or one-shot ticket template. Recurring templates
+// are tz-aware cron schedules; one-shot templates fire once at
+// `trigger_at - lead_days` then flip enabled=false. XOR constraint at the
+// DB layer guarantees exactly one schedule mode.
+//
+// Materialization: when the scheduler decides a template is due, it INSERTs
+// a regular ticket copying every template field, sets `tickets.template_id`
+// to point back here, applies `due_date_offset_days` (recurring) or
+// `trigger_at` (one-shot) to the new ticket's due_date, and stamps
+// `last_fired_at` BEFORE the insert so concurrent ticks can't double-fire.
+//
+// Editing a template never modifies past instances — only future creates.
+export const ticketTemplates = pgTable(
+  "ticket_templates",
+  {
+    id: id(),
+    project_id: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    enabled: boolean("enabled").notNull().default(true),
+    // ─── template fields (copied into each instance) ──────────────────────
+    title: varchar("title", { length: 500 }).notNull(),
+    description: text("description").notNull().default(""),
+    type: ticketType("type").notNull().default("task"),
+    priority: priority("priority"),
+    assignee_id: uuid("assignee_id").references(() => users.id, { onDelete: "set null" }),
+    // Parent inheritance: if set, every instance is created with this
+    // parent_id. NULL = each instance stands alone.
+    parent_id: uuid("parent_id").references(() => tickets.id, { onDelete: "set null" }),
+    // Label IDs to attach to each instance. Stored as uuid[] (small set,
+    // no need for a join table here — kept inline keeps INSERTs atomic).
+    label_ids: uuid("label_ids").array().notNull().default(sql`'{}'::uuid[]`),
+    // Custom-field defaults copied verbatim into the new ticket's metadata.
+    metadata: jsonb("metadata").notNull().default({}),
+    // Days added to the fire timestamp to compute the instance's due_date.
+    // NULL = no due date on instances. Recurring + non-null is the
+    // common "due Friday" pattern. One-shot ignores this (its due_date
+    // is `trigger_at` directly).
+    due_date_offset_days: integer("due_date_offset_days"),
+    // ─── schedule (XOR — recurring OR one-shot) ───────────────────────────
+    // Standard 5-field cron. When set, this is a recurring template.
+    schedule_cron: text("schedule_cron"),
+    // IANA tz name (e.g. "America/Chicago"). NULL = UTC. Recurring only.
+    schedule_tz: varchar("schedule_tz", { length: 80 }),
+    // One-shot trigger date. When set, fires once at `trigger_at - lead_days`
+    // and then `enabled` is flipped false. Mutually exclusive with cron.
+    trigger_at: timestamp("trigger_at", { withTimezone: true, mode: "string" }),
+    // Lead time before `trigger_at`. 0 = fire on the date itself.
+    lead_days: integer("lead_days").notNull().default(0),
+    // ─── behavior ─────────────────────────────────────────────────────────
+    overlap_policy: ticketTemplateOverlapPolicy("overlap_policy").notNull().default("skip"),
+    // The user who created the template. Used as reporter on each
+    // materialized instance so the audit trail attributes ticket creation
+    // to someone real instead of an anonymous scheduler tick.
+    created_by_user_id: uuid("created_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    // ─── bookkeeping ──────────────────────────────────────────────────────
+    last_fired_at: timestamp("last_fired_at", { withTimezone: true, mode: "string" }),
+    created_at: createdAt(),
+    updated_at: updatedAt(),
+  },
+  (t) => ({
+    projectIdx: index("ticket_templates_project_idx").on(t.project_id),
+    enabledIdx: index("ticket_templates_enabled_idx").on(t.enabled).where(sql`${t.enabled} = true`),
+    // Schedule mode XOR — recurring OR one-shot, never both, never neither.
+    scheduleMode: check(
+      "ticket_templates_schedule_mode_xor",
+      sql`(
+        (${t.schedule_cron} IS NOT NULL AND ${t.trigger_at} IS NULL)
+        OR
+        (${t.schedule_cron} IS NULL AND ${t.trigger_at} IS NOT NULL)
+      )`,
+    ),
+    // Active recurring templates the scheduler tick narrows on each pass.
+    scheduledIdx: index("ticket_templates_scheduled_idx")
+      .on(t.enabled, t.schedule_cron)
+      .where(sql`${t.enabled} = true AND ${t.schedule_cron} IS NOT NULL`),
+    // Active one-shot templates the scheduler tick narrows on each pass.
+    triggerIdx: index("ticket_templates_trigger_idx")
+      .on(t.enabled, t.trigger_at)
+      .where(sql`${t.enabled} = true AND ${t.trigger_at} IS NOT NULL`),
   })
 );

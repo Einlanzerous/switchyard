@@ -13,6 +13,7 @@ import { CronExpressionParser } from "cron-parser";
 import * as schema from "../../../drizzle/schema.js";
 import { db } from "../../db.js";
 import { StatusCategory, TicketType, type ScheduledRuleTarget } from "@switchyard/shared";
+import { tickTemplates } from "../templates/scheduler.js";
 
 const POLL_INTERVAL_MS = 60_000;
 // Cap per scheduled-tick result so a misconfigured target_query
@@ -80,6 +81,16 @@ async function tick(now: Date = new Date()): Promise<number> {
       console.error(`[rules-scheduler] rule ${rule.id} (${rule.name}):`, err);
     }
   }
+
+  // Ticket templates ride the same 60s tick. Errors in the template pass
+  // are handled inside tickTemplates() so they don't break the rule loop.
+  try {
+    const templateFires = await tickTemplates(now);
+    firedCount += templateFires;
+  } catch (err) {
+    console.error("[rules-scheduler] template tick error:", err);
+  }
+
   return firedCount;
 }
 

@@ -325,6 +325,7 @@ const errMessage = computed(() => {
         <InsightsTabs
           :board-path="`/projects/${projectKey}/board`"
           :insights-path="`/projects/${projectKey}/insights`"
+          :recurring-path="`/projects/${projectKey}/recurring`"
         />
         <div class="flex-1 min-w-0" />
         <label

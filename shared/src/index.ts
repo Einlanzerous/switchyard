@@ -20,3 +20,4 @@ export * from "./schemas/target.js";
 export * from "./schemas/ticketLink.js";
 export * from "./schemas/customField.js";
 export * from "./schemas/externalRef.js";
+export * from "./schemas/ticketTemplate.js";
