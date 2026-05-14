@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.13.0](https://github.com/Einlanzerous/switchyard/compare/v2.12.0...v2.13.0) (2026-05-14)
+
+
+### Features
+
+* Phase 4 polish — state pills, Targets URL wrap, settings input fix, README ([3ccb251](https://github.com/Einlanzerous/switchyard/commit/3ccb25109aaa118ec6922070f3af423f662e5002))
+* Phase 4 polish — state pills, Targets URL wrap, settings input fix, README ([43111c7](https://github.com/Einlanzerous/switchyard/commit/43111c7c42696d4c0acd2c69e7afb2a0f76b47e6))
+
 ## [2.12.0](https://github.com/Einlanzerous/switchyard/compare/v2.11.1...v2.12.0) (2026-05-13)
 
 
