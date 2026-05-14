@@ -15,7 +15,7 @@ The human sees a UI. The agents see a clean, typed, idempotent HTTP API with cur
 
 ## What's shipped
 
-Phases 1–3 are complete. See [`PHASES.md`](./PHASES.md) for the full plan and architectural decisions.
+Phases 1–4 are complete; Phase 5 (cross-system orchestration via plugins + observability) is the next milestone. See [`PHASES.md`](./PHASES.md) for the full plan and architectural decisions.
 
 ### Phase 1 — Backend API
 
@@ -76,6 +76,32 @@ Keyboard shortcuts (`g t` tickets, `g b` boards, `c` new ticket, `?` shortcut sh
 **Health page** — live `/healthz` subsystem probe surfaced in the admin sidebar: DB latency, uploads writability, webhook queue depth.
 
 ![Health page — DB, uploads, and webhook queue](.github/images/sy_health.png)
+
+### Phase 4 — Automation, integration, and deadlines
+
+Switchyard graduates from "task tracker with an API" to "orchestration substrate for agentic pipelines." Phase 4 ships the rules engine, named outbound targets, typed cross-ticket links, GitHub external references with state polling and webhook auto-attach, per-project custom fields, and first-class due dates.
+
+**Automation rules** — event-triggered (`ticket.created`, `status_changed`, `commented`, etc.) or cron-scheduled. Match a target query (project / status / type / label / assignee / metadata), apply actions (set field, add label, comment, transition, fire webhook, call n8n). Per-rule rate limit + global circuit breaker. Firings log with retry surface for visibility.
+
+**Targets** — named webhook destinations referenced by name from rules and webhook subscriptions. Swapping a host or rotating a secret is one edit instead of N. Optional per-target HMAC secret and custom headers; revealed once on creation.
+
+![Automation targets — named outbound destinations](.github/images/sy_automation_targets.png)
+
+**Custom fields** — typed views over the ticket `metadata` JSONB. Define a field once (text / select / number / url, plus visibility hints), and it shows up wherever it's flagged: card, drawer, create-form, filter bar. Storage stays in JSONB so declaring a field doesn't migrate existing data and deleting one doesn't drop any.
+
+![Custom fields — typed views over metadata JSONB](.github/images/sy_custom_fields.png)
+
+**Typed ticket links** — `blocks` / `relates_to` / `duplicates`, surfaced inline on each ticket's drawer. Reverse direction shown automatically (SWY-43 says "Blocked by SWY-42" without a second row).
+
+**External references** — attach GitHub PR / issue / commit / Actions URLs to a ticket. Background poller hydrates titles + state (open / merged / closed / success / failed) and emits `ticket.external_ref_state_changed` events so automations can react. Manual attach + auto-attach via the GitHub webhook receiver (see below).
+
+**GitHub webhook receiver** — `POST /v1/external/github` accepts `pull_request` events, HMAC-verified via `GITHUB_WEBHOOK_SECRET`. The handler parses ticket keys out of the PR title AND branch name (`KEY-N`), wildcard or strict prefix configurable via `EXTERNAL_REF_KEY_PREFIX`, and attaches the PR as an external ref on every matched ticket. State transitions (open → merged / closed) flow through as live updates without polling. Exposed via Tailscale Funnel in the construct-server deployment so GitHub can reach a tailnet-only backend.
+
+**Due dates** — the `due_date` field has been on the schema since Phase 1 but was invisible until now. Surface in the drawer (popover + native date input, anchored to local midnight), on board cards (calendar icon + relative date, red left stripe when overdue), on list rows (column + overdue accent), and in the activity feed as readable dates. Filter chips: Overdue, Due this week, No due date. Project Insights gains two tiles: **Overdue** (open, past due — live snapshot) and **Completed late** (closed tickets that shipped after their due date — all-time count). Overdue / completed-late are deliberately separate metrics — one is current load, the other is historical health.
+
+![Ticket card with overdue accent](.github/images/sy_ticket_card_details.png)
+
+![Ticket drawer with linked work, typed links, external refs, and due date](.github/images/sy_ticket_drawer_details.png)
 
 ## Layout
 
