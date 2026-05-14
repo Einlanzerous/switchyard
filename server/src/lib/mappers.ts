@@ -12,6 +12,9 @@ import type {
   CustomFieldOptions as ApiCustomFieldOptions,
   ExternalRef as ApiExternalRef, ExternalRefKind as ApiExternalRefKind,
   ExternalRefState as ApiExternalRefState,
+  TicketTemplate as ApiTicketTemplate,
+  OverlapPolicy as ApiOverlapPolicy,
+  ScheduleMode as ApiScheduleMode,
 } from "@switchyard/shared";
 import * as schema from "../../drizzle/schema.js";
 import { env } from "../env.js";
@@ -385,6 +388,40 @@ export function mapRuleFiring(f: RuleFiringRow): ApiRuleFiring {
     next_attempt_at: f.next_attempt_at,
     result_summary: (f.result_summary ?? null) as ApiRuleFiringSummary | null,
     created_at: f.created_at,
+  };
+}
+
+type TicketTemplateRow = typeof schema.ticketTemplates.$inferSelect;
+
+// Build the API shape from a template row + its project row + optional
+// assignee row. Mode is derived from which schedule field is populated
+// (the DB enforces XOR via CHECK, so this is unambiguous).
+export function mapTicketTemplate(
+  t: TicketTemplateRow,
+  deps: { project: ProjectRow; assignee: UserRow | null }
+): ApiTicketTemplate {
+  return {
+    id: t.id,
+    project: mapProjectRef(deps.project),
+    enabled: t.enabled,
+    title: t.title,
+    description: t.description,
+    type: t.type as TicketType,
+    priority: t.priority as Priority | null,
+    assignee: deps.assignee ? mapUserRef(deps.assignee) : null,
+    parent_id: t.parent_id,
+    label_ids: (t.label_ids ?? []) as string[],
+    metadata: (t.metadata ?? {}) as Record<string, unknown>,
+    due_date_offset_days: t.due_date_offset_days,
+    mode: (t.schedule_cron ? "recurring" : "one_shot") as ApiScheduleMode,
+    schedule_cron: t.schedule_cron,
+    schedule_tz: t.schedule_tz,
+    trigger_at: t.trigger_at,
+    lead_days: t.lead_days,
+    overlap_policy: t.overlap_policy as ApiOverlapPolicy,
+    last_fired_at: t.last_fired_at,
+    created_at: t.created_at,
+    updated_at: t.updated_at,
   };
 }
 
