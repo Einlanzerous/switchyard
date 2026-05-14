@@ -1,24 +1,14 @@
-// Materialize a ticket from a ticket_template (SWY-43 Phase 4.7).
-//
-// One call:
-//   1. Allocates a project-scoped ticket number
-//   2. Resolves the destination status (project default)
-//   3. Computes due_date from the template's offset (recurring) or
-//      trigger_at (one-shot)
-//   4. INSERTs the ticket row with the template_id back-pointer
-//   5. INSERTs ticket_labels rows for the template's label_ids
-//   6. Writes a ticket.created event so audit + webhooks fire
+// Materialize a ticket from a ticket_template.
 //
 // The caller wraps this in a transaction together with the
 // last_fired_at stamp + enabled-flip (one-shot) so concurrent ticks
 // can't double-materialize.
 
-import { and, eq, isNull, ne, sql } from "drizzle-orm";
+import { and, eq, isNull, ne } from "drizzle-orm";
 import * as schema from "../../../drizzle/schema.js";
 import type { db as defaultDb } from "../../db.js";
-import { allocateTicketNumber } from "../tickets.js";
+import { allocateTicketNumber, loadTicketSummary } from "../tickets.js";
 import { writeEvent } from "../events.js";
-import { mapTicketSummary, mapUserRef } from "../mappers.js";
 
 type Tx = typeof defaultDb;
 type TemplateRow = typeof schema.ticketTemplates.$inferSelect;
@@ -124,41 +114,17 @@ export async function materializeFromTemplate(
       .onConflictDoNothing();
   }
 
-  // ─── audit + webhook fan-out via the standard event path ────────────────
-  const [project] = await tx
-    .select()
-    .from(schema.projects)
-    .where(eq(schema.projects.id, template.project_id))
-    .limit(1);
-  const [creator] = await tx
-    .select()
-    .from(schema.users)
-    .where(eq(schema.users.id, template.created_by_user_id))
-    .limit(1);
-  const [status] = await tx
-    .select()
-    .from(schema.statuses)
-    .where(eq(schema.statuses.id, def.id))
-    .limit(1);
-
-  if (project && creator && status) {
-    const summary = mapTicketSummary(t, {
-      project,
-      status,
-      assignee: null,
-      reporter: creator,
-      labels: [],
-      number: t.number,
-      externalRefs: [],
-    });
-    await writeEvent(tx, {
-      event_type: "ticket.created",
-      actor: mapUserRef(creator),
-      ticket: summary,
-      project_id: project.id,
-      extras: { source: "ticket_template", template_id: template.id },
-    });
-  }
+  // Standard event path — loadTicketSummary fans out all deps (project,
+  // status, assignee, reporter, labels, external_refs) in one helper so
+  // the event carries the full snapshot, not a stripped-down version.
+  const summary = await loadTicketSummary(t, tx as any);
+  await writeEvent(tx, {
+    event_type: "ticket.created",
+    actor: summary.reporter,
+    ticket: summary,
+    project_id: summary.project.id,
+    extras: { source: "ticket_template", template_id: template.id },
+  });
 
   return { kind: "created", ticket: t };
 }
@@ -173,7 +139,3 @@ function computeDueDate(template: TemplateRow, firedAt: Date): string | null {
   const ms = firedAt.getTime() + template.due_date_offset_days * MS_PER_DAY;
   return new Date(ms).toISOString();
 }
-
-// Re-export sql shim so the route file can compose ad-hoc fragments
-// without re-importing drizzle directly.
-export { sql };

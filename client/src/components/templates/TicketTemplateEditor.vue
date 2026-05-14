@@ -49,6 +49,20 @@ const PRESET_OPTIONS = [
 ];
 type Preset = typeof PRESET_OPTIONS[number]["value"];
 
+// Reverse-map a stored cron expression back to a preset for round-trip
+// editing. Falls back to "custom" so the user sees the raw cron when no
+// preset matches exactly.
+function matchPreset(cron: string | null): { preset: Preset; weekday: number; monthDay: number } {
+  if (!cron) return { preset: "weekly", weekday: 1, monthDay: 1 };
+  if (cron === "0 9 * * *")        return { preset: "daily",    weekday: 1, monthDay: 1 };
+  if (cron === "0 9 * * MON-FRI")  return { preset: "weekdays", weekday: 1, monthDay: 1 };
+  const wk = cron.match(/^0 9 \* \* ([0-6])$/);
+  if (wk) return { preset: "weekly", weekday: Number(wk[1]), monthDay: 1 };
+  const mo = cron.match(/^0 9 (\d+) \* \*$/);
+  if (mo) return { preset: "monthly", weekday: 1, monthDay: Number(mo[1]) };
+  return { preset: "custom", weekday: 1, monthDay: 1 };
+}
+
 const preset = ref<Preset>("weekly");
 const weekday = ref(1); // 0=Sun, 1=Mon, ...
 const monthDay = ref(1); // 1..28 (avoid 29-31 which not every month has)
@@ -79,7 +93,10 @@ watch(() => props.open, (open) => {
     // Edit mode — hydrate from existing template.
     const t = props.template;
     mode.value = t.mode;
-    preset.value = "custom";
+    const matched = matchPreset(t.schedule_cron);
+    preset.value = matched.preset;
+    weekday.value = matched.weekday;
+    monthDay.value = matched.monthDay;
     customCron.value = t.schedule_cron ?? "0 9 * * MON";
     tz.value = t.schedule_tz ?? "UTC";
     triggerDate.value = t.trigger_at ? t.trigger_at.slice(0, 10) : "";

@@ -19,6 +19,7 @@ import InsightsTabs from "@/components/dashboard/InsightsTabs.vue";
 import TicketTemplateEditor from "@/components/templates/TicketTemplateEditor.vue";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
+import { formatRelativeTime } from "@/lib/formatTime";
 import { useProjectStats } from "@/composables/useProjectStats";
 import type { TicketTemplate } from "@switchyard/shared";
 
@@ -31,8 +32,7 @@ const projectKey = computed(() => {
   return typeof v === "string" ? v : "";
 });
 
-const projectKeyOrNull = computed(() => projectKey.value || null);
-const stats = useProjectStats(projectKeyOrNull);
+const stats = useProjectStats(computed(() => projectKey.value || null));
 
 const templatesQuery = useQuery({
   queryKey: computed(() => queryKeys.ticketTemplates(projectKey.value)),
@@ -76,8 +76,8 @@ const fireNowMut = useMutation({
   },
   onSuccess: (data) => {
     qc.invalidateQueries({ queryKey: queryKeys.ticketTemplates(projectKey.value) });
-    qc.invalidateQueries({ queryKey: ["sw", "tickets"] });
-    qc.invalidateQueries({ queryKey: ["sw", "projects", projectKey.value, "board"] });
+    qc.invalidateQueries({ queryKey: queryKeys.tickets() });
+    qc.invalidateQueries({ queryKey: queryKeys.projectBoard(projectKey.value) });
     if (data && "key" in data) toast.success(`Materialized ${data.key}`);
     else toast.success("Template fired");
   },
@@ -153,20 +153,17 @@ function scheduleDescription(t: TicketTemplate): string {
   return `${c}${tz}`;
 }
 
-function formatRelative(iso: string | null): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  const diffMs = Date.now() - d.getTime();
-  const minutes = Math.round(diffMs / 60_000);
-  if (minutes < 1 && minutes > -1) return "just now";
-  const absMin = Math.abs(minutes);
-  if (absMin < 60) return minutes > 0 ? `${absMin}m ago` : `in ${absMin}m`;
-  const hours = Math.round(minutes / 60);
-  if (Math.abs(hours) < 24) return hours > 0 ? `${Math.abs(hours)}h ago` : `in ${Math.abs(hours)}h`;
-  const days = Math.round(hours / 24);
-  return days > 0 ? `${Math.abs(days)}d ago` : `in ${Math.abs(days)}d`;
-}
+// Precomputed display strings per template — derived from the templates
+// array, so they don't get recomputed on every reactive tick (firingId /
+// confirmingId / etc.). The fire-now / toggle paths invalidate the
+// templates query, which refreshes this naturally.
+const decoratedTemplates = computed(() =>
+  templates.value.map((t) => ({
+    template: t,
+    scheduleDesc: scheduleDescription(t),
+    lastFiredRel: formatRelativeTime(t.last_fired_at),
+  })),
+);
 
 function back() { router.push("/projects"); }
 </script>
@@ -219,7 +216,7 @@ function back() { router.push("/projects"); }
         <CardContent class="p-0">
           <ul class="divide-y">
             <li
-              v-for="t in templates"
+              v-for="{ template: t, scheduleDesc, lastFiredRel } in decoratedTemplates"
               :key="t.id"
               class="flex items-start gap-3 p-3"
             >
@@ -242,10 +239,10 @@ function back() { router.push("/projects"); }
                   </span>
                 </div>
                 <div class="text-xs text-muted-foreground mt-0.5" :title="t.schedule_cron ?? t.trigger_at ?? ''">
-                  {{ scheduleDescription(t) }}
+                  {{ scheduleDesc }}
                 </div>
                 <div class="text-[11px] text-muted-foreground/80 mt-1">
-                  Last fired: {{ formatRelative(t.last_fired_at) }}
+                  Last fired: {{ lastFiredRel }}
                   <span v-if="t.due_date_offset_days != null" class="ml-3">
                     · Due offset: {{ t.due_date_offset_days }}d
                   </span>

@@ -1,43 +1,50 @@
-// Ticket-template scheduler tick (SWY-43 Phase 4.7).
-//
-// Called from the existing rules scheduler's 60s loop alongside the rules
-// tick. Polls enabled templates, computes next-fire from cron+tz (recurring)
-// or `trigger_at - lead_days` (one-shot), materializes a ticket via the
-// materializer when due, and stamps last_fired_at BEFORE the materialize
-// so concurrent ticks can't double-fire.
+// Ticket-template scheduler tick. Called from the rules scheduler's
+// 60s loop. Polls enabled templates, computes next-fire from cron+tz
+// (recurring) or `trigger_at - lead_days` (one-shot), materializes a
+// ticket via the materializer when due, and stamps last_fired_at
+// BEFORE the materialize so concurrent ticks can't double-fire.
 
-import { and, eq, isNotNull, lte, or, type SQL } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, lte } from "drizzle-orm";
 import { CronExpressionParser } from "cron-parser";
 import * as schema from "../../../drizzle/schema.js";
 import { db } from "../../db.js";
 import { materializeFromTemplate } from "./materializer.js";
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+// Look-ahead cap for one-shot templates so we don't pull rows dated decades
+// out. One year is generous; tighten if the table grows large.
+const ONE_SHOT_LOOKAHEAD_DAYS = 365;
 
 type TemplateRow = typeof schema.ticketTemplates.$inferSelect;
 
 // Exported for unit tests so the loop can be advanced manually without
 // waiting 60s. Returns the number of templates that fired.
 export async function tickTemplates(now: Date = new Date()): Promise<number> {
-  const nowIso = now.toISOString();
-
-  // Select enabled templates that COULD fire — recurring (any cron) or
-  // one-shot whose trigger is at-or-before "now + lead_days". The actual
-  // fire-time check happens per-row below.
-  const templates = await db
-    .select()
-    .from(schema.ticketTemplates)
-    .where(
+  // Split into two index-friendly queries — one for each schedule mode.
+  // The OR-form forced a fallback to the generic enabled index; this
+  // hits `scheduled_idx` and `trigger_idx` (partial indexes) directly.
+  const cap = new Date(now.getTime() + ONE_SHOT_LOOKAHEAD_DAYS * MS_PER_DAY).toISOString();
+  const [recurring, oneShot] = await Promise.all([
+    db.select().from(schema.ticketTemplates).where(
       and(
         eq(schema.ticketTemplates.enabled, true),
-        or(
-          isNotNull(schema.ticketTemplates.schedule_cron),
-          // For one-shot, the cheap filter is `trigger_at <= now + 365d` so
-          // we don't load templates dated decades out. Keep the precise
-          // check (with lead_days) inside the per-row branch.
-          lte(schema.ticketTemplates.trigger_at, new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString()),
-        ) as SQL,
+        isNotNull(schema.ticketTemplates.schedule_cron),
       ),
-    );
+    ),
+    db.select().from(schema.ticketTemplates).where(
+      and(
+        eq(schema.ticketTemplates.enabled, true),
+        isNotNull(schema.ticketTemplates.trigger_at),
+        lte(schema.ticketTemplates.trigger_at, cap),
+        // One-shots that have already fired are still enabled=false (the
+        // fire flips it), so the enabled filter above covers most. Belt-
+        // and-suspenders against a crashed mid-fire run.
+        isNull(schema.ticketTemplates.last_fired_at),
+      ),
+    ),
+  ]);
 
+  const templates = [...recurring, ...oneShot];
   let firedCount = 0;
   for (const tpl of templates) {
     try {
@@ -84,11 +91,11 @@ async function maybeFireTemplate(
 
   // ─── one-shot: fire at trigger_at - lead_days ──────────────────────────
   if (template.trigger_at) {
+    if (template.last_fired_at) return false; // already fired once
     const triggerMs = new Date(template.trigger_at).getTime();
-    const leadMs = (template.lead_days ?? 0) * 24 * 60 * 60 * 1000;
+    const leadMs = (template.lead_days ?? 0) * MS_PER_DAY;
     const fireAt = new Date(triggerMs - leadMs);
     if (fireAt > now) return false; // not yet
-    if (template.last_fired_at) return false; // already fired once
     return await fireTemplate(template, now, /* oneShot */ true);
   }
 

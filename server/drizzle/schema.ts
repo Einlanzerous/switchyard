@@ -40,10 +40,11 @@ export const webhookDeliveryStatus = pgEnum("webhook_delivery_status", [
   "abandoned",
 ]);
 
-// Ticket template overlap policy (SWY-43 Phase 4.7). Controls what happens
-// when a scheduled fire would create a new instance while a prior instance
-// is still open. `skip` is safe default; `always` is the "weekly notes"
-// pattern; `reuse_open` bumps the open instance's due_date forward.
+// Overlap policy controls what happens when a scheduled fire would create
+// a new instance while a prior instance is still open. `skip` is the safe
+// default; `always` is the "weekly notes" pattern (each cycle is its own
+// thing); `reuse_open` bumps the open instance's due_date forward instead
+// of stacking a second one.
 export const ticketTemplateOverlapPolicy = pgEnum("ticket_template_overlap_policy", [
   "skip",
   "always",
@@ -839,10 +840,10 @@ export const idempotencyKeys = pgTable(
   })
 );
 
-// Ticket templates (SWY-43 Phase 4.7). One row per recurring or one-shot
-// template. Recurring templates are tz-aware cron schedules; one-shot
-// templates fire once at `trigger_at - lead_days` then flip enabled=false.
-// XOR constraint at the DB layer guarantees exactly one schedule mode.
+// One row per recurring or one-shot ticket template. Recurring templates
+// are tz-aware cron schedules; one-shot templates fire once at
+// `trigger_at - lead_days` then flip enabled=false. XOR constraint at the
+// DB layer guarantees exactly one schedule mode.
 //
 // Materialization: when the scheduler decides a template is due, it INSERTs
 // a regular ticket copying every template field, sets `tickets.template_id`

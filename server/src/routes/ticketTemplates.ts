@@ -1,4 +1,4 @@
-// Ticket template CRUD + fire_now + instances feed (SWY-43 Phase 4.7).
+// Ticket template CRUD + fire_now + instances feed.
 //
 // Scope model mirrors tickets/rules:
 //   - GET endpoints: any authenticated user
@@ -21,10 +21,10 @@ import { idempotency } from "../lib/idempotency.js";
 import {
   errorResponses, okJson, createdJson, noContent, checkScope, z, idempotencyHeader,
 } from "./_helpers.js";
-import { mapTicketTemplate, mapTicketSummary, mapUserRef } from "../lib/mappers.js";
+import { mapTicketTemplate } from "../lib/mappers.js";
 import { getProjectByKey, getUserById } from "../lib/lookups.js";
 import { materializeFromTemplate } from "../lib/templates/materializer.js";
-import { fetchExternalRefsByTicket } from "../lib/tickets.js";
+import { loadTicketSummary } from "../lib/tickets.js";
 import { badRequest, notFound, unprocessable } from "../errors.js";
 
 const tag = "Ticket Templates";
@@ -83,7 +83,8 @@ const instances = createRoute({
 });
 
 export function mount(app: OpenAPIHono) {
-  app.use("/v1/projects/*", requireAuth);
+  // projects.ts already mounts requireAuth on `/v1/projects/*`, so we only
+  // need to cover the template-only namespace here.
   app.use("/v1/templates/*", requireAuth);
   app.use("/v1/templates/*", idempotency);
   app.use("/v1/projects/*/templates", idempotency);
@@ -240,27 +241,7 @@ export function mount(app: OpenAPIHono) {
       throw badRequest("overlap policy prevented fire (an open instance exists)");
     }
 
-    const t = result.ticket;
-    const [project] = await db.select().from(schema.projects).where(eq(schema.projects.id, t.project_id)).limit(1);
-    const [status] = await db.select().from(schema.statuses).where(eq(schema.statuses.id, t.status_id)).limit(1);
-    const [reporter] = await db.select().from(schema.users).where(eq(schema.users.id, t.reporter_id)).limit(1);
-    const [assignee] = t.assignee_id
-      ? await db.select().from(schema.users).where(eq(schema.users.id, t.assignee_id)).limit(1)
-      : [null];
-
-    if (!project || !status || !reporter) {
-      throw new Error("fire_now: missing project/status/reporter row");
-    }
-
-    const summary = mapTicketSummary(t, {
-      project, status,
-      assignee: assignee as any,
-      reporter,
-      labels: [],
-      number: t.number,
-      externalRefs: await fetchExternalRefsByTicket([t.id]).then((m) => m.get(t.id) ?? []),
-    });
-    return c.json(summary, 201);
+    return c.json(await loadTicketSummary(result.ticket), 201);
   }) as any);
 
   // ─── instances (tickets materialized from this template) ───────────────
@@ -268,35 +249,14 @@ export function mount(app: OpenAPIHono) {
     const { id } = c.req.valid("param");
 
     const rows = await db
-      .select({
-        t: schema.tickets, project: schema.projects, status: schema.statuses,
-        reporter: schema.users,
-      })
+      .select()
       .from(schema.tickets)
-      .innerJoin(schema.projects, eq(schema.tickets.project_id, schema.projects.id))
-      .innerJoin(schema.statuses, eq(schema.tickets.status_id, schema.statuses.id))
-      .innerJoin(schema.users, eq(schema.tickets.reporter_id, schema.users.id))
       .where(eq(schema.tickets.template_id, id))
       .orderBy(desc(schema.tickets.created_at))
       .limit(100);
 
-    return c.json(
-      {
-        items: rows.map((r) =>
-          mapTicketSummary(r.t, {
-            project: r.project,
-            status: r.status,
-            assignee: null,
-            reporter: r.reporter,
-            labels: [],
-            number: r.t.number,
-            externalRefs: [],
-          }),
-        ),
-        page: { next_cursor: null, has_more: false },
-      },
-      200,
-    );
+    const items = await Promise.all(rows.map((t) => loadTicketSummary(t)));
+    return c.json({ items, page: { next_cursor: null, has_more: false } }, 200);
   }) as any);
 }
 
