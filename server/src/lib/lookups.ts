@@ -35,17 +35,35 @@ export async function resolveTicket(idOrKey: string, opts: { includeDeleted?: bo
     .from(schema.projects)
     .where(and(eq(schema.projects.key, projectKey), isNull(schema.projects.deleted_at)))
     .limit(1);
-  if (!project) throw notFound("project");
 
-  const conds = [
-    eq(schema.tickets.project_id, project.id),
-    eq(schema.tickets.number, number),
-  ];
-  if (!includeDeleted) conds.push(isNull(schema.tickets.deleted_at));
+  if (project) {
+    const conds = [
+      eq(schema.tickets.project_id, project.id),
+      eq(schema.tickets.number, number),
+    ];
+    if (!includeDeleted) conds.push(isNull(schema.tickets.deleted_at));
+    const [row] = await db.select().from(schema.tickets).where(and(...conds)).limit(1);
+    if (row) return row;
+  }
 
-  const [row] = await db.select().from(schema.tickets).where(and(...conds)).limit(1);
-  if (!row) throw notFound("ticket");
-  return row;
+  // Path 3: alias fallback. After a move-ticket-to-project op, the old
+  // key (LOOP-3) is recorded in ticket_aliases so external systems that
+  // cached it (n8n payloads, GitHub PR titles, agent state) keep working.
+  // We only fall back to this when the direct (project, number) lookup
+  // missed — fresh keys always win.
+  const [alias] = await db
+    .select({ ticket_id: schema.ticketAliases.ticket_id })
+    .from(schema.ticketAliases)
+    .where(eq(schema.ticketAliases.alias_key, idOrKey))
+    .limit(1);
+  if (alias) {
+    const aliasConds = [eq(schema.tickets.id, alias.ticket_id)];
+    if (!includeDeleted) aliasConds.push(isNull(schema.tickets.deleted_at));
+    const [row] = await db.select().from(schema.tickets).where(and(...aliasConds)).limit(1);
+    if (row) return row;
+  }
+
+  throw notFound("ticket");
 }
 
 export async function getProjectByKey(key: string, opts: { includeArchived?: boolean } = {}) {

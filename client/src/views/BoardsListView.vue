@@ -90,6 +90,11 @@ function doDelete(id: string) {
             <CardTitle class="text-base flex items-center gap-2">
               <KanbanSquare class="h-4 w-4 text-muted-foreground" />
               <span class="truncate">{{ b.name }}</span>
+              <span
+                v-if="b.auto_include_all_projects"
+                class="text-[10px] uppercase tracking-wider rounded-full bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 font-bold"
+                title="Auto-managed: switchyard adds every new project and prunes archived ones. Editing projects manually opts this board out."
+              >Auto</span>
             </CardTitle>
             <CardDescription class="text-xs">
               {{ b.projects.length }} project{{ b.projects.length === 1 ? "" : "s" }}

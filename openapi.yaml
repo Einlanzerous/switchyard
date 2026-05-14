@@ -3085,6 +3085,7 @@ paths:
                               enum:
                                 - 30
                             - nullable: true
+                            - nullable: true
                         created_at:
                           type: string
                           format: date-time
@@ -3367,6 +3368,7 @@ paths:
                         enum:
                           - 30
                       - nullable: true
+                      - nullable: true
                   created_at:
                     type: string
                     format: date-time
@@ -3610,6 +3612,7 @@ paths:
                         enum:
                           - 30
                       - nullable: true
+                      - nullable: true
                   created_at:
                     type: string
                     format: date-time
@@ -3838,6 +3841,7 @@ paths:
                       enum:
                         - 30
                     - nullable: true
+                    - nullable: true
                 archived:
                   type: boolean
       responses:
@@ -3881,6 +3885,7 @@ paths:
                       - type: number
                         enum:
                           - 30
+                      - nullable: true
                       - nullable: true
                   created_at:
                     type: string
@@ -10798,6 +10803,807 @@ paths:
                       - message
                 required:
                   - error
+  /v1/tickets/{idOrKey}/move:
+    post:
+      tags:
+        - Tickets
+      summary: Move a ticket to a different project (allocates a new key, keeps old
+        key resolvable via alias)
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+          required: true
+          name: idOrKey
+          in: path
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 128
+          required: false
+          name: idempotency-key
+          in: header
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                project_key:
+                  type: string
+                  pattern: ^[A-Z][A-Z0-9]{1,9}$
+                status_id:
+                  type: string
+                  format: uuid
+                parent_id:
+                  type: string
+                  nullable: true
+                  format: uuid
+              required:
+                - project_key
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  key:
+                    type: string
+                    pattern: ^[A-Z][A-Z0-9]{1,9}-[1-9][0-9]*$
+                  number:
+                    type: integer
+                    minimum: 0
+                    exclusiveMinimum: true
+                  project:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      key:
+                        type: string
+                        pattern: ^[A-Z][A-Z0-9]{1,9}$
+                      name:
+                        type: string
+                        minLength: 1
+                        maxLength: 200
+                      color:
+                        type: string
+                        nullable: true
+                        pattern: ^#[0-9a-fA-F]{6}$
+                    required:
+                      - id
+                      - key
+                      - name
+                      - color
+                  type:
+                    type: string
+                    enum: *a5
+                  title:
+                    type: string
+                    minLength: 1
+                    maxLength: 500
+                  status:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      category:
+                        type: string
+                        enum: *a4
+                      display_name:
+                        type: string
+                        minLength: 1
+                        maxLength: 50
+                    required:
+                      - id
+                      - category
+                      - display_name
+                  resolution:
+                    type: string
+                    nullable: true
+                    enum: *a6
+                  priority:
+                    type: string
+                    nullable: true
+                    enum: *a7
+                  parent_id:
+                    type: string
+                    nullable: true
+                    format: uuid
+                  assignee:
+                    type: object
+                    nullable: true
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      name:
+                        type: string
+                        minLength: 1
+                        maxLength: 100
+                      icon:
+                        type: string
+                        nullable: true
+                        maxLength: 500
+                      type:
+                        type: string
+                        enum: *a2
+                    required:
+                      - id
+                      - name
+                      - icon
+                      - type
+                  reporter:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      name:
+                        type: string
+                        minLength: 1
+                        maxLength: 100
+                      icon:
+                        type: string
+                        nullable: true
+                        maxLength: 500
+                      type:
+                        type: string
+                        enum: *a2
+                    required:
+                      - id
+                      - name
+                      - icon
+                      - type
+                  due_date:
+                    type: string
+                    nullable: true
+                    format: date-time
+                  labels:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        name:
+                          type: string
+                          minLength: 1
+                          maxLength: 50
+                        color:
+                          type: string
+                          pattern: ^#[0-9a-fA-F]{6}$
+                      required:
+                        - id
+                        - name
+                        - color
+                  position:
+                    type: number
+                    nullable: true
+                  external_refs:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        ticket_id:
+                          type: string
+                          format: uuid
+                        kind:
+                          type: string
+                          enum: *a8
+                        url:
+                          type: string
+                          format: uri
+                        state:
+                          type: string
+                          nullable: true
+                          enum: *a9
+                        title:
+                          type: string
+                          nullable: true
+                        polled_at:
+                          type: string
+                          nullable: true
+                          format: date-time
+                        polled_state_changed_at:
+                          type: string
+                          nullable: true
+                          format: date-time
+                        created_at:
+                          type: string
+                          format: date-time
+                        created_by:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            name:
+                              type: string
+                              minLength: 1
+                              maxLength: 100
+                            icon:
+                              type: string
+                              nullable: true
+                              maxLength: 500
+                            type:
+                              type: string
+                              enum: *a2
+                          required:
+                            - id
+                            - name
+                            - icon
+                            - type
+                      required:
+                        - id
+                        - ticket_id
+                        - kind
+                        - url
+                        - state
+                        - title
+                        - polled_at
+                        - polled_state_changed_at
+                        - created_at
+                        - created_by
+                  template_id:
+                    type: string
+                    nullable: true
+                    format: uuid
+                  created_at:
+                    type: string
+                    format: date-time
+                  updated_at:
+                    type: string
+                    format: date-time
+                  deleted_at:
+                    type: string
+                    nullable: true
+                    format: date-time
+                  description:
+                    type: string
+                  metadata:
+                    type: object
+                    additionalProperties:
+                      nullable: true
+                  comments:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        ticket_id:
+                          type: string
+                          format: uuid
+                        author:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            name:
+                              type: string
+                              minLength: 1
+                              maxLength: 100
+                            icon:
+                              type: string
+                              nullable: true
+                              maxLength: 500
+                            type:
+                              type: string
+                              enum: *a2
+                          required:
+                            - id
+                            - name
+                            - icon
+                            - type
+                        body:
+                          type: string
+                          minLength: 1
+                          maxLength: 50000
+                        attachments:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              id:
+                                type: string
+                                format: uuid
+                              ticket_id:
+                                type: string
+                                nullable: true
+                                format: uuid
+                              comment_id:
+                                type: string
+                                nullable: true
+                                format: uuid
+                              kind:
+                                type: string
+                                enum: *a10
+                              mime_type:
+                                type: string
+                                maxLength: 200
+                              size_bytes:
+                                type: integer
+                                minimum: 0
+                              original_name:
+                                type: string
+                                nullable: true
+                                maxLength: 500
+                              url:
+                                type: string
+                                format: uri
+                              transcript:
+                                type: string
+                                nullable: true
+                              uploaded_by:
+                                type: object
+                                properties:
+                                  id:
+                                    type: string
+                                    format: uuid
+                                  name:
+                                    type: string
+                                    minLength: 1
+                                    maxLength: 100
+                                  icon:
+                                    type: string
+                                    nullable: true
+                                    maxLength: 500
+                                  type:
+                                    type: string
+                                    enum: *a2
+                                required:
+                                  - id
+                                  - name
+                                  - icon
+                                  - type
+                              created_at:
+                                type: string
+                                format: date-time
+                            required:
+                              - id
+                              - ticket_id
+                              - comment_id
+                              - kind
+                              - mime_type
+                              - size_bytes
+                              - original_name
+                              - url
+                              - transcript
+                              - uploaded_by
+                              - created_at
+                        created_at:
+                          type: string
+                          format: date-time
+                        updated_at:
+                          type: string
+                          format: date-time
+                        deleted_at:
+                          type: string
+                          nullable: true
+                          format: date-time
+                      required:
+                        - id
+                        - ticket_id
+                        - author
+                        - body
+                        - attachments
+                        - created_at
+                        - updated_at
+                        - deleted_at
+                  attachments:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        ticket_id:
+                          type: string
+                          nullable: true
+                          format: uuid
+                        comment_id:
+                          type: string
+                          nullable: true
+                          format: uuid
+                        kind:
+                          type: string
+                          enum: *a10
+                        mime_type:
+                          type: string
+                          maxLength: 200
+                        size_bytes:
+                          type: integer
+                          minimum: 0
+                        original_name:
+                          type: string
+                          nullable: true
+                          maxLength: 500
+                        url:
+                          type: string
+                          format: uri
+                        transcript:
+                          type: string
+                          nullable: true
+                        uploaded_by:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            name:
+                              type: string
+                              minLength: 1
+                              maxLength: 100
+                            icon:
+                              type: string
+                              nullable: true
+                              maxLength: 500
+                            type:
+                              type: string
+                              enum: *a2
+                          required:
+                            - id
+                            - name
+                            - icon
+                            - type
+                        created_at:
+                          type: string
+                          format: date-time
+                      required:
+                        - id
+                        - ticket_id
+                        - comment_id
+                        - kind
+                        - mime_type
+                        - size_bytes
+                        - original_name
+                        - url
+                        - transcript
+                        - uploaded_by
+                        - created_at
+                  all_attachments:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        ticket_id:
+                          type: string
+                          nullable: true
+                          format: uuid
+                        comment_id:
+                          type: string
+                          nullable: true
+                          format: uuid
+                        kind:
+                          type: string
+                          enum: *a10
+                        mime_type:
+                          type: string
+                          maxLength: 200
+                        size_bytes:
+                          type: integer
+                          minimum: 0
+                        original_name:
+                          type: string
+                          nullable: true
+                          maxLength: 500
+                        url:
+                          type: string
+                          format: uri
+                        transcript:
+                          type: string
+                          nullable: true
+                        uploaded_by:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            name:
+                              type: string
+                              minLength: 1
+                              maxLength: 100
+                            icon:
+                              type: string
+                              nullable: true
+                              maxLength: 500
+                            type:
+                              type: string
+                              enum: *a2
+                          required:
+                            - id
+                            - name
+                            - icon
+                            - type
+                        created_at:
+                          type: string
+                          format: date-time
+                      required:
+                        - id
+                        - ticket_id
+                        - comment_id
+                        - kind
+                        - mime_type
+                        - size_bytes
+                        - original_name
+                        - url
+                        - transcript
+                        - uploaded_by
+                        - created_at
+                  links:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        type:
+                          type: string
+                          enum: *a11
+                        direction:
+                          type: string
+                          enum: *a12
+                        other_ticket:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            key:
+                              type: string
+                              pattern: ^[A-Z][A-Z0-9]{1,9}-[1-9][0-9]*$
+                            title:
+                              type: string
+                          required:
+                            - id
+                            - key
+                            - title
+                        created_at:
+                          type: string
+                          format: date-time
+                        created_by:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            name:
+                              type: string
+                              minLength: 1
+                              maxLength: 100
+                            icon:
+                              type: string
+                              nullable: true
+                              maxLength: 500
+                            type:
+                              type: string
+                              enum: *a2
+                          required:
+                            - id
+                            - name
+                            - icon
+                            - type
+                      required:
+                        - id
+                        - type
+                        - direction
+                        - other_ticket
+                        - created_at
+                        - created_by
+                required:
+                  - id
+                  - key
+                  - number
+                  - project
+                  - type
+                  - title
+                  - status
+                  - resolution
+                  - priority
+                  - parent_id
+                  - assignee
+                  - reporter
+                  - due_date
+                  - labels
+                  - position
+                  - external_refs
+                  - template_id
+                  - created_at
+                  - updated_at
+                  - deleted_at
+                  - description
+                  - metadata
+                  - comments
+                  - attachments
+                  - all_attachments
+                  - links
+        "400":
+          description: bad request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "401":
+          description: unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "403":
+          description: forbidden
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "404":
+          description: not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "409":
+          description: conflict
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "422":
+          description: unprocessable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "500":
+          description: internal
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
   /v1/tickets/{idOrKey}/events:
     get:
       tags:
@@ -10850,6 +11656,7 @@ paths:
                             - ticket.closed
                             - ticket.released
                             - ticket.deleted
+                            - ticket.moved
                             - ticket.link_added
                             - ticket.link_removed
                             - ticket.external_ref_added
@@ -14020,6 +14827,8 @@ paths:
                               type: string
                             include_archived_projects:
                               type: boolean
+                        auto_include_all_projects:
+                          type: boolean
                         created_at:
                           type: string
                           format: date-time
@@ -14032,6 +14841,7 @@ paths:
                         - layout
                         - projects
                         - filter
+                        - auto_include_all_projects
                         - created_at
                         - updated_at
                   page:
@@ -14339,6 +15149,8 @@ paths:
                         type: string
                       include_archived_projects:
                         type: boolean
+                  auto_include_all_projects:
+                    type: boolean
                   created_at:
                     type: string
                     format: date-time
@@ -14351,6 +15163,7 @@ paths:
                   - layout
                   - projects
                   - filter
+                  - auto_include_all_projects
                   - created_at
                   - updated_at
         "400":
@@ -14602,6 +15415,8 @@ paths:
                         type: string
                       include_archived_projects:
                         type: boolean
+                  auto_include_all_projects:
+                    type: boolean
                   created_at:
                     type: string
                     format: date-time
@@ -14614,6 +15429,7 @@ paths:
                   - layout
                   - projects
                   - filter
+                  - auto_include_all_projects
                   - created_at
                   - updated_at
         "400":
@@ -14911,6 +15727,8 @@ paths:
                         type: string
                       include_archived_projects:
                         type: boolean
+                  auto_include_all_projects:
+                    type: boolean
                   created_at:
                     type: string
                     format: date-time
@@ -14923,6 +15741,7 @@ paths:
                   - layout
                   - projects
                   - filter
+                  - auto_include_all_projects
                   - created_at
                   - updated_at
         "400":
@@ -15359,6 +16178,8 @@ paths:
                             type: string
                           include_archived_projects:
                             type: boolean
+                      auto_include_all_projects:
+                        type: boolean
                       created_at:
                         type: string
                         format: date-time
@@ -15371,6 +16192,7 @@ paths:
                       - layout
                       - projects
                       - filter
+                      - auto_include_all_projects
                       - created_at
                       - updated_at
                   columns:
