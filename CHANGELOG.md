@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.14.0](https://github.com/Einlanzerous/switchyard/compare/v2.13.0...v2.14.0) (2026-05-14)
+
+
+### Features
+
+* SWY-43 Phase 4.7 — recurring & one-shot ticket templates ([b65b7ad](https://github.com/Einlanzerous/switchyard/commit/b65b7ad34e14530fe5f073b00522fdf7f7ef4656))
+* SWY-43 Phase 4.7 backend — ticket templates (recurring + one-shot) ([7ef49ea](https://github.com/Einlanzerous/switchyard/commit/7ef49ea284e82f34d1871bbaed56f1098cf7b765))
+* SWY-43 Phase 4.7 UI — Recurring tab + template editor + drawer badge ([f1c18d4](https://github.com/Einlanzerous/switchyard/commit/f1c18d404e2797f76c07c124e96e42ed7d09b8f2))
+
 ## [2.13.0](https://github.com/Einlanzerous/switchyard/compare/v2.12.0...v2.13.0) (2026-05-14)
 
 
