@@ -81,4 +81,19 @@ test.describe("tickets list", () => {
     await expect(page.getByLabel(/Remove project filter/i)).toBeVisible({ timeout: 5_000 });
     await expect(page).toHaveURL(/[?&]project=TEST/);
   });
+
+  test("due-date filter chips drive URL state", async ({ page }) => {
+    await page.goto("/tickets?project=TEST");
+    // Click the "Overdue" chip in the Due group.
+    await page.getByRole("button", { name: /^Overdue$/ }).click();
+    await expect(page).toHaveURL(/[?&]due=overdue/);
+    // Click again toggles off (single-select clears when reselected).
+    await page.getByRole("button", { name: /^Overdue$/ }).click();
+    await expect(page).not.toHaveURL(/[?&]due=/);
+    // Switching to "Due this week" replaces, not stacks.
+    await page.getByRole("button", { name: /^Overdue$/ }).click();
+    await page.getByRole("button", { name: /^Due this week$/ }).click();
+    await expect(page).toHaveURL(/[?&]due=this_week/);
+    await expect(page).not.toHaveURL(/[?&]due=overdue/);
+  });
 });

@@ -110,6 +110,9 @@ export const TicketListFilters = z.object({
   text: z.string().optional(), // simple ILIKE on title + description
   updated_after: Iso8601.optional(),
   updated_before: Iso8601.optional(),
+  // due_date filter — "overdue" excludes closed tickets, "this_week" is next 7
+  // days (open only), "none" matches null due_date regardless of status.
+  due: z.enum(["overdue", "this_week", "none"]).optional(),
   include_deleted: z.coerce.boolean().default(false),
 });
 export type TicketListFilters = z.infer<typeof TicketListFilters>;

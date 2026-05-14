@@ -39,6 +39,7 @@ const previewItems = computed(() => {
   if (f.priority.length) out.push(`priority=${f.priority.join(",")}`);
   if (f.assignee) out.push(`assignee=${f.assignee}`);
   if (f.text) out.push(`text=${JSON.stringify(f.text)}`);
+  if (f.due) out.push(`due=${f.due}`);
   return out;
 });
 
@@ -60,6 +61,7 @@ async function submit() {
       priority: filters.value.priority,
       assignee: filters.value.assignee ?? null,
       text: filters.value.text ?? null,
+      due: filters.value.due ?? null,
     } satisfies SavedViewFilters,
   };
   try {

@@ -15,6 +15,7 @@ import AttachmentLink from "./AttachmentLink.vue";
 import LinkedWork from "./LinkedWork.vue";
 import ExternalRefsSection from "./ExternalRefsSection.vue";
 import PriorityEditor from "./PriorityEditor.vue";
+import DueDateEditor from "./DueDateEditor.vue";
 import AssigneeEditor from "./AssigneeEditor.vue";
 import LabelEditor from "./LabelEditor.vue";
 import { cn } from "@/lib/utils";
@@ -219,6 +220,8 @@ const removeLinkMutation = useMutation({
           <AssigneeEditor :ticket="ticket" />
           <span class="text-muted-foreground/40">·</span>
           <PriorityEditor :ticket="ticket" />
+          <span class="text-muted-foreground/40">·</span>
+          <DueDateEditor :ticket="ticket" :is-open="ticket.status.category !== 'closed'" />
         </div>
         <TransitionButton :ticket="ticket" :allowed-statuses="allowedStatuses" />
       </div>

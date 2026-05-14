@@ -5,6 +5,7 @@ import UserAvatar from "@/components/UserAvatar.vue";
 import { Checkbox } from "@/components/ui/checkbox";
 import StatusBadge from "./StatusBadge.vue";
 import PriorityBadge from "./PriorityBadge.vue";
+import DueDateBadge from "./DueDateBadge.vue";
 import TypeIcon from "./TypeIcon.vue";
 import LabelChip from "./LabelChip.vue";
 import { cn } from "@/lib/utils";
@@ -41,6 +42,12 @@ const updatedRel = computed(() => {
 const visibleLabels = computed(() => props.ticket.labels.slice(0, 3));
 const extraLabelCount = computed(() => Math.max(0, props.ticket.labels.length - 3));
 
+const ticketOpen = computed(() => props.ticket.status.category !== "closed");
+const isOverdue = computed(() => {
+  if (!props.ticket.due_date || !ticketOpen.value) return false;
+  return new Date(props.ticket.due_date).getTime() < Date.now();
+});
+
 // The checkbox cell needs to stop the click bubbling up to the row button so
 // selecting a row doesn't also pop the drawer. Same for the keyboard space
 // activation on the checkbox.
@@ -61,6 +68,9 @@ function onSelectClick(e: MouseEvent) {
       // Focus accent: 2px primary stripe on the left edge. Drawn via
       // before-pseudo so it doesn't push content rightward.
       focused && 'before:absolute before:inset-y-0 before:left-0 before:w-[2px] before:bg-primary',
+      // Overdue stripe — uses `after` so it doesn't clash with the focus
+      // stripe above; same edge, slightly thicker, lower z behind focus.
+      isOverdue && !focused && 'after:absolute after:inset-y-0 after:left-0 after:w-[2px] after:bg-red-400/70',
     )"
   >
     <!-- Bulk-select cell. Always visible (muted) but clearer on hover
@@ -109,6 +119,13 @@ function onSelectClick(e: MouseEvent) {
         <span v-if="extraLabelCount > 0" class="text-[10px] text-muted-foreground">+{{ extraLabelCount }}</span>
       </div>
 
+      <DueDateBadge
+        v-if="ticket.due_date"
+        :due-date="ticket.due_date"
+        :is-open="ticketOpen"
+        show-label
+        class="hidden md:inline-flex"
+      />
       <PriorityBadge :priority="ticket.priority" class="hidden sm:inline-flex" />
       <StatusBadge :category="ticket.status.category" :display-name="ticket.status.display_name" size="sm" />
 

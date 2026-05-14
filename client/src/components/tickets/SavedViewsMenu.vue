@@ -37,6 +37,7 @@ function apply(view: SavedView) {
     priority: view.filters.priority ?? [],
     assignee: view.filters.assignee ?? undefined,
     text: view.filters.text ?? undefined,
+    due: view.filters.due ?? undefined,
   });
 }
 

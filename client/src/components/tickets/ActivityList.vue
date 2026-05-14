@@ -46,8 +46,26 @@ function relative(iso: string): string {
   catch { return ""; }
 }
 
-function fmtField(v: unknown): string {
+// Per-field friendly label. Most field names are already readable
+// (priority, parent_id is rare in audit) so this is a small allowlist.
+const FIELD_LABELS: Record<string, string> = {
+  due_date: "Due date",
+  parent_id: "Parent",
+};
+function fmtFieldName(name: string): string {
+  return FIELD_LABELS[name] ?? name;
+}
+
+function fmtField(v: unknown, field?: string): string {
   if (v === null || v === undefined) return "—";
+  if (field === "due_date" && typeof v === "string") {
+    try {
+      const d = new Date(v);
+      if (!Number.isNaN(d.getTime())) {
+        return d.toLocaleDateString(undefined, { dateStyle: "medium" });
+      }
+    } catch { /* fall through */ }
+  }
   if (typeof v === "string") return v.length > 80 ? v.slice(0, 80) + "…" : v;
   if (typeof v === "object") return JSON.stringify(v);
   return String(v);
@@ -102,10 +120,10 @@ function fmtField(v: unknown): string {
           class="text-xs space-y-0.5 text-muted-foreground"
         >
           <li v-for="(f, idx) in e.changes.fields" :key="idx">
-            <span class="font-medium text-foreground">{{ f.field }}</span>:
-            <span class="line-through">{{ fmtField(f.from) }}</span>
+            <span class="font-medium text-foreground">{{ fmtFieldName(f.field) }}</span>:
+            <span class="line-through">{{ fmtField(f.from, f.field) }}</span>
             <ArrowRight class="inline h-3 w-3 mx-1" />
-            <span class="text-foreground">{{ fmtField(f.to) }}</span>
+            <span class="text-foreground">{{ fmtField(f.to, f.field) }}</span>
           </li>
         </ul>
 

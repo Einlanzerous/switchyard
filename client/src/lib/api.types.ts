@@ -5101,6 +5101,7 @@ export interface paths {
                     text?: string;
                     updated_after?: string;
                     updated_before?: string;
+                    due?: "overdue" | "this_week" | "none";
                     include_deleted?: boolean | null;
                     cursor?: string;
                     limit?: number;
@@ -12241,6 +12242,8 @@ export interface paths {
                                 count: number;
                             }[];
                             stale_in_progress: number;
+                            overdue: number;
+                            completed_late: number;
                             /** Format: date-time */
                             most_recent_activity: string | null;
                         };
@@ -13433,6 +13436,8 @@ export interface paths {
                                     priority: string[];
                                     assignee?: string | null;
                                     text?: string | null;
+                                    /** @enum {string|null} */
+                                    due?: "overdue" | "this_week" | "none" | null;
                                 };
                                 /** Format: date-time */
                                 created_at: string;
@@ -13599,6 +13604,8 @@ export interface paths {
                             priority?: string[];
                             assignee?: string | null;
                             text?: string | null;
+                            /** @enum {string|null} */
+                            due?: "overdue" | "this_week" | "none" | null;
                         };
                     };
                 };
@@ -13635,6 +13642,8 @@ export interface paths {
                                 priority: string[];
                                 assignee?: string | null;
                                 text?: string | null;
+                                /** @enum {string|null} */
+                                due?: "overdue" | "this_week" | "none" | null;
                             };
                             /** Format: date-time */
                             created_at: string;
@@ -13963,6 +13972,8 @@ export interface paths {
                             priority?: string[];
                             assignee?: string | null;
                             text?: string | null;
+                            /** @enum {string|null} */
+                            due?: "overdue" | "this_week" | "none" | null;
                         };
                     };
                 };
@@ -13999,6 +14010,8 @@ export interface paths {
                                 priority: string[];
                                 assignee?: string | null;
                                 text?: string | null;
+                                /** @enum {string|null} */
+                                due?: "overdue" | "this_week" | "none" | null;
                             };
                             /** Format: date-time */
                             created_at: string;
