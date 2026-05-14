@@ -653,6 +653,8 @@ export interface paths {
                                             type: "agent" | "human";
                                         };
                                     }[];
+                                    /** Format: uuid */
+                                    template_id: string | null;
                                     /** Format: date-time */
                                     created_at: string;
                                     /** Format: date-time */
@@ -5199,6 +5201,8 @@ export interface paths {
                                         type: "agent" | "human";
                                     };
                                 }[];
+                                /** Format: uuid */
+                                template_id: string | null;
                                 /** Format: date-time */
                                 created_at: string;
                                 /** Format: date-time */
@@ -5464,6 +5468,8 @@ export interface paths {
                                     type: "agent" | "human";
                                 };
                             }[];
+                            /** Format: uuid */
+                            template_id: string | null;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
@@ -5839,6 +5845,8 @@ export interface paths {
                                     type: "agent" | "human";
                                 };
                             }[];
+                            /** Format: uuid */
+                            template_id: string | null;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
@@ -6374,6 +6382,8 @@ export interface paths {
                                     type: "agent" | "human";
                                 };
                             }[];
+                            /** Format: uuid */
+                            template_id: string | null;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
@@ -6760,6 +6770,8 @@ export interface paths {
                                     type: "agent" | "human";
                                 };
                             }[];
+                            /** Format: uuid */
+                            template_id: string | null;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
@@ -7154,6 +7166,8 @@ export interface paths {
                                             type: "agent" | "human";
                                         };
                                     }[];
+                                    /** Format: uuid */
+                                    template_id: string | null;
                                     /** Format: date-time */
                                     created_at: string;
                                     /** Format: date-time */
@@ -7442,6 +7456,8 @@ export interface paths {
                                         type: "agent" | "human";
                                     };
                                 }[];
+                                /** Format: uuid */
+                                template_id: string | null;
                                 /** Format: date-time */
                                 created_at: string;
                                 /** Format: date-time */
@@ -10124,6 +10140,8 @@ export interface paths {
                                             type: "agent" | "human";
                                         };
                                     }[];
+                                    /** Format: uuid */
+                                    template_id: string | null;
                                     /** Format: date-time */
                                     created_at: string;
                                     /** Format: date-time */
@@ -11668,6 +11686,8 @@ export interface paths {
                                             type: "agent" | "human";
                                         };
                                     }[];
+                                    /** Format: uuid */
+                                    template_id: string | null;
                                     /** Format: date-time */
                                     created_at: string;
                                     /** Format: date-time */
@@ -13240,6 +13260,8 @@ export interface paths {
                                             type: "agent" | "human";
                                         };
                                     }[];
+                                    /** Format: uuid */
+                                    template_id: string | null;
                                     /** Format: date-time */
                                     created_at: string;
                                     /** Format: date-time */
@@ -20083,6 +20105,8 @@ export interface paths {
                                     type: "agent" | "human";
                                 };
                             }[];
+                            /** Format: uuid */
+                            template_id: string | null;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
@@ -20335,6 +20359,8 @@ export interface paths {
                                         type: "agent" | "human";
                                     };
                                 }[];
+                                /** Format: uuid */
+                                template_id: string | null;
                                 /** Format: date-time */
                                 created_at: string;
                                 /** Format: date-time */

@@ -2,6 +2,7 @@
 import { computed, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useMutation, useQueryClient } from "@tanstack/vue-query";
+import { Repeat } from "lucide-vue-next";
 import { toast } from "vue-sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import StatusBadge from "./StatusBadge.vue";
@@ -60,6 +61,14 @@ const errMessage = computed(() => {
 function navigateToLinked(key: string) {
   if (props.onLinkNavigate) props.onLinkNavigate(key);
   else router.push(`/tickets/${key}`);
+}
+
+// Recurring-template back-link. The ticket's `template_id` is just the
+// UUID; route the user to the project Recurring tab so they can see the
+// template in context (and edit/disable it).
+function goToTemplate() {
+  if (!ticket.value) return;
+  router.push(`/projects/${ticket.value.project.key}/recurring`);
 }
 
 // LinkedWork renders three sections (parent, children-if-epic, typed links).
@@ -190,6 +199,16 @@ const removeLinkMutation = useMutation({
         <TypeIcon :type="ticket.type" class="mt-1" />
         <span class="font-mono text-muted-foreground">{{ ticket.key }}</span>
         <span class="font-semibold flex-1 min-w-0">{{ ticket.title }}</span>
+        <button
+          v-if="ticket.template_id"
+          type="button"
+          class="mt-1 inline-flex items-center gap-1 rounded-full bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider hover:bg-indigo-500/25 transition-colors"
+          :title="`Materialized from a recurring template`"
+          @click="goToTemplate"
+        >
+          <Repeat class="h-3 w-3" />
+          Recurring
+        </button>
       </h1>
     </header>
 

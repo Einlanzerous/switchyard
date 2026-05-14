@@ -45,6 +45,10 @@ export const queryKeys = {
   targets: () => ["sw", "targets"] as const,
   target: (id: string) => ["sw", "targets", id] as const,
 
+  ticketTemplates: (projectKey: string) => ["sw", "projects", projectKey, "templates"] as const,
+  ticketTemplate: (id: string) => ["sw", "templates", id] as const,
+  ticketTemplateInstances: (id: string) => ["sw", "templates", id, "instances"] as const,
+
   customFields: () => ["sw", "custom-fields"] as const,
   customField: (id: string) => ["sw", "custom-fields", id] as const,
 

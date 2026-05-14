@@ -5,21 +5,31 @@
 
 import { useRoute, useRouter } from "vue-router";
 import { computed } from "vue";
-import { KanbanSquare, BarChart2 } from "lucide-vue-next";
+import { KanbanSquare, BarChart2, Repeat } from "lucide-vue-next";
 import { cn } from "@/lib/utils";
 
 const props = defineProps<{
   boardPath: string;
   insightsPath: string;
+  // Optional: when set, renders a third "Recurring" tab. Project-scoped
+  // views pass this; board-scoped views don't (no recurring templates at
+  // the board level — they're project-bound).
+  recurringPath?: string;
 }>();
 
 const route = useRoute();
 const router = useRouter();
 
-const tabs = computed(() => [
-  { key: "board", label: "Board", icon: KanbanSquare, path: props.boardPath },
-  { key: "insights", label: "Insights", icon: BarChart2, path: props.insightsPath },
-]);
+const tabs = computed(() => {
+  const base = [
+    { key: "board", label: "Board", icon: KanbanSquare, path: props.boardPath },
+    { key: "insights", label: "Insights", icon: BarChart2, path: props.insightsPath },
+  ];
+  if (props.recurringPath) {
+    base.push({ key: "recurring", label: "Recurring", icon: Repeat, path: props.recurringPath });
+  }
+  return base;
+});
 
 function isActive(p: string): boolean {
   return route.path === p;

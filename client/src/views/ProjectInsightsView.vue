@@ -76,6 +76,7 @@ function back() { router.push("/projects"); }
         <InsightsTabs
           :board-path="`/projects/${projectKey}/board`"
           :insights-path="`/projects/${projectKey}/insights`"
+          :recurring-path="`/projects/${projectKey}/recurring`"
         />
         <div class="flex-1 min-w-0" />
         <Button size="sm" class="h-8" @click="ui.openCreateTicket(projectKey)">

@@ -1027,6 +1027,10 @@ paths:
                                   - polled_state_changed_at
                                   - created_at
                                   - created_by
+                            template_id:
+                              type: string
+                              nullable: true
+                              format: uuid
                             created_at:
                               type: string
                               format: date-time
@@ -1054,6 +1058,7 @@ paths:
                             - labels
                             - position
                             - external_refs
+                            - template_id
                             - created_at
                             - updated_at
                             - deleted_at
@@ -7171,6 +7176,10 @@ paths:
                               - polled_state_changed_at
                               - created_at
                               - created_by
+                        template_id:
+                          type: string
+                          nullable: true
+                          format: uuid
                         created_at:
                           type: string
                           format: date-time
@@ -7198,6 +7207,7 @@ paths:
                         - labels
                         - position
                         - external_refs
+                        - template_id
                         - created_at
                         - updated_at
                         - deleted_at
@@ -7657,6 +7667,10 @@ paths:
                         - polled_state_changed_at
                         - created_at
                         - created_by
+                  template_id:
+                    type: string
+                    nullable: true
+                    format: uuid
                   created_at:
                     type: string
                     format: date-time
@@ -8031,6 +8045,7 @@ paths:
                   - labels
                   - position
                   - external_refs
+                  - template_id
                   - created_at
                   - updated_at
                   - deleted_at
@@ -8435,6 +8450,10 @@ paths:
                         - polled_state_changed_at
                         - created_at
                         - created_by
+                  template_id:
+                    type: string
+                    nullable: true
+                    format: uuid
                   created_at:
                     type: string
                     format: date-time
@@ -8801,6 +8820,7 @@ paths:
                   - labels
                   - position
                   - external_refs
+                  - template_id
                   - created_at
                   - updated_at
                   - deleted_at
@@ -9247,6 +9267,10 @@ paths:
                         - polled_state_changed_at
                         - created_at
                         - created_by
+                  template_id:
+                    type: string
+                    nullable: true
+                    format: uuid
                   created_at:
                     type: string
                     format: date-time
@@ -9613,6 +9637,7 @@ paths:
                   - labels
                   - position
                   - external_refs
+                  - template_id
                   - created_at
                   - updated_at
                   - deleted_at
@@ -10225,6 +10250,10 @@ paths:
                         - polled_state_changed_at
                         - created_at
                         - created_by
+                  template_id:
+                    type: string
+                    nullable: true
+                    format: uuid
                   created_at:
                     type: string
                     format: date-time
@@ -10591,6 +10620,7 @@ paths:
                   - labels
                   - position
                   - external_refs
+                  - template_id
                   - created_at
                   - updated_at
                   - deleted_at
@@ -11070,6 +11100,10 @@ paths:
                                   - polled_state_changed_at
                                   - created_at
                                   - created_by
+                            template_id:
+                              type: string
+                              nullable: true
+                              format: uuid
                             created_at:
                               type: string
                               format: date-time
@@ -11097,6 +11131,7 @@ paths:
                             - labels
                             - position
                             - external_refs
+                            - template_id
                             - created_at
                             - updated_at
                             - deleted_at
@@ -11599,6 +11634,10 @@ paths:
                               - polled_state_changed_at
                               - created_at
                               - created_by
+                        template_id:
+                          type: string
+                          nullable: true
+                          format: uuid
                         created_at:
                           type: string
                           format: date-time
@@ -11626,6 +11665,7 @@ paths:
                         - labels
                         - position
                         - external_refs
+                        - template_id
                         - created_at
                         - updated_at
                         - deleted_at
@@ -15553,6 +15593,10 @@ paths:
                                     - polled_state_changed_at
                                     - created_at
                                     - created_by
+                              template_id:
+                                type: string
+                                nullable: true
+                                format: uuid
                               created_at:
                                 type: string
                                 format: date-time
@@ -15580,6 +15624,7 @@ paths:
                               - labels
                               - position
                               - external_refs
+                              - template_id
                               - created_at
                               - updated_at
                               - deleted_at
@@ -17803,6 +17848,10 @@ paths:
                                   - polled_state_changed_at
                                   - created_at
                                   - created_by
+                            template_id:
+                              type: string
+                              nullable: true
+                              format: uuid
                             created_at:
                               type: string
                               format: date-time
@@ -17830,6 +17879,7 @@ paths:
                             - labels
                             - position
                             - external_refs
+                            - template_id
                             - created_at
                             - updated_at
                             - deleted_at
@@ -20158,6 +20208,10 @@ paths:
                                   - polled_state_changed_at
                                   - created_at
                                   - created_by
+                            template_id:
+                              type: string
+                              nullable: true
+                              format: uuid
                             created_at:
                               type: string
                               format: date-time
@@ -20185,6 +20239,7 @@ paths:
                             - labels
                             - position
                             - external_refs
+                            - template_id
                             - created_at
                             - updated_at
                             - deleted_at
@@ -30663,6 +30718,10 @@ paths:
                         - polled_state_changed_at
                         - created_at
                         - created_by
+                  template_id:
+                    type: string
+                    nullable: true
+                    format: uuid
                   created_at:
                     type: string
                     format: date-time
@@ -30690,6 +30749,7 @@ paths:
                   - labels
                   - position
                   - external_refs
+                  - template_id
                   - created_at
                   - updated_at
                   - deleted_at
@@ -31107,6 +31167,10 @@ paths:
                               - polled_state_changed_at
                               - created_at
                               - created_by
+                        template_id:
+                          type: string
+                          nullable: true
+                          format: uuid
                         created_at:
                           type: string
                           format: date-time
@@ -31134,6 +31198,7 @@ paths:
                         - labels
                         - position
                         - external_refs
+                        - template_id
                         - created_at
                         - updated_at
                         - deleted_at

@@ -41,6 +41,9 @@ export const TicketSummary = z
     // fetch. Typical ticket has 0-3 refs; the list endpoint batches
     // the fan-out so the cost is one extra query per page, not N+1.
     external_refs: z.array(ExternalRef),
+    // Back-pointer to the ticket_template that materialized this ticket.
+    // NULL = hand-created. Drawer surfaces a "Recurring" badge when set.
+    template_id: Uuid.nullable(),
   })
   .merge(SoftDeletable);
 export type TicketSummary = z.infer<typeof TicketSummary>;

@@ -224,6 +224,7 @@ export function mapTicketSummary(t: TicketRow, deps: TicketSummaryDeps): TicketS
     labels: deps.labels.map(mapLabelRef),
     position: t.position,
     external_refs: deps.externalRefs,
+    template_id: t.template_id,
     created_at: t.created_at,
     updated_at: t.updated_at,
     deleted_at: t.deleted_at,
