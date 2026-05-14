@@ -43,6 +43,34 @@ function displayTitle(r: ExternalRef): string {
     return r.url;
   }
 }
+
+// State pill — colored chip with bold label. PR `closed` (closed without
+// merge) is treated as REJECTED for visual emphasis; for issues, `closed`
+// still uses the rejected styling but the surrounding kind icon
+// disambiguates (issue closed = resolved is still uncommon enough that
+// red-on-icon-only is the right read). Build errors / Action failures
+// share the rejected tone.
+function stateLabel(state: string): string {
+  if (state === "merged") return "Merged";
+  if (state === "open") return "Open";
+  if (state === "closed") return "Closed";
+  if (state === "success") return "Success";
+  if (state === "failed") return "Failed";
+  return state.toUpperCase();
+}
+
+function statePillClass(state: string): string {
+  if (state === "merged") {
+    return "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30";
+  }
+  if (state === "open" || state === "success") {
+    return "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30";
+  }
+  if (state === "closed" || state === "failed") {
+    return "bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30";
+  }
+  return "bg-muted text-muted-foreground border-border";
+}
 </script>
 
 <template>
@@ -72,8 +100,11 @@ function displayTitle(r: ExternalRef): string {
             rel="noopener noreferrer"
             class="flex-1 min-w-0 truncate text-left hover:text-foreground transition-colors"
           >{{ displayTitle(r) }}</a>
-          <span v-if="r.state" class="text-[10px] uppercase tracking-wider text-muted-foreground">
-            {{ r.state }}
+          <span
+            v-if="r.state"
+            :class="['inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider', statePillClass(r.state)]"
+          >
+            {{ stateLabel(r.state) }}
           </span>
           <Button
             type="button"

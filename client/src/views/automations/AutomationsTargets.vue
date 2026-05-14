@@ -204,11 +204,14 @@ const canSave = computed(() =>
           <li v-for="t in items" :key="t.id" class="flex items-start gap-3 p-3">
             <Send class="h-4 w-4 text-muted-foreground shrink-0 mt-1" />
             <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2">
-                <span class="font-medium text-sm">{{ t.name }}</span>
-                <span class="font-mono text-xs text-muted-foreground truncate">{{ t.url }}</span>
-              </div>
-              <div v-if="t.description" class="text-xs text-muted-foreground mt-0.5 truncate">
+              <div class="font-medium text-sm">{{ t.name }}</div>
+              <!-- URL on its own line so name + URL don't compete for horizontal space.
+                   line-clamp-2 caps at 2 lines; hover the row to see the full URL via title attr. -->
+              <div
+                class="font-mono text-xs text-muted-foreground mt-0.5 break-all line-clamp-2"
+                :title="t.url"
+              >{{ t.url }}</div>
+              <div v-if="t.description" class="text-xs text-muted-foreground mt-0.5 line-clamp-2" :title="t.description">
                 {{ t.description }}
               </div>
             </div>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
 import { Loader2 } from "lucide-vue-next";
 import { toast } from "vue-sonner";
@@ -29,6 +29,15 @@ const closedWindow = computed<number>(() => {
 const staleDays = computed<number>(() => {
   return settingsQuery.data.value?.stale_in_progress_days ?? 30;
 });
+
+// Local mirror so the <Input> v-models a string the user can edit freely.
+// We seed it from `staleDays` and reconcile on server-side change (e.g. after
+// save success the computed value updates → we re-seed). Without this the
+// input shows up empty because shadcn-vue's Input uses v-model, not :value.
+const staleDaysInput = ref<string>(String(staleDays.value));
+watch(staleDays, (v) => {
+  staleDaysInput.value = String(v);
+}, { immediate: true });
 
 const closedWindowMutation = useMutation({
   mutationFn: async (raw: string) => {
@@ -122,13 +131,13 @@ const staleDaysMutation = useMutation({
               type="number"
               min="1"
               max="3650"
-              :value="staleDays"
-              class="w-24"
-              @blur="(e) => {
-                const v = (e.target as HTMLInputElement).value;
-                if (v !== String(staleDays)) staleDaysMutation.mutate(v);
+              v-model="staleDaysInput"
+              class="w-24 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              @blur="() => {
+                if (staleDaysInput !== String(staleDays)) staleDaysMutation.mutate(staleDaysInput);
               }"
             />
+            <span class="text-xs text-muted-foreground">days</span>
             <span v-if="staleDaysMutation.isPending.value">
               <Loader2 class="h-3.5 w-3.5 animate-spin text-muted-foreground" />
             </span>
