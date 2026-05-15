@@ -9,7 +9,10 @@ import BoardView from "./views/BoardView.vue";
 import BoardInsightsView from "./views/BoardInsightsView.vue";
 import ProjectsView from "./views/ProjectsView.vue";
 import ProjectInsightsView from "./views/ProjectInsightsView.vue";
-import ProjectRecurringView from "./views/ProjectRecurringView.vue";
+import ProjectSetupView from "./views/ProjectSetupView.vue";
+import ProjectSetupRecurring from "./views/setup/ProjectSetupRecurring.vue";
+import ProjectSetupAutomations from "./views/setup/ProjectSetupAutomations.vue";
+import ProjectSetupSettings from "./views/setup/ProjectSetupSettings.vue";
 import HealthView from "./views/HealthView.vue";
 
 // Settings is a nested layout so each sub-section is its own route while
@@ -52,7 +55,22 @@ export const router = createRouter({
     { path: "/projects", name: "projects", component: ProjectsView },
     { path: "/projects/:key/board", name: "project-board", component: ProjectBoardView },
     { path: "/projects/:key/insights", name: "project-insights", component: ProjectInsightsView },
-    { path: "/projects/:key/recurring", name: "project-recurring", component: ProjectRecurringView },
+    // Setup tab replaces the standalone Recurring tab. Old /recurring URL
+    // redirects below to preserve any bookmarks.
+    {
+      path: "/projects/:key/setup",
+      component: ProjectSetupView,
+      redirect: (to) => `/projects/${to.params.key}/setup/recurring`,
+      children: [
+        { path: "recurring", name: "project-setup-recurring", component: ProjectSetupRecurring },
+        { path: "automations", name: "project-setup-automations", component: ProjectSetupAutomations },
+        { path: "settings", name: "project-setup-settings", component: ProjectSetupSettings },
+      ],
+    },
+    {
+      path: "/projects/:key/recurring",
+      redirect: (to) => `/projects/${to.params.key}/setup/recurring`,
+    },
     { path: "/health", name: "health", component: HealthView },
 
     {

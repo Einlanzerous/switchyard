@@ -821,11 +821,17 @@ paths:
                                   type: string
                                   nullable: true
                                   pattern: ^#[0-9a-fA-F]{6}$
+                                repo_url:
+                                  type: string
+                                  nullable: true
+                                  maxLength: 2048
+                                  format: uri
                               required:
                                 - id
                                 - key
                                 - name
                                 - color
+                                - repo_url
                             type:
                               type: string
                               enum: &a5
@@ -3069,6 +3075,11 @@ paths:
                           type: string
                           nullable: true
                           pattern: ^#[0-9a-fA-F]{6}$
+                        repo_url:
+                          type: string
+                          nullable: true
+                          maxLength: 2048
+                          format: uri
                         archived_at:
                           type: string
                           nullable: true
@@ -3102,6 +3113,7 @@ paths:
                         - name
                         - description
                         - color
+                        - repo_url
                         - archived_at
                         - board_closed_window_days
                         - created_at
@@ -3312,6 +3324,10 @@ paths:
                 color:
                   type: string
                   pattern: ^#[0-9a-fA-F]{6}$
+                repo_url:
+                  type: string
+                  maxLength: 2048
+                  format: uri
                 board_closed_window_days:
                   anyOf:
                     - type: number
@@ -3352,6 +3368,11 @@ paths:
                     type: string
                     nullable: true
                     pattern: ^#[0-9a-fA-F]{6}$
+                  repo_url:
+                    type: string
+                    nullable: true
+                    maxLength: 2048
+                    format: uri
                   archived_at:
                     type: string
                     nullable: true
@@ -3385,6 +3406,7 @@ paths:
                   - name
                   - description
                   - color
+                  - repo_url
                   - archived_at
                   - board_closed_window_days
                   - created_at
@@ -3596,6 +3618,11 @@ paths:
                     type: string
                     nullable: true
                     pattern: ^#[0-9a-fA-F]{6}$
+                  repo_url:
+                    type: string
+                    nullable: true
+                    maxLength: 2048
+                    format: uri
                   archived_at:
                     type: string
                     nullable: true
@@ -3629,6 +3656,7 @@ paths:
                   - name
                   - description
                   - color
+                  - repo_url
                   - archived_at
                   - board_closed_window_days
                   - created_at
@@ -3829,6 +3857,11 @@ paths:
                 color:
                   type: string
                   pattern: ^#[0-9a-fA-F]{6}$
+                repo_url:
+                  type: string
+                  nullable: true
+                  maxLength: 2048
+                  format: uri
                 board_closed_window_days:
                   anyOf:
                     - type: number
@@ -3870,6 +3903,11 @@ paths:
                     type: string
                     nullable: true
                     pattern: ^#[0-9a-fA-F]{6}$
+                  repo_url:
+                    type: string
+                    nullable: true
+                    maxLength: 2048
+                    format: uri
                   archived_at:
                     type: string
                     nullable: true
@@ -3903,6 +3941,7 @@ paths:
                   - name
                   - description
                   - color
+                  - repo_url
                   - archived_at
                   - board_closed_window_days
                   - created_at
@@ -7001,11 +7040,17 @@ paths:
                               type: string
                               nullable: true
                               pattern: ^#[0-9a-fA-F]{6}$
+                            repo_url:
+                              type: string
+                              nullable: true
+                              maxLength: 2048
+                              format: uri
                           required:
                             - id
                             - key
                             - name
                             - color
+                            - repo_url
                         type:
                           type: string
                           enum: *a5
@@ -7492,11 +7537,17 @@ paths:
                         type: string
                         nullable: true
                         pattern: ^#[0-9a-fA-F]{6}$
+                      repo_url:
+                        type: string
+                        nullable: true
+                        maxLength: 2048
+                        format: uri
                     required:
                       - id
                       - key
                       - name
                       - color
+                      - repo_url
                   type:
                     type: string
                     enum: *a5
@@ -8275,11 +8326,17 @@ paths:
                         type: string
                         nullable: true
                         pattern: ^#[0-9a-fA-F]{6}$
+                      repo_url:
+                        type: string
+                        nullable: true
+                        maxLength: 2048
+                        format: uri
                     required:
                       - id
                       - key
                       - name
                       - color
+                      - repo_url
                   type:
                     type: string
                     enum: *a5
@@ -9092,11 +9149,17 @@ paths:
                         type: string
                         nullable: true
                         pattern: ^#[0-9a-fA-F]{6}$
+                      repo_url:
+                        type: string
+                        nullable: true
+                        maxLength: 2048
+                        format: uri
                     required:
                       - id
                       - key
                       - name
                       - color
+                      - repo_url
                   type:
                     type: string
                     enum: *a5
@@ -10075,11 +10138,17 @@ paths:
                         type: string
                         nullable: true
                         pattern: ^#[0-9a-fA-F]{6}$
+                      repo_url:
+                        type: string
+                        nullable: true
+                        maxLength: 2048
+                        format: uri
                     required:
                       - id
                       - key
                       - name
                       - color
+                      - repo_url
                   type:
                     type: string
                     enum: *a5
@@ -10876,11 +10945,17 @@ paths:
                         type: string
                         nullable: true
                         pattern: ^#[0-9a-fA-F]{6}$
+                      repo_url:
+                        type: string
+                        nullable: true
+                        maxLength: 2048
+                        format: uri
                     required:
                       - id
                       - key
                       - name
                       - color
+                      - repo_url
                   type:
                     type: string
                     enum: *a5
@@ -11727,11 +11802,17 @@ paths:
                                   type: string
                                   nullable: true
                                   pattern: ^#[0-9a-fA-F]{6}$
+                                repo_url:
+                                  type: string
+                                  nullable: true
+                                  maxLength: 2048
+                                  format: uri
                               required:
                                 - id
                                 - key
                                 - name
                                 - color
+                                - repo_url
                             type:
                               type: string
                               enum: *a5
@@ -12261,11 +12342,17 @@ paths:
                               type: string
                               nullable: true
                               pattern: ^#[0-9a-fA-F]{6}$
+                            repo_url:
+                              type: string
+                              nullable: true
+                              maxLength: 2048
+                              format: uri
                           required:
                             - id
                             - key
                             - name
                             - color
+                            - repo_url
                         type:
                           type: string
                           enum: *a5
@@ -14795,11 +14882,17 @@ paths:
                                 type: string
                                 nullable: true
                                 pattern: ^#[0-9a-fA-F]{6}$
+                              repo_url:
+                                type: string
+                                nullable: true
+                                maxLength: 2048
+                                format: uri
                             required:
                               - id
                               - key
                               - name
                               - color
+                              - repo_url
                         filter:
                           type: object
                           properties:
@@ -15117,11 +15210,17 @@ paths:
                           type: string
                           nullable: true
                           pattern: ^#[0-9a-fA-F]{6}$
+                        repo_url:
+                          type: string
+                          nullable: true
+                          maxLength: 2048
+                          format: uri
                       required:
                         - id
                         - key
                         - name
                         - color
+                        - repo_url
                   filter:
                     type: object
                     properties:
@@ -15383,11 +15482,17 @@ paths:
                           type: string
                           nullable: true
                           pattern: ^#[0-9a-fA-F]{6}$
+                        repo_url:
+                          type: string
+                          nullable: true
+                          maxLength: 2048
+                          format: uri
                       required:
                         - id
                         - key
                         - name
                         - color
+                        - repo_url
                   filter:
                     type: object
                     properties:
@@ -15695,11 +15800,17 @@ paths:
                           type: string
                           nullable: true
                           pattern: ^#[0-9a-fA-F]{6}$
+                        repo_url:
+                          type: string
+                          nullable: true
+                          maxLength: 2048
+                          format: uri
                       required:
                         - id
                         - key
                         - name
                         - color
+                        - repo_url
                   filter:
                     type: object
                     properties:
@@ -16146,11 +16257,17 @@ paths:
                               type: string
                               nullable: true
                               pattern: ^#[0-9a-fA-F]{6}$
+                            repo_url:
+                              type: string
+                              nullable: true
+                              maxLength: 2048
+                              format: uri
                           required:
                             - id
                             - key
                             - name
                             - color
+                            - repo_url
                       filter:
                         type: object
                         properties:
@@ -16235,11 +16352,17 @@ paths:
                                     type: string
                                     nullable: true
                                     pattern: ^#[0-9a-fA-F]{6}$
+                                  repo_url:
+                                    type: string
+                                    nullable: true
+                                    maxLength: 2048
+                                    format: uri
                                 required:
                                   - id
                                   - key
                                   - name
                                   - color
+                                  - repo_url
                               type:
                                 type: string
                                 enum: *a5
@@ -18490,11 +18613,17 @@ paths:
                                   type: string
                                   nullable: true
                                   pattern: ^#[0-9a-fA-F]{6}$
+                                repo_url:
+                                  type: string
+                                  nullable: true
+                                  maxLength: 2048
+                                  format: uri
                               required:
                                 - id
                                 - key
                                 - name
                                 - color
+                                - repo_url
                             type:
                               type: string
                               enum: *a5
@@ -19421,11 +19550,17 @@ paths:
                         type: string
                         nullable: true
                         pattern: ^#[0-9a-fA-F]{6}$
+                      repo_url:
+                        type: string
+                        nullable: true
+                        maxLength: 2048
+                        format: uri
                     required:
                       - id
                       - key
                       - name
                       - color
+                      - repo_url
                   totals:
                     type: object
                     properties:
@@ -19771,11 +19906,17 @@ paths:
                               type: string
                               nullable: true
                               pattern: ^#[0-9a-fA-F]{6}$
+                            repo_url:
+                              type: string
+                              nullable: true
+                              maxLength: 2048
+                              format: uri
                           required:
                             - id
                             - key
                             - name
                             - color
+                            - repo_url
                         totals:
                           type: object
                           properties:
@@ -20811,11 +20952,17 @@ paths:
                               type: string
                               nullable: true
                               pattern: ^#[0-9a-fA-F]{6}$
+                            repo_url:
+                              type: string
+                              nullable: true
+                              maxLength: 2048
+                              format: uri
                           required:
                             - id
                             - key
                             - name
                             - color
+                            - repo_url
                         stale_count:
                           type: integer
                           minimum: 0
@@ -20850,11 +20997,17 @@ paths:
                                   type: string
                                   nullable: true
                                   pattern: ^#[0-9a-fA-F]{6}$
+                                repo_url:
+                                  type: string
+                                  nullable: true
+                                  maxLength: 2048
+                                  format: uri
                               required:
                                 - id
                                 - key
                                 - name
                                 - color
+                                - repo_url
                             type:
                               type: string
                               enum: *a5
@@ -29751,11 +29904,17 @@ paths:
                               type: string
                               nullable: true
                               pattern: ^#[0-9a-fA-F]{6}$
+                            repo_url:
+                              type: string
+                              nullable: true
+                              maxLength: 2048
+                              format: uri
                           required:
                             - id
                             - key
                             - name
                             - color
+                            - repo_url
                         enabled:
                           type: boolean
                         title:
@@ -30154,11 +30313,17 @@ paths:
                         type: string
                         nullable: true
                         pattern: ^#[0-9a-fA-F]{6}$
+                      repo_url:
+                        type: string
+                        nullable: true
+                        maxLength: 2048
+                        format: uri
                     required:
                       - id
                       - key
                       - name
                       - color
+                      - repo_url
                   enabled:
                     type: boolean
                   title:
@@ -30472,11 +30637,17 @@ paths:
                         type: string
                         nullable: true
                         pattern: ^#[0-9a-fA-F]{6}$
+                      repo_url:
+                        type: string
+                        nullable: true
+                        maxLength: 2048
+                        format: uri
                     required:
                       - id
                       - key
                       - name
                       - color
+                      - repo_url
                   enabled:
                     type: boolean
                   title:
@@ -30846,11 +31017,17 @@ paths:
                         type: string
                         nullable: true
                         pattern: ^#[0-9a-fA-F]{6}$
+                      repo_url:
+                        type: string
+                        nullable: true
+                        maxLength: 2048
+                        format: uri
                     required:
                       - id
                       - key
                       - name
                       - color
+                      - repo_url
                   enabled:
                     type: boolean
                   title:
@@ -31360,11 +31537,17 @@ paths:
                         type: string
                         nullable: true
                         pattern: ^#[0-9a-fA-F]{6}$
+                      repo_url:
+                        type: string
+                        nullable: true
+                        maxLength: 2048
+                        format: uri
                     required:
                       - id
                       - key
                       - name
                       - color
+                      - repo_url
                   type:
                     type: string
                     enum: *a5
@@ -31809,11 +31992,17 @@ paths:
                               type: string
                               nullable: true
                               pattern: ^#[0-9a-fA-F]{6}$
+                            repo_url:
+                              type: string
+                              nullable: true
+                              maxLength: 2048
+                              format: uri
                           required:
                             - id
                             - key
                             - name
                             - color
+                            - repo_url
                         type:
                           type: string
                           enum: *a5

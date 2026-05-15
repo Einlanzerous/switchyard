@@ -16,6 +16,7 @@ import { formatDurationMs, formatDeltaPercent } from "@/lib/formatDuration";
 import KpiCard from "@/components/dashboard/KpiCard.vue";
 import DashboardWidget from "@/components/dashboard/DashboardWidget.vue";
 import InsightsTabs from "@/components/dashboard/InsightsTabs.vue";
+import ProjectHeaderLabel from "@/components/projects/ProjectHeaderLabel.vue";
 import ThroughputChart from "@/components/dashboard/widgets/ThroughputChart.vue";
 import StatusDonut from "@/components/dashboard/widgets/StatusDonut.vue";
 import CycleTimeWidget from "@/components/dashboard/widgets/CycleTimeWidget.vue";
@@ -67,16 +68,12 @@ function back() { router.push("/projects"); }
           <ArrowLeft class="h-3.5 w-3.5 mr-1" /> Back
         </Button>
         <Separator orientation="vertical" class="h-5" />
-        <span class="font-mono text-sm text-muted-foreground">{{ projectKey }}</span>
-        <span v-if="stats.data.value?.project.name" class="text-muted-foreground/40">—</span>
-        <span v-if="stats.data.value?.project.name" class="text-sm font-medium truncate">
-          {{ stats.data.value.project.name }}
-        </span>
+        <ProjectHeaderLabel :project-key="projectKey" :project="stats.data.value?.project ?? null" />
         <Separator orientation="vertical" class="h-5" />
         <InsightsTabs
           :board-path="`/projects/${projectKey}/board`"
           :insights-path="`/projects/${projectKey}/insights`"
-          :recurring-path="`/projects/${projectKey}/recurring`"
+          :setup-path="`/projects/${projectKey}/setup`"
         />
         <div class="flex-1 min-w-0" />
         <Button size="sm" class="h-8" @click="ui.openCreateTicket(projectKey)">

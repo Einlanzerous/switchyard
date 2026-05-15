@@ -584,6 +584,8 @@ export interface paths {
                                         key: string;
                                         name: string;
                                         color: string | null;
+                                        /** Format: uri */
+                                        repo_url: string | null;
                                     };
                                     /** @enum {string} */
                                     type: "spike" | "task" | "bug" | "epic";
@@ -2210,6 +2212,8 @@ export interface paths {
                                 name: string;
                                 description: string | null;
                                 color: string | null;
+                                /** Format: uri */
+                                repo_url: string | null;
                                 /** Format: date-time */
                                 archived_at: string | null;
                                 board_closed_window_days: 7 | 14 | 30 | unknown | unknown;
@@ -2371,6 +2375,8 @@ export interface paths {
                         name: string;
                         description?: string;
                         color?: string;
+                        /** Format: uri */
+                        repo_url?: string;
                         board_closed_window_days?: 7 | 14 | 30;
                     };
                 };
@@ -2389,6 +2395,8 @@ export interface paths {
                             name: string;
                             description: string | null;
                             color: string | null;
+                            /** Format: uri */
+                            repo_url: string | null;
                             /** Format: date-time */
                             archived_at: string | null;
                             board_closed_window_days: 7 | 14 | 30 | unknown | unknown;
@@ -2567,6 +2575,8 @@ export interface paths {
                             name: string;
                             description: string | null;
                             color: string | null;
+                            /** Format: uri */
+                            repo_url: string | null;
                             /** Format: date-time */
                             archived_at: string | null;
                             board_closed_window_days: 7 | 14 | 30 | unknown | unknown;
@@ -2874,6 +2884,8 @@ export interface paths {
                         name?: string;
                         description?: string;
                         color?: string;
+                        /** Format: uri */
+                        repo_url?: string | null;
                         board_closed_window_days?: 7 | 14 | 30 | unknown | unknown;
                         archived?: boolean;
                     };
@@ -2893,6 +2905,8 @@ export interface paths {
                             name: string;
                             description: string | null;
                             color: string | null;
+                            /** Format: uri */
+                            repo_url: string | null;
                             /** Format: date-time */
                             archived_at: string | null;
                             board_closed_window_days: 7 | 14 | 30 | unknown | unknown;
@@ -5132,6 +5146,8 @@ export interface paths {
                                     key: string;
                                     name: string;
                                     color: string | null;
+                                    /** Format: uri */
+                                    repo_url: string | null;
                                 };
                                 /** @enum {string} */
                                 type: "spike" | "task" | "bug" | "epic";
@@ -5399,6 +5415,8 @@ export interface paths {
                                 key: string;
                                 name: string;
                                 color: string | null;
+                                /** Format: uri */
+                                repo_url: string | null;
                             };
                             /** @enum {string} */
                             type: "spike" | "task" | "bug" | "epic";
@@ -5776,6 +5794,8 @@ export interface paths {
                                 key: string;
                                 name: string;
                                 color: string | null;
+                                /** Format: uri */
+                                repo_url: string | null;
                             };
                             /** @enum {string} */
                             type: "spike" | "task" | "bug" | "epic";
@@ -6313,6 +6333,8 @@ export interface paths {
                                 key: string;
                                 name: string;
                                 color: string | null;
+                                /** Format: uri */
+                                repo_url: string | null;
                             };
                             /** @enum {string} */
                             type: "spike" | "task" | "bug" | "epic";
@@ -6701,6 +6723,8 @@ export interface paths {
                                 key: string;
                                 name: string;
                                 color: string | null;
+                                /** Format: uri */
+                                repo_url: string | null;
                             };
                             /** @enum {string} */
                             type: "spike" | "task" | "bug" | "epic";
@@ -7092,6 +7116,8 @@ export interface paths {
                                 key: string;
                                 name: string;
                                 color: string | null;
+                                /** Format: uri */
+                                repo_url: string | null;
                             };
                             /** @enum {string} */
                             type: "spike" | "task" | "bug" | "epic";
@@ -7488,6 +7514,8 @@ export interface paths {
                                         key: string;
                                         name: string;
                                         color: string | null;
+                                        /** Format: uri */
+                                        repo_url: string | null;
                                     };
                                     /** @enum {string} */
                                     type: "spike" | "task" | "bug" | "epic";
@@ -7778,6 +7806,8 @@ export interface paths {
                                     key: string;
                                     name: string;
                                     color: string | null;
+                                    /** Format: uri */
+                                    repo_url: string | null;
                                 };
                                 /** @enum {string} */
                                 type: "spike" | "task" | "bug" | "epic";
@@ -9520,6 +9550,8 @@ export interface paths {
                                     key: string;
                                     name: string;
                                     color: string | null;
+                                    /** Format: uri */
+                                    repo_url: string | null;
                                 }[];
                                 filter: {
                                     types?: ("spike" | "task" | "bug" | "epic")[];
@@ -9719,6 +9751,8 @@ export interface paths {
                                 key: string;
                                 name: string;
                                 color: string | null;
+                                /** Format: uri */
+                                repo_url: string | null;
                             }[];
                             filter: {
                                 types?: ("spike" | "task" | "bug" | "epic")[];
@@ -9907,6 +9941,8 @@ export interface paths {
                                 key: string;
                                 name: string;
                                 color: string | null;
+                                /** Format: uri */
+                                repo_url: string | null;
                             }[];
                             filter: {
                                 types?: ("spike" | "task" | "bug" | "epic")[];
@@ -10253,6 +10289,8 @@ export interface paths {
                                 key: string;
                                 name: string;
                                 color: string | null;
+                                /** Format: uri */
+                                repo_url: string | null;
                             }[];
                             filter: {
                                 types?: ("spike" | "task" | "bug" | "epic")[];
@@ -10438,6 +10476,8 @@ export interface paths {
                                     key: string;
                                     name: string;
                                     color: string | null;
+                                    /** Format: uri */
+                                    repo_url: string | null;
                                 }[];
                                 filter: {
                                     types?: ("spike" | "task" | "bug" | "epic")[];
@@ -10467,6 +10507,8 @@ export interface paths {
                                         key: string;
                                         name: string;
                                         color: string | null;
+                                        /** Format: uri */
+                                        repo_url: string | null;
                                     };
                                     /** @enum {string} */
                                     type: "spike" | "task" | "bug" | "epic";
@@ -12013,6 +12055,8 @@ export interface paths {
                                         key: string;
                                         name: string;
                                         color: string | null;
+                                        /** Format: uri */
+                                        repo_url: string | null;
                                     };
                                     /** @enum {string} */
                                     type: "spike" | "task" | "bug" | "epic";
@@ -12620,6 +12664,8 @@ export interface paths {
                                 key: string;
                                 name: string;
                                 color: string | null;
+                                /** Format: uri */
+                                repo_url: string | null;
                             };
                             totals: {
                                 open: number;
@@ -12832,6 +12878,8 @@ export interface paths {
                                     key: string;
                                     name: string;
                                     color: string | null;
+                                    /** Format: uri */
+                                    repo_url: string | null;
                                 };
                                 totals: {
                                     open: number;
@@ -13574,6 +13622,8 @@ export interface paths {
                                     key: string;
                                     name: string;
                                     color: string | null;
+                                    /** Format: uri */
+                                    repo_url: string | null;
                                 };
                                 stale_count: number;
                                 sample_ticket: {
@@ -13587,6 +13637,8 @@ export interface paths {
                                         key: string;
                                         name: string;
                                         color: string | null;
+                                        /** Format: uri */
+                                        repo_url: string | null;
                                     };
                                     /** @enum {string} */
                                     type: "spike" | "task" | "bug" | "epic";
@@ -19402,6 +19454,8 @@ export interface paths {
                                     key: string;
                                     name: string;
                                     color: string | null;
+                                    /** Format: uri */
+                                    repo_url: string | null;
                                 };
                                 enabled: boolean;
                                 title: string;
@@ -19637,6 +19691,8 @@ export interface paths {
                                 key: string;
                                 name: string;
                                 color: string | null;
+                                /** Format: uri */
+                                repo_url: string | null;
                             };
                             enabled: boolean;
                             title: string;
@@ -19846,6 +19902,8 @@ export interface paths {
                                 key: string;
                                 name: string;
                                 color: string | null;
+                                /** Format: uri */
+                                repo_url: string | null;
                             };
                             enabled: boolean;
                             title: string;
@@ -20221,6 +20279,8 @@ export interface paths {
                                 key: string;
                                 name: string;
                                 color: string | null;
+                                /** Format: uri */
+                                repo_url: string | null;
                             };
                             enabled: boolean;
                             title: string;
@@ -20432,6 +20492,8 @@ export interface paths {
                                 key: string;
                                 name: string;
                                 color: string | null;
+                                /** Format: uri */
+                                repo_url: string | null;
                             };
                             /** @enum {string} */
                             type: "spike" | "task" | "bug" | "epic";
@@ -20686,6 +20748,8 @@ export interface paths {
                                     key: string;
                                     name: string;
                                     color: string | null;
+                                    /** Format: uri */
+                                    repo_url: string | null;
                                 };
                                 /** @enum {string} */
                                 type: "spike" | "task" | "bug" | "epic";
