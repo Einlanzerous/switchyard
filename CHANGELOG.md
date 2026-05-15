@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.15.0](https://github.com/Einlanzerous/switchyard/compare/v2.14.0...v2.15.0) (2026-05-15)
+
+
+### Features
+
+* SWY-49 + SWY-50 — default "All projects" board + cross-project ticket move ([053c599](https://github.com/Einlanzerous/switchyard/commit/053c599a908971b52452602d5d47d5c6b253386b))
+* SWY-49 + SWY-50 — default "All projects" board + move ticket cross-project ([68a9002](https://github.com/Einlanzerous/switchyard/commit/68a9002e51cbed3b7970e4d02aaf9bcdfff72e4d))
+
 ## [2.14.0](https://github.com/Einlanzerous/switchyard/compare/v2.13.0...v2.14.0) (2026-05-14)
 
 
