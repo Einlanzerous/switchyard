@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.16.0](https://github.com/Einlanzerous/switchyard/compare/v2.15.0...v2.16.0) (2026-05-15)
+
+
+### Features
+
+* SWY-57 + 58 + 59 — repo URL, detail-page delete, project Setup tab ([7521117](https://github.com/Einlanzerous/switchyard/commit/75211177dd058046152ec9169670aca52898ee71))
+* SWY-57 + SWY-58 + SWY-59 — repo URL, detail-page delete, project Setup tab ([8003c63](https://github.com/Einlanzerous/switchyard/commit/8003c630cc796afcfa665347ee6ec8224598b343))
+
 ## [2.15.0](https://github.com/Einlanzerous/switchyard/compare/v2.14.0...v2.15.0) (2026-05-15)
 
 
