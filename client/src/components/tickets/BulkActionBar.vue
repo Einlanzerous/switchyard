@@ -232,6 +232,30 @@ const filteredAddLabels = computed(() => {
       <span class="text-sm font-medium tabular-nums px-1">
         {{ count }} selected
       </span>
+
+      <!-- Delete confirm replaces the action row inline (no overlay). The
+           count-selected label above stays visible so context is preserved. -->
+      <template v-if="confirmDelete">
+        <span class="text-sm text-muted-foreground">
+          Delete {{ count }} ticket{{ count === 1 ? "" : "s" }}? Soft-delete is recoverable.
+        </span>
+        <div class="h-6 w-px bg-border mx-1" />
+        <Button variant="ghost" size="sm" class="h-7" @click="confirmDelete = false">
+          Cancel
+        </Button>
+        <Button
+          variant="destructive"
+          size="sm"
+          class="h-7"
+          :disabled="busy"
+          @click="bulkDelete"
+        >
+          <Loader2 v-if="busy" class="h-3.5 w-3.5 mr-1.5 animate-spin" />
+          Confirm delete
+        </Button>
+      </template>
+
+      <template v-else>
       <Button
         variant="ghost"
         size="sm"
@@ -352,7 +376,7 @@ const filteredAddLabels = computed(() => {
 
       <div class="h-6 w-px bg-border mx-1" />
 
-      <!-- Delete -->
+      <!-- Delete (opens inline confirm above, replacing this row) -->
       <Button
         variant="ghost"
         size="sm"
@@ -364,27 +388,7 @@ const filteredAddLabels = computed(() => {
       </Button>
 
       <Loader2 v-if="busy" class="h-4 w-4 animate-spin text-muted-foreground ml-1" />
-
-      <!-- Inline confirm delete row replaces the bar's content briefly. -->
-      <div
-        v-if="confirmDelete"
-        class="absolute inset-0 flex items-center justify-between gap-2 px-3 bg-destructive/5 rounded-lg border border-destructive/20"
-      >
-        <span class="text-sm">
-          Delete <span class="font-semibold tabular-nums">{{ count }}</span> ticket{{ count === 1 ? "" : "s" }}? Soft-delete is recoverable.
-        </span>
-        <div class="flex items-center gap-1">
-          <Button variant="ghost" size="sm" class="h-7" @click="confirmDelete = false">Cancel</Button>
-          <Button
-            variant="destructive"
-            size="sm"
-            class="h-7"
-            @click="bulkDelete"
-          >
-            Delete
-          </Button>
-        </div>
-      </div>
+      </template>
     </div>
   </Transition>
 

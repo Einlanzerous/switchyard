@@ -5,16 +5,17 @@
 
 import { useRoute, useRouter } from "vue-router";
 import { computed } from "vue";
-import { KanbanSquare, BarChart2, Repeat } from "lucide-vue-next";
+import { KanbanSquare, BarChart2, Settings as SettingsIcon } from "lucide-vue-next";
 import { cn } from "@/lib/utils";
 
 const props = defineProps<{
   boardPath: string;
   insightsPath: string;
-  // Optional: when set, renders a third "Recurring" tab. Project-scoped
-  // views pass this; board-scoped views don't (no recurring templates at
-  // the board level — they're project-bound).
-  recurringPath?: string;
+  // Optional: when set, renders a third "Setup" tab containing the
+  // project's recurring templates, project-scoped automations, and
+  // project settings as sub-tabs. Project-scoped views pass this;
+  // board-scoped views don't (those concerns are project-bound).
+  setupPath?: string;
 }>();
 
 const route = useRoute();
@@ -25,13 +26,19 @@ const tabs = computed(() => {
     { key: "board", label: "Board", icon: KanbanSquare, path: props.boardPath },
     { key: "insights", label: "Insights", icon: BarChart2, path: props.insightsPath },
   ];
-  if (props.recurringPath) {
-    base.push({ key: "recurring", label: "Recurring", icon: Repeat, path: props.recurringPath });
+  if (props.setupPath) {
+    base.push({ key: "setup", label: "Setup", icon: SettingsIcon, path: props.setupPath });
   }
   return base;
 });
 
 function isActive(p: string): boolean {
+  // The Setup tab has sub-routes (/setup/recurring, /setup/automations,
+  // etc.). Match any sub-path so the tab stays highlighted as the user
+  // moves between sub-tabs.
+  if (props.setupPath && p === props.setupPath) {
+    return route.path === p || route.path.startsWith(p + "/");
+  }
   return route.path === p;
 }
 </script>

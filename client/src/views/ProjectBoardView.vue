@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import BoardColumn from "@/components/tickets/BoardColumn.vue";
 import InsightsTabs from "@/components/dashboard/InsightsTabs.vue";
+import ProjectHeaderLabel from "@/components/projects/ProjectHeaderLabel.vue";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
 import { useUiStore } from "@/stores/ui";
@@ -318,14 +319,12 @@ const errMessage = computed(() => {
           <ArrowLeft class="h-3.5 w-3.5 mr-1" /> Back
         </Button>
         <Separator orientation="vertical" class="h-5" />
-        <span class="font-mono text-sm text-muted-foreground">{{ projectKey }}</span>
-        <span v-if="project?.name" class="text-muted-foreground/40">—</span>
-        <span v-if="project?.name" class="text-sm font-medium truncate">{{ project.name }}</span>
+        <ProjectHeaderLabel :project-key="projectKey" :project="project" />
         <Separator orientation="vertical" class="h-5" />
         <InsightsTabs
           :board-path="`/projects/${projectKey}/board`"
           :insights-path="`/projects/${projectKey}/insights`"
-          :recurring-path="`/projects/${projectKey}/recurring`"
+          :setup-path="`/projects/${projectKey}/setup`"
         />
         <div class="flex-1 min-w-0" />
         <label

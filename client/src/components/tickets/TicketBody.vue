@@ -68,7 +68,7 @@ function navigateToLinked(key: string) {
 // template in context (and edit/disable it).
 function goToTemplate() {
   if (!ticket.value) return;
-  router.push(`/projects/${ticket.value.project.key}/recurring`);
+  router.push(`/projects/${ticket.value.project.key}/setup/recurring`);
 }
 
 // LinkedWork renders three sections (parent, children-if-epic, typed links).

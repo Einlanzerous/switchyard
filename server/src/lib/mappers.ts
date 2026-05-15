@@ -56,6 +56,7 @@ export function mapProject(p: ProjectRow): Project {
     name: p.name,
     description: p.description,
     color: p.color,
+    repo_url: p.repo_url,
     archived_at: p.archived_at,
     board_closed_window_days: (p.board_closed_window_days ?? null) as Project["board_closed_window_days"],
     created_at: p.created_at,
@@ -65,7 +66,7 @@ export function mapProject(p: ProjectRow): Project {
 }
 
 export function mapProjectRef(p: ProjectRow): ProjectRef {
-  return { id: p.id, key: p.key, name: p.name, color: p.color };
+  return { id: p.id, key: p.key, name: p.name, color: p.color, repo_url: p.repo_url };
 }
 
 // ─── statuses ──────────────────────────────────────────────────────────────

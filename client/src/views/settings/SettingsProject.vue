@@ -40,30 +40,37 @@ const project = computed(() => projectQuery.data.value);
 const name = ref("");
 const description = ref("");
 const color = ref("");
+const repoUrl = ref("");
 
 watch(project, (p) => {
   if (!p) return;
   name.value = p.name;
   description.value = p.description ?? "";
   color.value = p.color ?? "";
+  repoUrl.value = p.repo_url ?? "";
 }, { immediate: true });
 
 const dirty = computed(() => {
   if (!project.value) return false;
   return name.value !== project.value.name
     || description.value !== (project.value.description ?? "")
-    || (color.value || null) !== project.value.color;
+    || (color.value || null) !== project.value.color
+    || (repoUrl.value || null) !== project.value.repo_url;
 });
 
 const saveMutation = useMutation({
   mutationFn: async () => {
+    // repo_url: empty string sends explicit null to clear; trimmed value
+    // otherwise. Server validates URL shape — bad input surfaces as 422.
+    const trimmedRepo = repoUrl.value.trim();
     const { data, error } = await api.PATCH("/v1/projects/{key}", {
       params: { path: { key: projectKey.value } },
       body: {
         name: name.value.trim(),
         description: description.value.trim() || undefined,
         color: color.value.trim() || undefined,
-      },
+        repo_url: trimmedRepo === "" ? null : trimmedRepo,
+      } as never,
     });
     if (error) throw error;
     return data;
@@ -255,6 +262,20 @@ const deleteMutation = useMutation({
               />
               <Input id="proj-color" v-model="color" placeholder="#3b82f6" class="font-mono" />
             </div>
+          </div>
+          <div class="space-y-1.5">
+            <Label for="proj-repo">Repo URL</Label>
+            <Input
+              id="proj-repo"
+              v-model="repoUrl"
+              type="url"
+              placeholder="https://github.com/owner/repo"
+              class="font-mono text-sm"
+            />
+            <p class="text-[11px] text-muted-foreground">
+              When set, the project name in headers links to this URL. Leave
+              empty to keep the name as plain text.
+            </p>
           </div>
           <div class="flex justify-end">
             <Button :disabled="!dirty || saveMutation.isPending.value" @click="saveMutation.mutate()">

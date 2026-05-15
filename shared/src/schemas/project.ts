@@ -9,6 +9,9 @@ export const Project = z
     name: z.string().min(1).max(200),
     description: z.string().max(10_000).nullable(),
     color: HexColor.nullable(),
+    // Canonical repo URL — surfaced as a link from the project header.
+    // Loose `string().url()` validation; empty/null = no link.
+    repo_url: z.string().url().max(2048).nullable(),
     archived_at: z.string().datetime({ offset: true }).nullable(),
     // Per-project override for the kanban Closed column window. NULL =
     // inherit the system setting (`board_closed_window_days`). The
@@ -23,7 +26,11 @@ export const Project = z
   .merge(SoftDeletable);
 export type Project = z.infer<typeof Project>;
 
-export const ProjectRef = Project.pick({ id: true, key: true, name: true, color: true });
+// Including repo_url here is intentional: project names render as repo
+// links across every view that shows a ProjectRef (board headers, insights,
+// recurring tab, drawer breadcrumb, etc.). The string is small and
+// embedded everywhere is cheaper than a parallel project query per view.
+export const ProjectRef = Project.pick({ id: true, key: true, name: true, color: true, repo_url: true });
 export type ProjectRef = z.infer<typeof ProjectRef>;
 
 export const CreateProject = z.object({
@@ -31,6 +38,7 @@ export const CreateProject = z.object({
   name: z.string().min(1).max(200),
   description: z.string().max(10_000).optional(),
   color: HexColor.optional(),
+  repo_url: z.string().url().max(2048).optional(),
   board_closed_window_days: ClosedWindowDays.optional(),
 });
 export type CreateProject = z.infer<typeof CreateProject>;
@@ -41,5 +49,7 @@ export const UpdateProject = CreateProject.omit({ key: true }).partial().extend(
   board_closed_window_days: z.union([
     z.literal(7), z.literal(14), z.literal(30), z.null(),
   ]).optional(),
+  // Null clears the repo_url link.
+  repo_url: z.string().url().max(2048).nullable().optional(),
 });
 export type UpdateProject = z.infer<typeof UpdateProject>;

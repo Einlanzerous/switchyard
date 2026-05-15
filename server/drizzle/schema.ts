@@ -93,6 +93,10 @@ export const projects = pgTable(
     name: varchar("name", { length: 200 }).notNull(),
     description: text("description"),
     color: varchar("color", { length: 7 }),
+    // Canonical repo URL for the project (e.g. https://github.com/owner/repo).
+    // When set, the project header renders the project name as a link out.
+    // Loose `text` so we accept any URL shape; the UI validates.
+    repo_url: text("repo_url"),
     archived_at: timestamp("archived_at", { withTimezone: true, mode: "string" }),
     // Per-project override for the kanban Closed column window. NULL
     // means inherit the system setting (`board_closed_window_days`).
