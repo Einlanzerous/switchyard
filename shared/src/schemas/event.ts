@@ -12,6 +12,7 @@ export const EventType = z.enum([
   "ticket.closed",
   "ticket.released",
   "ticket.deleted",
+  "ticket.moved",
   "ticket.link_added",
   "ticket.link_removed",
   "ticket.external_ref_added",

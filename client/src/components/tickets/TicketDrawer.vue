@@ -1,14 +1,18 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useQuery } from "@tanstack/vue-query";
-import { ExternalLink } from "lucide-vue-next";
+import { ExternalLink, MoreHorizontal, FolderInput } from "lucide-vue-next";
 import {
   Sheet, SheetContent, SheetTitle, SheetDescription,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import TicketBody from "./TicketBody.vue";
 import TypeIcon from "./TypeIcon.vue";
+import MoveTicketDialog from "./MoveTicketDialog.vue";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
 
@@ -62,6 +66,9 @@ const headTicket = useQuery({
   },
 });
 const titleTicket = computed(() => headTicket.data.value);
+
+const moveDialogOpen = ref(false);
+function openMoveDialog() { moveDialogOpen.value = true; }
 </script>
 
 <template>
@@ -95,6 +102,18 @@ const titleTicket = computed(() => headTicket.data.value);
         >
           <ExternalLink class="h-3.5 w-3.5" />
         </Button>
+        <DropdownMenu v-if="titleTicket">
+          <DropdownMenuTrigger as-child>
+            <Button variant="ghost" size="icon" class="h-7 w-7 shrink-0" aria-label="More actions">
+              <MoreHorizontal class="h-3.5 w-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem class="cursor-pointer" @click="openMoveDialog">
+              <FolderInput class="h-3.5 w-3.5 mr-2" /> Move to project…
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       <SheetDescription class="sr-only">
         Detail panel for ticket {{ focusedKey ?? "" }}
@@ -110,4 +129,11 @@ const titleTicket = computed(() => headTicket.data.value);
       </div>
     </SheetContent>
   </Sheet>
+
+  <MoveTicketDialog
+    v-if="titleTicket"
+    v-model:open="moveDialogOpen"
+    :ticket="titleTicket"
+    @moved="(newKey) => focusKey(newKey)"
+  />
 </template>

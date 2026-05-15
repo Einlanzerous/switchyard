@@ -101,6 +101,25 @@ export const TransitionTicket = z.object({
 });
 export type TransitionTicket = z.infer<typeof TransitionTicket>;
 
+// Move a ticket to a different project. Allocates a new ticket number in
+// the destination, remaps status (via fallback chain — exact name+category,
+// then category alone, else 400 with candidates), and clears the parent
+// when it doesn't carry over. The old key keeps resolving via
+// ticket_aliases forever, so external systems that cached the prior key
+// keep working.
+export const MoveTicket = z.object({
+  project_key: ProjectKey,
+  // Optional explicit destination status. Required when status mapping
+  // is ambiguous (multiple candidates in the destination project share
+  // the source's category).
+  status_id: Uuid.optional(),
+  // Optional new parent in the destination project. Validated as an epic
+  // in that project. When omitted and the source had a cross-project
+  // parent, the parent is cleared (don't 400 the common case).
+  parent_id: Uuid.nullable().optional(),
+});
+export type MoveTicket = z.infer<typeof MoveTicket>;
+
 // Filters supported on GET /v1/tickets — agents use this heavily.
 export const TicketListFilters = z.object({
   project: z.string().optional(), // project key OR comma-separated keys

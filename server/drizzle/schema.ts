@@ -499,14 +499,30 @@ export const events = pgTable(
 
 // ─── boards (cross-project saved views) ─────────────────────────────────────
 
-export const boards = pgTable("boards", {
-  id: id(),
-  name: varchar("name", { length: 200 }).notNull(),
-  layout: boardLayout("layout").notNull().default("kanban"),
-  filter: jsonb("filter").notNull().default({}),
-  created_at: createdAt(),
-  updated_at: updatedAt(),
-});
+export const boards = pgTable(
+  "boards",
+  {
+    id: id(),
+    name: varchar("name", { length: 200 }).notNull(),
+    layout: boardLayout("layout").notNull().default("kanban"),
+    filter: jsonb("filter").notNull().default({}),
+    // When true, this board's project list is auto-managed: the server
+    // adds every new project on create and removes archived ones, so the
+    // user always sees a "view everything" board. At most one board can
+    // have this set (partial unique index below). Flipped to false when
+    // the user manually edits projects via the Edit Board dialog — once
+    // you touch it, you own it.
+    auto_include_all_projects: boolean("auto_include_all_projects").notNull().default(false),
+    created_at: createdAt(),
+    updated_at: updatedAt(),
+  },
+  (t) => ({
+    // Enforce at most one auto-include board at a time.
+    autoIncludeUniqueIdx: uniqueIndex("boards_auto_include_unique_idx")
+      .on(t.auto_include_all_projects)
+      .where(sql`${t.auto_include_all_projects} = true`),
+  })
+);
 
 export const boardProjects = pgTable(
   "board_projects",
@@ -922,5 +938,24 @@ export const ticketTemplates = pgTable(
     triggerIdx: index("ticket_templates_trigger_idx")
       .on(t.enabled, t.trigger_at)
       .where(sql`${t.enabled} = true AND ${t.trigger_at} IS NOT NULL`),
+  })
+);
+
+// Ticket key aliases. When a ticket moves between projects (SWY-50) its
+// key changes (LOOP-3 → SWY-72). We keep the old key resolvable forever
+// so external systems (n8n payloads, GitHub PR titles, agent state) that
+// cached the old reference keep working. resolveTicket() falls back to
+// this table on miss. Tiny table, no maintenance.
+export const ticketAliases = pgTable(
+  "ticket_aliases",
+  {
+    alias_key: varchar("alias_key", { length: 64 }).primaryKey(),
+    ticket_id: uuid("ticket_id")
+      .notNull()
+      .references(() => tickets.id, { onDelete: "cascade" }),
+    created_at: createdAt(),
+  },
+  (t) => ({
+    ticketIdx: index("ticket_aliases_ticket_idx").on(t.ticket_id),
   })
 );

@@ -103,6 +103,15 @@ const deleteMutation = useMutation({
         </DialogDescription>
       </DialogHeader>
 
+      <div
+        v-if="board.auto_include_all_projects"
+        class="rounded-md border border-indigo-500/30 bg-indigo-500/10 px-3 py-2 text-xs text-indigo-700 dark:text-indigo-300"
+      >
+        <span class="font-semibold uppercase tracking-wider mr-1">Auto-managed</span>
+        Switchyard adds every new project and prunes archived ones. Editing
+        projects manually opts this board out — auto-sync stops after save.
+      </div>
+
       <div class="space-y-4">
         <div class="space-y-1.5">
           <Label for="board-name-edit">Name</Label>

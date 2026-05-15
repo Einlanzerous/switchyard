@@ -3,7 +3,7 @@ import { computed } from "vue";
 import { formatDistanceToNow } from "date-fns";
 import {
   Plus, Pencil, ArrowRight, UserCheck, MessageSquare, Paperclip, X, CheckCircle2, Send, Trash2,
-  Link2, GitPullRequest,
+  Link2, GitPullRequest, FolderInput,
 } from "lucide-vue-next";
 import { Skeleton } from "@/components/ui/skeleton";
 import StatusBadge from "./StatusBadge.vue";
@@ -24,6 +24,7 @@ const META: Record<EventType, { icon: any; verb: string }> = {
   "ticket.closed": { icon: CheckCircle2, verb: "closed the ticket" },
   "ticket.released": { icon: Send, verb: "released the ticket" },
   "ticket.deleted": { icon: Trash2, verb: "deleted the ticket" },
+  "ticket.moved": { icon: FolderInput, verb: "moved the ticket to another project" },
   "ticket.link_added": { icon: Link2, verb: "added a link" },
   "ticket.link_removed": { icon: Link2, verb: "removed a link" },
   "ticket.external_ref_added": { icon: GitPullRequest, verb: "attached an external reference" },

@@ -11,6 +11,7 @@ import { idempotency } from "../lib/idempotency.js";
 import { errorResponses, okJson, createdJson, noContent, scope, z, checkScope } from "./_helpers.js";
 import { mapProject, mapUserRef } from "../lib/mappers.js";
 import { getProjectByKey } from "../lib/lookups.js";
+import { addProjectToDefaultBoard, removeProjectFromDefaultBoard } from "../lib/defaultBoard.js";
 import { buildPage, cursorOrderBy, cursorWhere, decodeCursor } from "../lib/pagination.js";
 import { writeEvent } from "../lib/events.js";
 import { badRequest, catchUnique } from "../errors.js";
@@ -126,6 +127,10 @@ export function mount(app: OpenAPIHono) {
           project_id: created.id,
         });
 
+        // Keep the auto-managed "All projects" board in sync. No-op when
+        // the user has deleted that board (the helper guards on existence).
+        await addProjectToDefaultBoard(tx as any, created.id);
+
         return created;
       })
     );
@@ -178,6 +183,14 @@ export function mount(app: OpenAPIHono) {
         },
       });
 
+      // Archive flips drive the default board membership — archived
+      // projects shouldn't clutter the "show me everything" view.
+      if (body.archived === true && !existing.archived_at) {
+        await removeProjectFromDefaultBoard(tx as any, u.id);
+      } else if (body.archived === false && existing.archived_at) {
+        await addProjectToDefaultBoard(tx as any, u.id);
+      }
+
       return u;
     });
 
@@ -200,6 +213,10 @@ export function mount(app: OpenAPIHono) {
         actor: mapUserRef(auth.user),
         project_id: existing.id,
       });
+
+      // Soft-delete doesn't fire FK cascade on board_projects, so prune
+      // explicitly. (Hard-delete would cascade, but we don't hard-delete.)
+      await removeProjectFromDefaultBoard(tx as any, existing.id);
     });
 
     return c.body(null, 204);

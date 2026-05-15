@@ -16,6 +16,7 @@ import { db, schema } from "../db.js";
 import { env } from "../env.js";
 import { generateApiToken, hashToken } from "./id.js";
 import { DEFAULT_STALE_IN_PROGRESS_DAYS, DEFAULT_BOARD_CLOSED_WINDOW_DAYS } from "@switchyard/shared";
+import { DEFAULT_BOARD_DELETED_KEY } from "./defaultBoard.js";
 
 type CanonicalUser = {
   name: string;
@@ -59,6 +60,50 @@ export async function seed(): Promise<void> {
   await ensureBootstrapToken(userIdsByName.get("magos")!);
   await ensureDefaultSettings();
   await ensureLabels();
+  await ensureDefaultBoard();
+}
+
+// Auto-create an "All projects" board on first boot. Populates it with
+// every active, non-archived project, and flips `auto_include_all_projects`
+// so the project lifecycle hooks keep it in sync. If the user later
+// deletes the board, the delete handler stamps `default_board_deleted`
+// in system_settings — we honor that here and never recreate it.
+async function ensureDefaultBoard(): Promise<void> {
+  const [existing] = await db
+    .select({ id: schema.boards.id })
+    .from(schema.boards)
+    .where(eq(schema.boards.auto_include_all_projects, true))
+    .limit(1);
+  if (existing) return;
+
+  const [deletedFlag] = await db
+    .select({ value: schema.systemSettings.value })
+    .from(schema.systemSettings)
+    .where(eq(schema.systemSettings.key, DEFAULT_BOARD_DELETED_KEY))
+    .limit(1);
+  if (deletedFlag?.value === true) return;
+
+  const rows = await db.execute<{ id: string }>(
+    /* sql */ `SELECT id FROM projects WHERE deleted_at IS NULL AND archived_at IS NULL` as any,
+  );
+  const projectIds = ((rows as any).rows ?? rows) as Array<{ id: string }>;
+
+  const [board] = await db
+    .insert(schema.boards)
+    .values({
+      name: "All projects",
+      layout: "kanban",
+      auto_include_all_projects: true,
+    })
+    .returning({ id: schema.boards.id });
+  if (!board) throw new Error("ensureDefaultBoard: insert returned nothing");
+
+  if (projectIds.length > 0) {
+    await db
+      .insert(schema.boardProjects)
+      .values(projectIds.map((p) => ({ board_id: board.id, project_id: p.id })));
+  }
+  console.log(`[seed] created default "All projects" board with ${projectIds.length} project(s)`);
 }
 
 async function ensureLabels(): Promise<void> {

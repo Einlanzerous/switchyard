@@ -41,7 +41,13 @@ const projectsQuery = useQuery({
 });
 
 const items = computed<CustomField[]>(() => fieldsQuery.data.value?.items ?? []);
-const projects = computed<Project[]>(() => projectsQuery.data.value?.items ?? []);
+// `board_closed_window_days` is typed as `7 | 14 | 30 | unknown` by the
+// generated client (zod-to-openapi emits the nullable as `{ nullable: true }`
+// which openapi-typescript reads as `unknown`). The runtime shape is correct;
+// cast through `unknown` so the rest of the file sees the proper Project type.
+const projects = computed<Project[]>(
+  () => (projectsQuery.data.value?.items ?? []) as unknown as Project[],
+);
 
 // Bucket fields into "global" vs "per-project". Project rows are
 // grouped under their project; we render each group as its own section.

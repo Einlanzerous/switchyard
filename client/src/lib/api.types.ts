@@ -2212,7 +2212,7 @@ export interface paths {
                                 color: string | null;
                                 /** Format: date-time */
                                 archived_at: string | null;
-                                board_closed_window_days: 7 | 14 | 30 | unknown;
+                                board_closed_window_days: 7 | 14 | 30 | unknown | unknown;
                                 /** Format: date-time */
                                 created_at: string;
                                 /** Format: date-time */
@@ -2391,7 +2391,7 @@ export interface paths {
                             color: string | null;
                             /** Format: date-time */
                             archived_at: string | null;
-                            board_closed_window_days: 7 | 14 | 30 | unknown;
+                            board_closed_window_days: 7 | 14 | 30 | unknown | unknown;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
@@ -2569,7 +2569,7 @@ export interface paths {
                             color: string | null;
                             /** Format: date-time */
                             archived_at: string | null;
-                            board_closed_window_days: 7 | 14 | 30 | unknown;
+                            board_closed_window_days: 7 | 14 | 30 | unknown | unknown;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
@@ -2874,7 +2874,7 @@ export interface paths {
                         name?: string;
                         description?: string;
                         color?: string;
-                        board_closed_window_days?: 7 | 14 | 30 | unknown;
+                        board_closed_window_days?: 7 | 14 | 30 | unknown | unknown;
                         archived?: boolean;
                     };
                 };
@@ -2895,7 +2895,7 @@ export interface paths {
                             color: string | null;
                             /** Format: date-time */
                             archived_at: string | null;
-                            board_closed_window_days: 7 | 14 | 30 | unknown;
+                            board_closed_window_days: 7 | 14 | 30 | unknown | unknown;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
@@ -7042,6 +7042,397 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tickets/{idOrKey}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Move a ticket to a different project (allocates a new key, keeps old key resolvable via alias) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: {
+                    "idempotency-key"?: string;
+                };
+                path: {
+                    idOrKey: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        project_key: string;
+                        /** Format: uuid */
+                        status_id?: string;
+                        /** Format: uuid */
+                        parent_id?: string | null;
+                    };
+                };
+            };
+            responses: {
+                /** @description ok */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** Format: uuid */
+                            id: string;
+                            key: string;
+                            number: number;
+                            project: {
+                                /** Format: uuid */
+                                id: string;
+                                key: string;
+                                name: string;
+                                color: string | null;
+                            };
+                            /** @enum {string} */
+                            type: "spike" | "task" | "bug" | "epic";
+                            title: string;
+                            status: {
+                                /** Format: uuid */
+                                id: string;
+                                /** @enum {string} */
+                                category: "backlog" | "planning" | "in_progress" | "blocked" | "closed";
+                                display_name: string;
+                            };
+                            /** @enum {string|null} */
+                            resolution: "done" | "released" | "cancelled" | null;
+                            /** @enum {string|null} */
+                            priority: "low" | "medium" | "high" | "critical" | null;
+                            /** Format: uuid */
+                            parent_id: string | null;
+                            assignee: {
+                                /** Format: uuid */
+                                id: string;
+                                name: string;
+                                icon: string | null;
+                                /** @enum {string} */
+                                type: "agent" | "human";
+                            } | null;
+                            reporter: {
+                                /** Format: uuid */
+                                id: string;
+                                name: string;
+                                icon: string | null;
+                                /** @enum {string} */
+                                type: "agent" | "human";
+                            };
+                            /** Format: date-time */
+                            due_date: string | null;
+                            labels: {
+                                /** Format: uuid */
+                                id: string;
+                                name: string;
+                                color: string;
+                            }[];
+                            position: number | null;
+                            external_refs: {
+                                /** Format: uuid */
+                                id: string;
+                                /** Format: uuid */
+                                ticket_id: string;
+                                /** @enum {string} */
+                                kind: "github_pr" | "github_issue" | "github_commit" | "github_action" | "generic";
+                                /** Format: uri */
+                                url: string;
+                                /** @enum {string|null} */
+                                state: "open" | "closed" | "merged" | "success" | "failed" | null;
+                                title: string | null;
+                                /** Format: date-time */
+                                polled_at: string | null;
+                                /** Format: date-time */
+                                polled_state_changed_at: string | null;
+                                /** Format: date-time */
+                                created_at: string;
+                                created_by: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    name: string;
+                                    icon: string | null;
+                                    /** @enum {string} */
+                                    type: "agent" | "human";
+                                };
+                            }[];
+                            /** Format: uuid */
+                            template_id: string | null;
+                            /** Format: date-time */
+                            created_at: string;
+                            /** Format: date-time */
+                            updated_at: string;
+                            /** Format: date-time */
+                            deleted_at: string | null;
+                            description: string;
+                            metadata: {
+                                [key: string]: unknown;
+                            };
+                            comments: {
+                                /** Format: uuid */
+                                id: string;
+                                /** Format: uuid */
+                                ticket_id: string;
+                                author: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    name: string;
+                                    icon: string | null;
+                                    /** @enum {string} */
+                                    type: "agent" | "human";
+                                };
+                                body: string;
+                                attachments: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    /** Format: uuid */
+                                    ticket_id: string | null;
+                                    /** Format: uuid */
+                                    comment_id: string | null;
+                                    /** @enum {string} */
+                                    kind: "image" | "audio" | "text";
+                                    mime_type: string;
+                                    size_bytes: number;
+                                    original_name: string | null;
+                                    /** Format: uri */
+                                    url: string;
+                                    transcript: string | null;
+                                    uploaded_by: {
+                                        /** Format: uuid */
+                                        id: string;
+                                        name: string;
+                                        icon: string | null;
+                                        /** @enum {string} */
+                                        type: "agent" | "human";
+                                    };
+                                    /** Format: date-time */
+                                    created_at: string;
+                                }[];
+                                /** Format: date-time */
+                                created_at: string;
+                                /** Format: date-time */
+                                updated_at: string;
+                                /** Format: date-time */
+                                deleted_at: string | null;
+                            }[];
+                            attachments: {
+                                /** Format: uuid */
+                                id: string;
+                                /** Format: uuid */
+                                ticket_id: string | null;
+                                /** Format: uuid */
+                                comment_id: string | null;
+                                /** @enum {string} */
+                                kind: "image" | "audio" | "text";
+                                mime_type: string;
+                                size_bytes: number;
+                                original_name: string | null;
+                                /** Format: uri */
+                                url: string;
+                                transcript: string | null;
+                                uploaded_by: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    name: string;
+                                    icon: string | null;
+                                    /** @enum {string} */
+                                    type: "agent" | "human";
+                                };
+                                /** Format: date-time */
+                                created_at: string;
+                            }[];
+                            all_attachments: {
+                                /** Format: uuid */
+                                id: string;
+                                /** Format: uuid */
+                                ticket_id: string | null;
+                                /** Format: uuid */
+                                comment_id: string | null;
+                                /** @enum {string} */
+                                kind: "image" | "audio" | "text";
+                                mime_type: string;
+                                size_bytes: number;
+                                original_name: string | null;
+                                /** Format: uri */
+                                url: string;
+                                transcript: string | null;
+                                uploaded_by: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    name: string;
+                                    icon: string | null;
+                                    /** @enum {string} */
+                                    type: "agent" | "human";
+                                };
+                                /** Format: date-time */
+                                created_at: string;
+                            }[];
+                            links: {
+                                /** Format: uuid */
+                                id: string;
+                                /** @enum {string} */
+                                type: "blocks" | "relates_to" | "duplicates";
+                                /** @enum {string} */
+                                direction: "outgoing" | "incoming";
+                                other_ticket: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    key: string;
+                                    title: string;
+                                };
+                                /** Format: date-time */
+                                created_at: string;
+                                created_by: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    name: string;
+                                    icon: string | null;
+                                    /** @enum {string} */
+                                    type: "agent" | "human";
+                                };
+                            }[];
+                        };
+                    };
+                };
+                /** @description bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description unprocessable */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description internal */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tickets/{idOrKey}/events": {
         parameters: {
             query?: never;
@@ -7075,7 +7466,7 @@ export interface paths {
                                 /** Format: uuid */
                                 id: string;
                                 /** @enum {string} */
-                                event: "ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.link_added" | "ticket.link_removed" | "ticket.external_ref_added" | "ticket.external_ref_removed" | "ticket.external_ref_state_changed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted";
+                                event: "ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.moved" | "ticket.link_added" | "ticket.link_removed" | "ticket.external_ref_added" | "ticket.external_ref_removed" | "ticket.external_ref_state_changed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted";
                                 /** Format: date-time */
                                 occurred_at: string;
                                 actor: {
@@ -9138,6 +9529,7 @@ export interface paths {
                                     text?: string;
                                     include_archived_projects?: boolean;
                                 };
+                                auto_include_all_projects: boolean;
                                 /** Format: date-time */
                                 created_at: string;
                                 /** Format: date-time */
@@ -9336,6 +9728,7 @@ export interface paths {
                                 text?: string;
                                 include_archived_projects?: boolean;
                             };
+                            auto_include_all_projects: boolean;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
@@ -9523,6 +9916,7 @@ export interface paths {
                                 text?: string;
                                 include_archived_projects?: boolean;
                             };
+                            auto_include_all_projects: boolean;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
@@ -9868,6 +10262,7 @@ export interface paths {
                                 text?: string;
                                 include_archived_projects?: boolean;
                             };
+                            auto_include_all_projects: boolean;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
@@ -10052,6 +10447,7 @@ export interface paths {
                                     text?: string;
                                     include_archived_projects?: boolean;
                                 };
+                                auto_include_all_projects: boolean;
                                 /** Format: date-time */
                                 created_at: string;
                                 /** Format: date-time */
@@ -10321,7 +10717,7 @@ export interface paths {
                                 id: string;
                                 /** Format: uri */
                                 url: string;
-                                event_types: (("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.link_added" | "ticket.link_removed" | "ticket.external_ref_added" | "ticket.external_ref_removed" | "ticket.external_ref_state_changed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted") | "*")[];
+                                event_types: (("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.moved" | "ticket.link_added" | "ticket.link_removed" | "ticket.external_ref_added" | "ticket.external_ref_removed" | "ticket.external_ref_state_changed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted") | "*")[];
                                 status_filter: {
                                     /** @enum {string} */
                                     to_category?: "backlog" | "planning" | "in_progress" | "blocked" | "closed";
@@ -10486,7 +10882,7 @@ export interface paths {
                     "application/json": {
                         /** Format: uri */
                         url: string;
-                        event_types: (("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.link_added" | "ticket.link_removed" | "ticket.external_ref_added" | "ticket.external_ref_removed" | "ticket.external_ref_state_changed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted") | "*")[];
+                        event_types: (("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.moved" | "ticket.link_added" | "ticket.link_removed" | "ticket.external_ref_added" | "ticket.external_ref_removed" | "ticket.external_ref_state_changed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted") | "*")[];
                         status_filter?: {
                             /** @enum {string} */
                             to_category?: "backlog" | "planning" | "in_progress" | "blocked" | "closed";
@@ -10513,7 +10909,7 @@ export interface paths {
                             id: string;
                             /** Format: uri */
                             url: string;
-                            event_types: (("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.link_added" | "ticket.link_removed" | "ticket.external_ref_added" | "ticket.external_ref_removed" | "ticket.external_ref_state_changed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted") | "*")[];
+                            event_types: (("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.moved" | "ticket.link_added" | "ticket.link_removed" | "ticket.external_ref_added" | "ticket.external_ref_removed" | "ticket.external_ref_state_changed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted") | "*")[];
                             status_filter: {
                                 /** @enum {string} */
                                 to_category?: "backlog" | "planning" | "in_progress" | "blocked" | "closed";
@@ -10696,7 +11092,7 @@ export interface paths {
                             id: string;
                             /** Format: uri */
                             url: string;
-                            event_types: (("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.link_added" | "ticket.link_removed" | "ticket.external_ref_added" | "ticket.external_ref_removed" | "ticket.external_ref_state_changed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted") | "*")[];
+                            event_types: (("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.moved" | "ticket.link_added" | "ticket.link_removed" | "ticket.external_ref_added" | "ticket.external_ref_removed" | "ticket.external_ref_state_changed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted") | "*")[];
                             status_filter: {
                                 /** @enum {string} */
                                 to_category?: "backlog" | "planning" | "in_progress" | "blocked" | "closed";
@@ -11008,7 +11404,7 @@ export interface paths {
                     "application/json": {
                         /** Format: uri */
                         url?: string;
-                        event_types?: (("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.link_added" | "ticket.link_removed" | "ticket.external_ref_added" | "ticket.external_ref_removed" | "ticket.external_ref_state_changed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted") | "*")[];
+                        event_types?: (("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.moved" | "ticket.link_added" | "ticket.link_removed" | "ticket.external_ref_added" | "ticket.external_ref_removed" | "ticket.external_ref_state_changed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted") | "*")[];
                         status_filter?: {
                             /** @enum {string} */
                             to_category?: "backlog" | "planning" | "in_progress" | "blocked" | "closed";
@@ -11035,7 +11431,7 @@ export interface paths {
                             id: string;
                             /** Format: uri */
                             url: string;
-                            event_types: (("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.link_added" | "ticket.link_removed" | "ticket.external_ref_added" | "ticket.external_ref_removed" | "ticket.external_ref_state_changed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted") | "*")[];
+                            event_types: (("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.moved" | "ticket.link_added" | "ticket.link_removed" | "ticket.external_ref_added" | "ticket.external_ref_removed" | "ticket.external_ref_state_changed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted") | "*")[];
                             status_filter: {
                                 /** @enum {string} */
                                 to_category?: "backlog" | "planning" | "in_progress" | "blocked" | "closed";
@@ -11595,7 +11991,7 @@ export interface paths {
                                 /** Format: uuid */
                                 id: string;
                                 /** @enum {string} */
-                                event: "ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.link_added" | "ticket.link_removed" | "ticket.external_ref_added" | "ticket.external_ref_removed" | "ticket.external_ref_state_changed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted";
+                                event: "ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.moved" | "ticket.link_added" | "ticket.link_removed" | "ticket.external_ref_added" | "ticket.external_ref_removed" | "ticket.external_ref_state_changed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted";
                                 /** Format: date-time */
                                 occurred_at: string;
                                 actor: {
@@ -14207,7 +14603,7 @@ export interface paths {
                                 project_id: string | null;
                                 name: string;
                                 enabled: boolean;
-                                trigger_event_types: ("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.link_added" | "ticket.link_removed" | "ticket.external_ref_added" | "ticket.external_ref_removed" | "ticket.external_ref_state_changed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted")[];
+                                trigger_event_types: ("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.moved" | "ticket.link_added" | "ticket.link_removed" | "ticket.external_ref_added" | "ticket.external_ref_removed" | "ticket.external_ref_state_changed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted")[];
                                 conditions: Record<string, never> | {
                                     all: ({
                                         field: string;
@@ -14464,7 +14860,7 @@ export interface paths {
                         /** @default true */
                         enabled?: boolean;
                         /** @default [] */
-                        trigger_event_types?: ("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.link_added" | "ticket.link_removed" | "ticket.external_ref_added" | "ticket.external_ref_removed" | "ticket.external_ref_state_changed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted")[];
+                        trigger_event_types?: ("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.moved" | "ticket.link_added" | "ticket.link_removed" | "ticket.external_ref_added" | "ticket.external_ref_removed" | "ticket.external_ref_state_changed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted")[];
                         /** @default {} */
                         conditions?: Record<string, never> | {
                             all: ({
@@ -14577,7 +14973,7 @@ export interface paths {
                             project_id: string | null;
                             name: string;
                             enabled: boolean;
-                            trigger_event_types: ("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.link_added" | "ticket.link_removed" | "ticket.external_ref_added" | "ticket.external_ref_removed" | "ticket.external_ref_state_changed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted")[];
+                            trigger_event_types: ("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.moved" | "ticket.link_added" | "ticket.link_removed" | "ticket.external_ref_added" | "ticket.external_ref_removed" | "ticket.external_ref_state_changed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted")[];
                             conditions: Record<string, never> | {
                                 all: ({
                                     field: string;
@@ -14848,7 +15244,7 @@ export interface paths {
                             project_id: string | null;
                             name: string;
                             enabled: boolean;
-                            trigger_event_types: ("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.link_added" | "ticket.link_removed" | "ticket.external_ref_added" | "ticket.external_ref_removed" | "ticket.external_ref_state_changed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted")[];
+                            trigger_event_types: ("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.moved" | "ticket.link_added" | "ticket.link_removed" | "ticket.external_ref_added" | "ticket.external_ref_removed" | "ticket.external_ref_state_changed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted")[];
                             conditions: Record<string, never> | {
                                 all: ({
                                     field: string;
@@ -15246,7 +15642,7 @@ export interface paths {
                     "application/json": {
                         name?: string;
                         enabled?: boolean;
-                        trigger_event_types?: ("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.link_added" | "ticket.link_removed" | "ticket.external_ref_added" | "ticket.external_ref_removed" | "ticket.external_ref_state_changed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted")[];
+                        trigger_event_types?: ("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.moved" | "ticket.link_added" | "ticket.link_removed" | "ticket.external_ref_added" | "ticket.external_ref_removed" | "ticket.external_ref_state_changed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted")[];
                         conditions?: Record<string, never> | {
                             all: ({
                                 field: string;
@@ -15358,7 +15754,7 @@ export interface paths {
                             project_id: string | null;
                             name: string;
                             enabled: boolean;
-                            trigger_event_types: ("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.link_added" | "ticket.link_removed" | "ticket.external_ref_added" | "ticket.external_ref_removed" | "ticket.external_ref_state_changed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted")[];
+                            trigger_event_types: ("ticket.created" | "ticket.updated" | "ticket.status_changed" | "ticket.assigned" | "ticket.closed" | "ticket.released" | "ticket.deleted" | "ticket.moved" | "ticket.link_added" | "ticket.link_removed" | "ticket.external_ref_added" | "ticket.external_ref_removed" | "ticket.external_ref_state_changed" | "comment.created" | "comment.updated" | "comment.deleted" | "attachment.added" | "attachment.removed" | "project.created" | "project.updated" | "project.deleted")[];
                             conditions: Record<string, never> | {
                                 all: ({
                                     field: string;

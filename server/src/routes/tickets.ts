@@ -4,7 +4,7 @@ import {
 } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import {
-  Ticket, TicketSummary, CreateTicket, UpdateTicket, TransitionTicket,
+  Ticket, TicketSummary, CreateTicket, UpdateTicket, TransitionTicket, MoveTicket,
   TicketListFilters, Event, paginated, Pagination,
   StatusCategory, TicketType,
   type TicketSummary as ApiTicketSummary,
@@ -15,8 +15,8 @@ import * as schema from "../../drizzle/schema.js";
 import { requireAuth } from "../auth.js";
 import { idempotency } from "../lib/idempotency.js";
 import { errorResponses, okJson, createdJson, noContent, checkScope, z, idempotencyHeader } from "./_helpers.js";
-import { mapEvent, mapTicketSummary, mapStatusRef, mapUserRef } from "../lib/mappers.js";
-import { resolveTicket, getProjectByKey, getStatusById, getUserById } from "../lib/lookups.js";
+import { mapEvent, mapTicketSummary, mapStatusRef, mapUserRef, mapProjectRef } from "../lib/mappers.js";
+import { resolveTicket, getProjectByKey, getProjectById, getStatusById, getUserById } from "../lib/lookups.js";
 import { buildPage, cursorOrderBy, cursorWhere, decodeCursor } from "../lib/pagination.js";
 import { writeEvent } from "../lib/events.js";
 import {
@@ -77,6 +77,17 @@ const transition = createRoute({
     params: z.object({ idOrKey }),
     headers: idempotencyHeader,
     body: { content: { "application/json": { schema: TransitionTicket } } },
+  },
+  responses: { ...okJson(Ticket), ...errorResponses },
+});
+
+const move = createRoute({
+  method: "post", path: "/v1/tickets/{idOrKey}/move", tags: [tag],
+  summary: "Move a ticket to a different project (allocates a new key, keeps old key resolvable via alias)",
+  request: {
+    params: z.object({ idOrKey }),
+    headers: idempotencyHeader,
+    body: { content: { "application/json": { schema: MoveTicket } } },
   },
   responses: { ...okJson(Ticket), ...errorResponses },
 });
@@ -619,6 +630,121 @@ export function mount(app: OpenAPIHono) {
           extras: { comment_body: body.comment },
         });
       }
+
+      return u;
+    });
+
+    return c.json(await loadTicketDetail(updated), 200);
+  }) as any);
+
+  // ─── move (cross-project) ────────────────────────────────────────────────
+  app.openapi(move, (async (c: any) => {
+    checkScope(c, "tickets:write");
+    const { idOrKey: param } = c.req.valid("param");
+    const body = c.req.valid("json");
+    const auth = c.get("auth");
+    const existing = await resolveTicket(param);
+    const fromProject = await getProjectById(existing.project_id);
+    const toProject = await getProjectByKey(body.project_key);
+
+    if (fromProject.id === toProject.id) {
+      throw badRequest("ticket is already in this project");
+    }
+
+    const fromStatus = await getStatusById(existing.status_id);
+
+    // ─── resolve destination status ────────────────────────────────────────
+    // Fallback chain: explicit > exact name+category > unique-by-category.
+    // Ambiguity surfaces as 400 with candidate ids so the caller can pick.
+    let toStatus: typeof fromStatus;
+    if (body.status_id) {
+      toStatus = await getStatusById(body.status_id);
+      if (toStatus.project_id !== toProject.id) {
+        throw badRequest("status_id does not belong to the destination project");
+      }
+    } else {
+      const destStatuses = await db
+        .select()
+        .from(schema.statuses)
+        .where(eq(schema.statuses.project_id, toProject.id));
+      const byNameAndCat = destStatuses.filter(
+        (s) => s.category === fromStatus.category && s.display_name === fromStatus.display_name,
+      );
+      if (byNameAndCat.length === 1) {
+        toStatus = byNameAndCat[0]!;
+      } else {
+        const byCat = destStatuses.filter((s) => s.category === fromStatus.category);
+        if (byCat.length === 1) {
+          toStatus = byCat[0]!;
+        } else {
+          throw badRequest(
+            `status mapping ambiguous: destination project "${toProject.key}" has ${byCat.length} statuses in category "${fromStatus.category}". Pass status_id explicitly.`,
+            { candidates: byCat.map((s) => ({ id: s.id, display_name: s.display_name, category: s.category })) },
+          );
+        }
+      }
+    }
+
+    // ─── resolve parent ───────────────────────────────────────────────────
+    // Cross-project parent doesn't survive automatically — caller can pass
+    // an explicit replacement, otherwise we clear it.
+    let nextParentId: string | null;
+    if (body.parent_id !== undefined) {
+      if (body.parent_id === null) {
+        nextParentId = null;
+      } else {
+        const newParent = await resolveTicket(body.parent_id);
+        if (newParent.project_id !== toProject.id) {
+          throw badRequest("parent_id must reference a ticket in the destination project");
+        }
+        if (newParent.type !== "epic") {
+          throw badRequest("parent_id must reference an epic");
+        }
+        nextParentId = newParent.id;
+      }
+    } else if (existing.parent_id) {
+      const oldParent = await resolveTicket(existing.parent_id);
+      nextParentId = oldParent.project_id === toProject.id ? oldParent.id : null;
+    } else {
+      nextParentId = null;
+    }
+
+    // ─── apply the move ───────────────────────────────────────────────────
+    const oldKey = `${fromProject.key}-${existing.number}`;
+    const updated = await db.transaction(async (tx) => {
+      const newNumber = await allocateTicketNumber(tx, toProject.id);
+
+      const [u] = await tx
+        .update(schema.tickets)
+        .set({
+          project_id: toProject.id,
+          number: newNumber,
+          status_id: toStatus.id,
+          parent_id: nextParentId,
+          updated_at: new Date().toISOString(),
+        })
+        .where(eq(schema.tickets.id, existing.id))
+        .returning();
+      if (!u) throw new Error("move: update returned nothing");
+
+      // Preserve the old key forever — agents, GitHub PR titles, n8n
+      // payloads that cached `LOOP-3` keep resolving to this ticket.
+      await tx
+        .insert(schema.ticketAliases)
+        .values({ alias_key: oldKey, ticket_id: u.id })
+        .onConflictDoNothing();
+
+      const summary = await loadTicketSummary(u, tx as any);
+      await writeEvent(tx as any, {
+        event_type: "ticket.moved",
+        actor: mapUserRef(auth.user),
+        ticket: summary,
+        project_id: u.project_id,
+        extras: {
+          from: { project: mapProjectRef(fromProject), key: oldKey, status: mapStatusRef(fromStatus) },
+          to: { project: mapProjectRef(toProject), key: `${toProject.key}-${newNumber}`, status: mapStatusRef(toStatus) },
+        },
+      });
 
       return u;
     });

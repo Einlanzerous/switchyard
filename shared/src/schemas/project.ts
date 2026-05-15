@@ -11,8 +11,14 @@ export const Project = z
     color: HexColor.nullable(),
     archived_at: z.string().datetime({ offset: true }).nullable(),
     // Per-project override for the kanban Closed column window. NULL =
-    // inherit the system setting (`board_closed_window_days`).
-    board_closed_window_days: ClosedWindowDays.nullable(),
+    // inherit the system setting (`board_closed_window_days`). The
+    // unions-with-null form (instead of `.nullable()`) is intentional —
+    // zod-to-openapi emits a clean `anyOf [number, number, number, null]`
+    // for this, whereas `.nullable()` on a union produces a poison-pill
+    // `{ nullable: true }` entry that openapi-typescript reads as `unknown`.
+    board_closed_window_days: z.union([
+      z.literal(7), z.literal(14), z.literal(30), z.null(),
+    ]),
   })
   .merge(SoftDeletable);
 export type Project = z.infer<typeof Project>;
@@ -32,6 +38,8 @@ export type CreateProject = z.infer<typeof CreateProject>;
 export const UpdateProject = CreateProject.omit({ key: true }).partial().extend({
   archived: z.boolean().optional(),
   // Allow null to clear the override and inherit from system again.
-  board_closed_window_days: ClosedWindowDays.nullable().optional(),
+  board_closed_window_days: z.union([
+    z.literal(7), z.literal(14), z.literal(30), z.null(),
+  ]).optional(),
 });
 export type UpdateProject = z.infer<typeof UpdateProject>;

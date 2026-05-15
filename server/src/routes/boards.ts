@@ -7,6 +7,7 @@ import {
   type StatusCategory, type ProjectRef as ApiProjectRef, type BoardFilter as ApiBoardFilter,
 } from "@switchyard/shared";
 import { db } from "../db.js";
+import { DEFAULT_BOARD_DELETED_KEY } from "../lib/defaultBoard.js";
 import * as schema from "../../drizzle/schema.js";
 import { requireAuth } from "../auth.js";
 import { idempotency } from "../lib/idempotency.js";
@@ -18,6 +19,23 @@ import { badRequest, notFound } from "../errors.js";
 
 const tag = "Boards";
 const CATEGORIES: StatusCategory[] = ["backlog", "planning", "in_progress", "blocked", "closed"];
+
+// Map a board row + the bulk-fetched project refs into the API shape.
+// Centralized so adding a new board-level field is one edit instead of
+// touching every handler.
+type BoardRow = typeof schema.boards.$inferSelect;
+function shapeBoard(b: BoardRow, projects: ApiProjectRef[]) {
+  return {
+    id: b.id,
+    name: b.name,
+    layout: b.layout,
+    filter: (b.filter ?? {}) as ApiBoardFilter,
+    projects,
+    auto_include_all_projects: b.auto_include_all_projects,
+    created_at: b.created_at,
+    updated_at: b.updated_at,
+  };
+}
 
 const list = createRoute({
   method: "get", path: "/v1/boards", tags: [tag], summary: "List boards",
@@ -86,15 +104,7 @@ export function mount(app: OpenAPIHono) {
     // Bulk-fetch project memberships for the boards on this page.
     const projectsByBoard = await fetchBoardProjects(rows.map((b) => b.id));
 
-    const boards = rows.map((b) => ({
-      id: b.id,
-      name: b.name,
-      layout: b.layout,
-      filter: (b.filter ?? {}) as ApiBoardFilter,
-      projects: projectsByBoard.get(b.id) ?? [],
-      created_at: b.created_at,
-      updated_at: b.updated_at,
-    }));
+    const boards = rows.map((b) => shapeBoard(b, projectsByBoard.get(b.id) ?? []));
 
     return c.json(buildPage(boards, limit), 200);
   }) as any);
@@ -104,15 +114,7 @@ export function mount(app: OpenAPIHono) {
     const [board] = await db.select().from(schema.boards).where(eq(schema.boards.id, id)).limit(1);
     if (!board) throw notFound("board");
     const projects = (await fetchBoardProjects([board.id])).get(board.id) ?? [];
-    return c.json({
-      id: board.id,
-      name: board.name,
-      layout: board.layout,
-      filter: (board.filter ?? {}) as ApiBoardFilter,
-      projects,
-      created_at: board.created_at,
-      updated_at: board.updated_at,
-    }, 200);
+    return c.json(shapeBoard(board, projects), 200);
   }) as any);
 
   app.openapi(columns, (async (c: any) => {
@@ -125,11 +127,7 @@ export function mount(app: OpenAPIHono) {
 
     if (projectIds.length === 0) {
       return c.json({
-        board: {
-          id: board.id, name: board.name, layout: board.layout,
-          filter: (board.filter ?? {}) as ApiBoardFilter, projects: [],
-          created_at: board.created_at, updated_at: board.updated_at,
-        },
+        board: shapeBoard(board, []),
         columns: CATEGORIES.map((category) => ({ category, tickets: [] })),
       }, 200);
     }
@@ -214,15 +212,7 @@ export function mount(app: OpenAPIHono) {
     }
 
     return c.json({
-      board: {
-        id: board.id,
-        name: board.name,
-        layout: board.layout,
-        filter,
-        projects: projectRefs,
-        created_at: board.created_at,
-        updated_at: board.updated_at,
-      },
+      board: shapeBoard(board, projectRefs),
       columns: CATEGORIES.map((category) => ({
         category,
         tickets: byCategory.get(category) ?? [],
@@ -255,15 +245,7 @@ export function mount(app: OpenAPIHono) {
     });
 
     const projects = (await fetchBoardProjects([created.id])).get(created.id) ?? [];
-    return c.json({
-      id: created.id,
-      name: created.name,
-      layout: created.layout,
-      filter: (created.filter ?? {}) as ApiBoardFilter,
-      projects,
-      created_at: created.created_at,
-      updated_at: created.updated_at,
-    }, 201);
+    return c.json(shapeBoard(created, projects), 201);
   }) as any);
 
   // ─── update ──────────────────────────────────────────────────────────────
@@ -305,31 +287,54 @@ export function mount(app: OpenAPIHono) {
         await tx.insert(schema.boardProjects).values(
           body.project_ids!.map((project_id: string) => ({ board_id: id, project_id }))
         );
+        // Manual project edit on the auto-managed "All projects" board
+        // opts out of auto-management: once you touch it, you own it.
+        if (existing.auto_include_all_projects) {
+          const [flipped] = await tx
+            .update(schema.boards)
+            .set({ auto_include_all_projects: false })
+            .where(eq(schema.boards.id, id))
+            .returning();
+          if (flipped) row = flipped;
+        }
       }
       return row;
     });
 
     const projects = (await fetchBoardProjects([updated.id])).get(updated.id) ?? [];
-    return c.json({
-      id: updated.id,
-      name: updated.name,
-      layout: updated.layout,
-      filter: (updated.filter ?? {}) as ApiBoardFilter,
-      projects,
-      created_at: updated.created_at,
-      updated_at: updated.updated_at,
-    }, 200);
+    return c.json(shapeBoard(updated, projects), 200);
   }) as any);
 
   // ─── delete ──────────────────────────────────────────────────────────────
   app.openapi(remove, (async (c: any) => {
     checkScope(c, "projects:manage");
     const { id } = c.req.valid("param");
-    // FK on board_projects has ON DELETE CASCADE — the row goes with the board.
-    const result = await db.delete(schema.boards)
-      .where(eq(schema.boards.id, id))
-      .returning({ id: schema.boards.id });
-    if (result.length === 0) throw notFound("board");
+
+    await db.transaction(async (tx) => {
+      // Capture the board BEFORE deleting so we know whether to set the
+      // `default_board_deleted` flag (prevents seed.ts from recreating it
+      // on the next boot).
+      const [existing] = await tx
+        .select({ auto_include: schema.boards.auto_include_all_projects })
+        .from(schema.boards)
+        .where(eq(schema.boards.id, id))
+        .limit(1);
+      if (!existing) throw notFound("board");
+
+      // FK on board_projects has ON DELETE CASCADE — the row goes with the board.
+      await tx.delete(schema.boards).where(eq(schema.boards.id, id));
+
+      if (existing.auto_include) {
+        await tx
+          .insert(schema.systemSettings)
+          .values({ key: DEFAULT_BOARD_DELETED_KEY, value: true })
+          .onConflictDoUpdate({
+            target: schema.systemSettings.key,
+            set: { value: true, updated_at: new Date().toISOString() },
+          });
+      }
+    });
+
     return c.body(null, 204);
   }) as any);
 }

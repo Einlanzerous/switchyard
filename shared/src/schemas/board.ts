@@ -27,6 +27,10 @@ export const Board = z
     layout: BoardLayout,
     projects: z.array(ProjectRef),
     filter: BoardFilter,
+    // When true, this board's project list is auto-managed: switchyard
+    // adds every new project on create and prunes archived ones. Flipped
+    // off the moment the user manually edits projects via the Edit dialog.
+    auto_include_all_projects: z.boolean(),
   })
   .merge(Timestamps);
 export type Board = z.infer<typeof Board>;
