@@ -1,3 +1,17 @@
+// Per-phase startup timing. Deploys take 30-120s end-to-end (Phase 4.12b);
+// `[boot]` lines make the long pole visible in `docker logs` without any
+// external profiling. Each `mark(phase)` logs how long the PREVIOUS phase
+// took, so the running tally walks itself through the boot sequence.
+const bootStart = Date.now();
+let lastMark = bootStart;
+let lastName = "module imports";
+function mark(name: string): void {
+  const now = Date.now();
+  console.log(`[boot] ${lastName} took ${now - lastMark}ms`);
+  lastMark = now;
+  lastName = name;
+}
+
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { cors } from "hono/cors";
 import { env } from "./env.js";
@@ -17,8 +31,10 @@ import { cleanupExpiredIdempotencyKeys } from "./lib/idempotency.js";
 import { accessLog } from "./lib/access-log.js";
 import { buildHealthReport } from "./lib/health.js";
 
+mark("db reachability check");
 await assertDatabaseReachable();
 
+mark("app wiring");
 const app = new OpenAPIHono();
 
 app.use("*", accessLog);
@@ -46,6 +62,7 @@ app.doc("/v1/openapi.json", {
   servers: [{ url: env.PUBLIC_URL }],
 });
 
+mark("route registry");
 mountRoutes(app);
 
 // API-only — the static client lives in a sibling container that passthroughs
@@ -58,14 +75,16 @@ app.notFound((c) => {
   );
 });
 
-console.log(`[switchyard] listening on :${env.PORT}`);
-
+mark("listen setup");
 const server = Bun.serve({
   port: env.PORT,
   fetch: app.fetch,
 });
+console.log(`[switchyard] listening on :${env.PORT}`);
 
-// Background workers.
+// Background workers start AFTER listen so /healthz is reachable as soon
+// as possible — the orchestrator's healthcheck flips from "starting" to
+// "healthy" without waiting on the scheduler / dispatcher tick loops.
 startDispatcher();
 startRulesDispatcher();
 startScheduler();
@@ -74,6 +93,8 @@ const idempotencyCleanup = setInterval(
   () => void cleanupExpiredIdempotencyKeys().catch((e) => console.warn("[idempotency cleanup]", e)),
   60 * 60 * 1000
 );
+mark("background workers");
+console.log(`[boot] total boot ${Date.now() - bootStart}ms`);
 
 // Graceful shutdown: stop accepting new conns, let in-flight requests finish,
 // drain the webhook dispatcher, then close the DB. Hard ceiling at 10s total.
