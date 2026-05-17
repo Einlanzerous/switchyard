@@ -120,6 +120,15 @@ export const MoveTicket = z.object({
 });
 export type MoveTicket = z.infer<typeof MoveTicket>;
 
+// Sort keys for GET /v1/tickets. Cross-board "what's due next" is the
+// motivating use case; updated_at stays the default so existing callers
+// keep their ordering.
+export const TicketSortBy = z.enum(["updated_at", "due_date", "created_at", "priority"]);
+export type TicketSortBy = z.infer<typeof TicketSortBy>;
+
+export const TicketSortOrder = z.enum(["asc", "desc"]);
+export type TicketSortOrder = z.infer<typeof TicketSortOrder>;
+
 // Filters supported on GET /v1/tickets — agents use this heavily.
 export const TicketListFilters = z.object({
   project: z.string().optional(), // project key OR comma-separated keys
@@ -136,5 +145,11 @@ export const TicketListFilters = z.object({
   // days (open only), "none" matches null due_date regardless of status.
   due: z.enum(["overdue", "this_week", "none"]).optional(),
   include_deleted: z.coerce.boolean().default(false),
+  // Sort key + direction. Omitted = legacy behavior (updated_at DESC). When
+  // sort_by is set without sort_order, the natural direction is used:
+  // due_date / created_at ASC, updated_at / priority DESC. due_date and
+  // priority sort NULLS LAST regardless of direction.
+  sort_by: TicketSortBy.optional(),
+  sort_order: TicketSortOrder.optional(),
 });
 export type TicketListFilters = z.infer<typeof TicketListFilters>;

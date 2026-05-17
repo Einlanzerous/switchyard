@@ -1,4 +1,4 @@
-// Fractional indexing for ticket order within a column.
+// Fractional indexing + sort modes for ticket order within a column.
 //
 // Each ticket carries a `position` number. Higher = closer to the top. When
 // the user drops a card between two others, we compute a new position halfway
@@ -6,6 +6,12 @@
 // without a position (legacy rows pre-backfill), we fall back to their
 // updated_at timestamp interpreted as ms-since-epoch — same scale the new
 // epoch-ms-on-create scheme uses, so all values live on a comparable axis.
+//
+// Sort modes layer on top of position. The board defaults to "smart" — due
+// date floats dated tickets to the top, undated tickets keep their position
+// order. Drag-reorder always updates `position`, so a manual drag inside a
+// sort mode is still a meaningful nudge (it just only re-orders within the
+// same due-date bucket, which is the right semantics).
 
 import type { TicketSummary } from "@switchyard/shared";
 
@@ -35,4 +41,80 @@ export function positionBetween(
   // Midpoint between the two neighbors. Float precision starts dropping after
   // ~50 binary halvings; for a homelab kanban that's fine.
   return ((b as number) + (a as number)) / 2;
+}
+
+// ─── sort modes ────────────────────────────────────────────────────────────
+
+export type SortMode =
+  // Smart default: due_date ASC NULLS LAST → position DESC → id DESC.
+  // If no tickets have due dates, this is equivalent to position-only.
+  | "smart"
+  // Position-only (legacy board behavior).
+  | "position"
+  // Strict due-date sort: due_date ASC NULLS LAST → position DESC → id DESC.
+  // Distinct from "smart" only conceptually — same comparator in practice.
+  | "due_date"
+  | "updated"
+  | "created"
+  | "priority";
+
+export const SORT_MODES: { value: SortMode; label: string }[] = [
+  { value: "smart", label: "Smart (due first)" },
+  { value: "due_date", label: "Due date" },
+  { value: "priority", label: "Priority" },
+  { value: "position", label: "Manual order" },
+  { value: "updated", label: "Recently updated" },
+  { value: "created", label: "Recently created" },
+];
+
+const PRIORITY_ORDINAL: Record<NonNullable<TicketSummary["priority"]>, number> = {
+  critical: 4,
+  high: 3,
+  medium: 2,
+  low: 1,
+};
+
+function dueOrInfinity(t: TicketSummary): number {
+  // Null due_date sorts last in ascending order — return +∞ so it lands after
+  // any real date. Real dates compare numerically via Date.parse.
+  if (!t.due_date) return Number.POSITIVE_INFINITY;
+  const ms = Date.parse(t.due_date);
+  return Number.isNaN(ms) ? Number.POSITIVE_INFINITY : ms;
+}
+
+function priorityOrdinal(t: TicketSummary): number {
+  // Null priority sorts last in descending order — return -∞ so it lands at
+  // the bottom regardless of direction.
+  return t.priority ? PRIORITY_ORDINAL[t.priority] : Number.NEGATIVE_INFINITY;
+}
+
+// Returns negative if `a` should sort before `b`, positive if after, 0 if
+// equivalent. Use as `arr.sort((a, b) => compareTickets(a, b, mode))`.
+export function compareTickets(a: TicketSummary, b: TicketSummary, mode: SortMode): number {
+  switch (mode) {
+    case "position":
+      // Higher position = top.
+      return effectivePosition(b) - effectivePosition(a);
+    case "smart":
+    case "due_date": {
+      const da = dueOrInfinity(a);
+      const db = dueOrInfinity(b);
+      if (da !== db) return da - db; // earlier dates first; ∞ tickets fall through to position
+      // Same due bucket (incl. both undated) → defer to position.
+      return effectivePosition(b) - effectivePosition(a);
+    }
+    case "priority": {
+      const diff = priorityOrdinal(b) - priorityOrdinal(a); // critical first
+      if (diff !== 0) return diff;
+      return effectivePosition(b) - effectivePosition(a);
+    }
+    case "updated":
+      return Date.parse(b.updated_at) - Date.parse(a.updated_at); // recent first
+    case "created": {
+      // TicketSummary doesn't carry created_at directly; epoch-ms position is
+      // the create-time stamp by default, so position is a good proxy when no
+      // drag has happened. Fall back to position.
+      return effectivePosition(b) - effectivePosition(a);
+    }
+  }
 }

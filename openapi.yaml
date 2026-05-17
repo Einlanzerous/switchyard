@@ -6988,6 +6988,24 @@ paths:
           in: query
         - schema:
             type: string
+            enum:
+              - updated_at
+              - due_date
+              - created_at
+              - priority
+          required: false
+          name: sort_by
+          in: query
+        - schema:
+            type: string
+            enum:
+              - asc
+              - desc
+          required: false
+          name: sort_order
+          in: query
+        - schema:
+            type: string
             minLength: 1
           required: false
           name: cursor

@@ -12,12 +12,28 @@ import SaveViewDialog from "@/components/tickets/SaveViewDialog.vue";
 import BulkActionBar from "@/components/tickets/BulkActionBar.vue";
 import { useTicketFilters } from "@/composables/useTicketFilters";
 import { useTicketsList } from "@/composables/useTicketsList";
+import { useTicketSort } from "@/composables/useTicketSort";
+import SortMenu from "@/components/tickets/SortMenu.vue";
 import { useUiStore } from "@/stores/ui";
 
 const ui = useUiStore();
 const showSaveView = ref(false);
 
 const { filters, isAnySet, clear } = useTicketFilters();
+const { sort, direction, setBy, setOrder } = useTicketSort();
+
+// Server-side sort knobs. The list defaults to updated_at DESC; users opt
+// into due-date sort to answer "what's next due across all my projects".
+const SORT_BY_OPTIONS = [
+  { value: "updated_at" as const, label: "Recently updated" },
+  { value: "due_date" as const, label: "Due date" },
+  { value: "created_at" as const, label: "Recently created" },
+  { value: "priority" as const, label: "Priority" },
+];
+const SORT_ORDER_OPTIONS = [
+  { value: "asc" as const, label: "Ascending" },
+  { value: "desc" as const, label: "Descending" },
+];
 
 // ─── bulk selection ─────────────────────────────────────────────────────────
 //
@@ -48,7 +64,7 @@ const singleProjectKey = computed(() =>
   filters.value.project.length === 1 ? filters.value.project[0]! : null
 );
 const { items, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage, error } =
-  useTicketsList(filters);
+  useTicketsList(filters, sort);
 
 const route = useRoute();
 const router = useRouter();
@@ -241,6 +257,18 @@ watch(() => filters.value, () => { keyboardFocusIdx.value = -1; });
   <div class="flex flex-col h-full">
     <FilterBar>
       <template #actions>
+        <SortMenu
+          :model-value="sort.sort_by"
+          :options="SORT_BY_OPTIONS"
+          label="Sort"
+          @update:model-value="setBy"
+        />
+        <SortMenu
+          :model-value="direction"
+          :options="SORT_ORDER_OPTIONS"
+          label="Order"
+          @update:model-value="setOrder"
+        />
         <SavedViewsMenu @save="showSaveView = true" />
         <Button
           v-if="singleProjectKey"
