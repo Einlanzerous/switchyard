@@ -16,9 +16,13 @@ const queryClient = useQueryClient();
 const token = ref("");
 const error = ref<string | null>(null);
 const submitting = ref(false);
-const inputEl = useTemplateRef<HTMLInputElement>("inputEl");
+// shadcn-vue Input is a thin wrapper, so the template ref resolves to the
+// component instance, not the native <input>. `$el` is the rendered root
+// element (the actual <input>). The chained optional calls keep this safe
+// if the wrapper structure ever changes.
+const inputEl = useTemplateRef<{ $el?: HTMLInputElement } | null>("inputEl");
 
-onMounted(() => inputEl.value?.focus());
+onMounted(() => inputEl.value?.$el?.focus?.());
 
 async function submit() {
   const trimmed = token.value.trim();
