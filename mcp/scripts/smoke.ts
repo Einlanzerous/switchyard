@@ -162,6 +162,10 @@ async function main(): Promise<void> {
     else logPass("comment_on_ticket", "body posted");
 
     // move_ticket: best-effort. Only exercise if ≥2 projects exist.
+    // After a successful move, transition the new key against the destination
+    // project's closed status (status IDs are project-scoped).
+    let transitionKey = smokeKey;
+    let transitionStatusId = closedStatus.id;
     if (projectItems && projectItems.length >= 2) {
       const dest = projectItems.find((p) => p.key !== PROJECT_KEY);
       if (dest) {
@@ -175,7 +179,6 @@ async function main(): Promise<void> {
         } else {
           const newKey = movedTicket?.key ?? smokeKey;
           logPass("move_ticket", `→ ${dest.key} (new key ${newKey})`);
-          // Need destination project's closed status to land the close cleanly.
           const destStatuses = await client.callTool({
             name: "get_project_statuses",
             arguments: { project_key: dest.key },
@@ -186,17 +189,19 @@ async function main(): Promise<void> {
           }> | null;
           const destClosed = destStatusItems?.find((s) => s.category === "closed");
           if (destClosed) {
-            await transitionToClosed(client, newKey, destClosed.id);
-            return;
+            transitionKey = newKey;
+            transitionStatusId = destClosed.id;
           }
-          // Fall through to original-project transition if destination lacks closed.
+          // If destination lacks closed-category, fall back to closing in the
+          // original project — but the ticket already moved, so this will fail.
+          // Better signal than silently leaving the ticket open.
         }
       }
     } else {
       console.log(`ℹ️  SKIP  move_ticket               only one project (${PROJECT_KEY}) — skipping cross-project move`);
     }
 
-    await transitionToClosed(client, smokeKey, closedStatus.id);
+    await transitionToClosed(client, transitionKey, transitionStatusId);
   } finally {
     await client.close();
   }
