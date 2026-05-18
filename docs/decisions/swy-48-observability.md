@@ -1,8 +1,21 @@
 # SWY-48 — Observability for the agentic pipeline (decision)
 
-Status: **draft** — open questions at the bottom.
+Status: **resolved — ready to implement**.
 Ticket: SWY-48 (Phase 5.1, parent SWY-45).
 Decision owner: magos.
+
+## Review notes
+
+Local-AI pre-review surfaced five amendments that have been folded in
+below: per-item idempotency via explicit `dedup_key` (vs. relying on
+the HTTP `Idempotency-Key` header alone), daily rollups (vs. monthly)
+to keep the global Insights view snappy at ~2.6M raw rows/yr, on-the-fly
+cost computation via a SQL view over `model_pricing` (vs. storing
+`cost_usd` and running backfill jobs on price changes), warn-only
+cardinality management (vs. hard-reject), and an explicit
+`(ticket_id, occurred_at desc)` index for the HITL stall detector's
+"absence-of-data" query shape. Resolutions to the original 8 open
+questions are in the "Resolutions" section below.
 
 ## Context
 
@@ -103,18 +116,38 @@ New table `llm_observations`:
 | `cache_creation_input_tokens` | int nullable | Anthropic-specific |
 | `cache_read_input_tokens` | int nullable | Anthropic-specific |
 | `latency_ms` | int | End-to-end LLM call duration |
-| `cost_usd` | numeric(10,6) nullable | Server-computed from model pricing table; NULL for local models |
 | `error_code` | text nullable | `rate_limited` / `content_filter` / `network` / `timeout` / `tool_call_malformed` / etc. |
+| `dedup_key` | text nullable | Per-observation natural key for at-most-once writes. Partial unique index where not null. Suggested shape: `<service>:<execution_id>:<node_or_op>:<turn>`. |
 | `metadata` | jsonb | Free-form: `{tool_calls_count, turn_index, session_id, ...}` |
 | `created_at` | timestamptz default now() | Server-side insert time |
 
-Indexes: `(occurred_at desc)`, `(ticket_id, occurred_at)`,
-`(service, operation, occurred_at)`, `(actor_id, occurred_at)`.
+Indexes:
 
-A separate `model_pricing` table (model, provider, input_usd_per_mtok,
-output_usd_per_mtok, cache_creation_multiplier, cache_read_multiplier,
-effective_from, effective_to) lets the server compute `cost_usd` at insert
-time without hardcoding rates in agent code. Local models default to 0.
+- `(occurred_at desc)` — global time-range queries.
+- `(ticket_id, occurred_at desc)` — per-ticket cost decomposition AND the
+  HITL stall detector's "max(occurred_at) WHERE ticket_id = X" query.
+  Explicit because the stall detector is an absence-of-data query and
+  needs index-only-scan-friendly access to avoid sequential scan as
+  the table grows.
+- `(service, operation, occurred_at)` — service+operation breakdowns.
+- `(actor_id, occurred_at)` — per-actor breakdowns.
+- Partial unique on `dedup_key WHERE dedup_key IS NOT NULL` — enables
+  `INSERT ... ON CONFLICT (dedup_key) DO NOTHING` for at-most-once writes.
+
+**Cost is computed on-the-fly, not stored.** A separate `model_pricing`
+table holds rates, and a view `llm_observations_with_cost` joins to it.
+This eliminates the backfill-on-price-change operational burden.
+
+`model_pricing` columns: `model`, `provider`, `input_usd_per_mtok`,
+`output_usd_per_mtok`, `cache_creation_multiplier`,
+`cache_read_multiplier`, `effective_from`, `effective_to nullable`.
+A `tstzrange` exclusion constraint on
+`(model, provider, tstzrange(effective_from, effective_to))` prevents
+overlapping pricing periods (which would multiply rows on the join).
+The current rate for a model has `effective_to IS NULL`; adding a new
+rate closes the previous row by setting its `effective_to` to the new
+rate's `effective_from`. Local models seed with all-zero rates so
+joins still resolve cleanly.
 
 ### Endpoint
 
@@ -142,11 +175,25 @@ time without hardcoding rates in agent code. Local models default to 0.
 ```
 
 - Actor inferred from bearer token; no actor field in the body.
-- Idempotency-key header supported (same shape as other mutations).
+- **Two-layer dedup:**
+  - The HTTP `Idempotency-Key` header applies to the **request** (same
+    key within 24h returns the cached response), matching every other
+    mutation endpoint.
+  - Each observation may carry an optional `dedup_key` field. Server
+    writes via `INSERT ... ON CONFLICT (dedup_key) DO NOTHING`, so a
+    partial replay of a bulk batch is safe — observations already
+    written get skipped, new ones land. Per-item dedup is the right
+    grain here because emitters retry batches, not individual calls.
 - New scope `llm-obs:write` minted per-actor; existing tokens get it via
   re-mint, not silent grant.
-- Schema validation rejects unknown service/operation values to keep
-  cardinality bounded (allow-list lives in `system_settings`).
+- **Cardinality management is warn-list, not allow-list.** Unknown
+  service/operation/model values land successfully and are flagged in
+  the Admin → Observability view as "pending review." The admin can
+  one-click promote (writes the value to the canonical
+  `system_settings.llm_obs_known_values`) or reject (future writes with
+  that value 422). Rejected values cease to write but historical rows
+  stay queryable. Avoids the "pipeline silently broken at 3am because a
+  model name changed" failure mode while still catching typo growth.
 
 ### UI: Insights → LLM tab
 
@@ -171,8 +218,24 @@ Tiles + charts (first cut):
    with no LLM activity in the last M hours. N + M configurable via
    `system_settings`.
 
-All five tiles read from `llm_observations` + the existing event log; no
-external dependency.
+All six tiles read from `llm_observations_with_cost` (the cost-joined
+view) + `llm_observations_daily` (the rollup; see below) + the existing
+event log. No external dependency.
+
+**Daily rollups keep the global view snappy.** A scheduled job rolls
+raw observations into `llm_observations_daily` (same dimensions:
+`bucket_date, service, operation, model, provider, actor_id, ticket_id`;
+sum-aggregated metrics: `call_count, input_tokens, output_tokens,
+cache_creation_tokens, cache_read_tokens, sum_latency_ms,
+p50_latency_ms, p95_latency_ms, p99_latency_ms, cost_usd_at_rollup,
+error_count`). The job runs hourly to keep "today" fresh while still
+amortizing the heavy aggregations. Global KPI strip + time-series read
+from `llm_observations_daily`; per-ticket leaderboard and
+HITL detector read from raw `llm_observations` (small per-ticket row
+counts make this cheap). Cost at rollup time is *frozen into the
+rollup row* — no retroactive recomputation when pricing changes; only
+new rollup buckets reflect the new rates. Historical accuracy beats
+revisionism here.
 
 ### Emit-side work (lives in imperium-loop, not this repo)
 
@@ -188,48 +251,56 @@ external dependency.
 Single shared `SWITCHYARD_TOKEN` per service (already minted, see
 `~/imperium-loop/CLAUDE.md` per-actor mapping).
 
-## Open questions
+## Resolutions
 
-The following need answers before any code lands. Some can be deferred to
-follow-up tickets:
-
-1. **Cost computation: client or server?** Recommendation: **server**, via
-   a `model_pricing` table. Emitters don't track price changes; switchyard
-   does. Cost re-computation on price changes is a recurring backfill job.
-2. **Retention.** Recommendation: **365 days raw, then aggregate to
-   monthly `llm_observations_monthly_rollup`**. Raw rows for 1 year covers
-   any "what changed last quarter" question; monthly aggregates are
-   forever. Open: is 365d too much? Initial volume estimate: ~50k rows /
-   week at current pipeline cadence = ~2.6M rows / yr. Comfortable in
-   postgres.
-3. **Bulk vs single endpoint.** Recommendation: **bulk by default** (array
-   of observations), with single-observation as a degenerate case (array
-   of one). Lets emitters batch when convenient (n8n end-of-workflow flush)
-   without forcing it (greenfield agents POST per turn for liveness).
-4. **Cache token attribution.** Anthropic returns both `cache_creation`
-   and `cache_read` counts per call. Store both as separate columns (per
-   schema above); compute hit rate as
+1. **Cost computation:** ✅ **server, on-the-fly via SQL view.** Drops the
+   stored `cost_usd` column from `llm_observations`; computation lives in
+   `llm_observations_with_cost` joining to `model_pricing` on
+   `(model, provider)` where `occurred_at` falls inside the pricing
+   period. Daily rollups freeze cost at rollup time (no retroactive
+   recompute). Local-AI amendment to the original proposal — eliminates
+   the backfill-on-price-change burden cleanly.
+2. **Retention:** ✅ **180 days raw, daily rollups forever, configurable.**
+   Half a year of raw covers the realistic "what changed last quarter"
+   investigation window. `system_settings.llm_obs_retention_days` (default
+   180) drives the cleanup job — bump or shrink per appetite without code
+   changes.
+3. **Bulk vs single endpoint:** ✅ **bulk as proposed.** Array of
+   observations; emitters batch when convenient, send single-element
+   arrays when not.
+4. **Cache token attribution:** ✅ **as proposed.** Separate columns for
+   creation vs. read; hit-rate formula
    `cache_read_input_tokens / (cache_creation_input_tokens + cache_read_input_tokens + input_tokens)`.
-5. **Cardinality cap.** Service/operation/model are all allow-listed via
-   `system_settings`; new values rejected with `unprocessable` until added.
-   Prevents typo-induced unbounded growth.
-6. **Overlap with Phase 5.2 plugin contract (SWY-47).** PHASES.md §5.1
-   mentions "Surface 3 KPI tiles in switchyard via the SWY-47 plugin
-   contract." With switchyard-native LLM obs (this doc), three of those
-   tiles can be drawn from local data instead of a plugin endpoint.
-   Decision: **switchyard owns LLM data directly** here; the plugin
-   contract is reserved for genuinely-external state (e.g. live n8n
-   execution snapshots, autosavant-bot in-flight prompts). Cleaner split.
-7. **Alerting.** PHASES.md §5.1 listed 5 alerts (HITL stalls, cycle-time
-   regressions, API rate-limit hits, cost spikes, sandbox zombies).
-   Recommendation: **defer to a second pass** — let the data exist for 2–4
-   weeks, then build alerts on patterns we actually see, not patterns we
-   imagine. Initial implementation surfaces HITL stalls as a UI tile
-   (already in the sketch above), not a paging alert.
-8. **`assignee=unassigned` mistakes vs. real ambient ops.** Some LLM
-   calls genuinely have no ticket (the Scribe routing decision happens
-   *before* a ticket exists). Distinguish via `ticket_id IS NULL` rather
-   than a sentinel; UI groups these as "Ambient" in the cost leaderboard.
+5. **Cardinality management:** ✅ **warn-list, not allow-list** (local-AI
+   amendment). Unknown values write successfully and surface in Admin →
+   Observability with one-click promote / reject. Avoids the "pipeline
+   silently 422-ing because a model name shifted" failure mode while
+   still catching typo growth.
+6. **Overlap with Phase 5.2 plugin contract:** ✅ **switchyard owns LLM
+   data directly.** The 5.2 plugin contract (SWY-47) is reserved for
+   genuinely-external state (live n8n execution snapshots, autosavant-bot
+   in-flight prompts) — LLM obs is local because the data shape is
+   already half-owned (cycle time, actors, tickets).
+7. **Alerting:** ✅ **defer.** Let raw data accumulate for 2–4 weeks
+   post-launch, then build alerts on patterns observed, not patterns
+   imagined. Initial implementation surfaces HITL stalls as a UI tile
+   (already in the sketch), not a paging alert.
+8. **Ambient ops (LLM calls with no ticket):** ✅ **`ticket_id IS NULL`,
+   no sentinel.** UI groups these as "Ambient" in the cost leaderboard.
+
+Additional resolutions from local-AI review (folded into "Proposed shape"
+above):
+
+- **Idempotency granularity:** explicit per-observation `dedup_key`
+  column with partial unique index; HTTP `Idempotency-Key` header still
+  applies at the request layer for response caching. Partial batch
+  replays are safe.
+- **HITL stall detector index:** `(ticket_id, occurred_at desc)` on raw
+  `llm_observations` — explicit support for the "max(occurred_at) WHERE
+  ticket_id = X" query shape that absence-of-data detection needs.
+- **`model_pricing` overlap prevention:** `tstzrange` exclusion
+  constraint on `(model, provider, range(effective_from, effective_to))`
+  so the cost-view join can't multiply rows.
 
 ## Non-goals
 
@@ -245,23 +316,34 @@ follow-up tickets:
   every ad-hoc question we have. If a query keeps showing up, it becomes
   a saved view in the UI.
 
-## Implementation skeleton (when this doc is approved)
+## Implementation skeleton
 
-1. **5.1.0 — Schema + endpoint.** `llm_observations` table, Drizzle
-   migration, `model_pricing` table seeded with current Anthropic +
-   Gemma + GPT prices, `POST /v1/llm-observations` route, `llm-obs:write`
-   scope, Zod schemas, OpenAPI regen, integration test.
+1. **5.1.0 — Schema + endpoint.** Drizzle migration for
+   `llm_observations` (with `dedup_key` partial unique + the four
+   indexes), `model_pricing` (with `tstzrange` exclusion constraint),
+   `llm_observations_with_cost` view, `llm_observations_daily` rollup
+   table. Seed `model_pricing` with current Anthropic / Ollama-local /
+   OpenAI rates. Add `POST /v1/llm-observations` route (bulk, with
+   per-item ON CONFLICT dedup), `llm-obs:write` scope, Zod schemas,
+   OpenAPI regen, integration test (per-item dedup, warn-list capture,
+   actor inference).
 2. **5.1.1 — Emit-side wiring (imperium-loop).** Cogitation Engine n8n
-   nodes, Servo-Signal per-turn hook, autosavant-bot prompt hook.
-   Lives in `~/imperium-loop`, gated on 5.1.0 landing.
+   nodes append "Log LLM call" HTTP node with `dedup_key =
+   <service>:<n8n_execution_id>:<node_id>:<turn_index>`; Servo-Signal
+   greenfield/planning agents emit per-turn with equivalent key shape;
+   autosavant-bot emits on Discord-prompt LLM calls. Lives in
+   `~/imperium-loop`, gated on 5.1.0 landing.
 3. **5.1.2 — Switchyard Insights → LLM tab UI.** Six tiles per sketch
-   above. Reads only; no mutation.
-4. **5.1.3 — Aggregate + retention.** Daily rollup to
-   `llm_observations_monthly_rollup`, 365d retention on raw, scheduled
-   cleanup job.
+   above. Global tiles read `llm_observations_daily`; per-ticket +
+   HITL tiles read raw `llm_observations`. Reads only; no mutation.
+   Admin → Observability page hosts the warn-list promote/reject UI.
+4. **5.1.3 — Rollup + retention.** Hourly rollup job into
+   `llm_observations_daily`, raw retention configurable via
+   `system_settings.llm_obs_retention_days` (default 180), scheduled
+   cleanup job. Daily rollups persist forever.
 5. **5.1.4 — (Deferred until data exists)** Alerts. Pattern-driven, not
    pre-imagined.
 
-Phase 5.1 closes when 5.1.0 + 5.1.2 land with data flowing from at least
-two emitters (Cogitation Engine planning + Servo-Signal greenfield). 5.1.1
-finishes itself via imperium-loop's own tracker.
+Phase 5.1 closes when 5.1.0 + 5.1.2 + 5.1.3 land with data flowing from
+at least two emitters (Cogitation Engine planning + Servo-Signal
+greenfield). 5.1.1 finishes itself via imperium-loop's own tracker.
