@@ -12,6 +12,7 @@
     "dev": "bun --watch src/index.ts",
     "start": "bun src/index.ts",
     "build": "bun build src/index.ts --target=node --outdir=dist",
+    "test": "bun test",
     "api:gen": "bunx openapi-typescript ../openapi.yaml -o ./src/api.types.ts"
   },
   "dependencies": {

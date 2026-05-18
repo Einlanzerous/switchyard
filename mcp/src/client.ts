@@ -21,3 +21,9 @@ export function getClient() {
   });
   return _client;
 }
+
+// Test seam: drop the cached client so the next getClient() rebuilds it
+// against current env / global fetch. Production code never calls this.
+export function __resetClientForTests(): void {
+  _client = null;
+}
