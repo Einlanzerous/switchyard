@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.19.0](https://github.com/Einlanzerous/switchyard/compare/v2.18.1...v2.19.0) (2026-05-18)
+
+
+### Features
+
+* Phase 5.0 polish — error-path tests + live smoke (SWY-60, SWY-61) ([cce90cd](https://github.com/Einlanzerous/switchyard/commit/cce90cd417ca792ba95d27d1431c67e89cce3b00))
+* SWY-60 — add mcp/scripts/smoke.ts live tool exerciser ([df6f705](https://github.com/Einlanzerous/switchyard/commit/df6f7052472722af4d56d96d2a8f111b3dab04ce))
+
+
+### Bug Fixes
+
+* **mcp/smoke:** print summary line on success too ([da11d69](https://github.com/Einlanzerous/switchyard/commit/da11d698124ee02fc331f65888f46b407623f614))
+
 ## [2.18.1](https://github.com/Einlanzerous/switchyard/compare/v2.18.0...v2.18.1) (2026-05-18)
 
 
