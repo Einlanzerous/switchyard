@@ -46,23 +46,24 @@ export function positionBetween(
 // ─── sort modes ────────────────────────────────────────────────────────────
 
 export type SortMode =
-  // Smart default: due_date ASC NULLS LAST → position DESC → id DESC.
-  // If no tickets have due dates, this is equivalent to position-only.
+  // Default: manual position order (drag-driven). Newly-created tickets get
+  // epoch-ms-at-create positions and stack newest-first; drag-to-reorder
+  // overwrites via fractional indexing. Alias of `position` — kept as a
+  // distinct value so a future "smart placement at create time" feature
+  // can fill in the smart half without churning the URL contract.
   | "smart"
-  // Position-only (legacy board behavior).
+  // Explicit manual order (identical to smart today).
   | "position"
   // Strict due-date sort: due_date ASC NULLS LAST → position DESC → id DESC.
-  // Distinct from "smart" only conceptually — same comparator in practice.
   | "due_date"
   | "updated"
   | "created"
   | "priority";
 
 export const SORT_MODES: { value: SortMode; label: string }[] = [
-  { value: "smart", label: "Smart (due first)" },
+  { value: "smart", label: "Manual order" },
   { value: "due_date", label: "Due date" },
   { value: "priority", label: "Priority" },
-  { value: "position", label: "Manual order" },
   { value: "updated", label: "Recently updated" },
   { value: "created", label: "Recently created" },
 ];
@@ -90,17 +91,23 @@ function priorityOrdinal(t: TicketSummary): number {
 
 // Returns negative if `a` should sort before `b`, positive if after, 0 if
 // equivalent. Use as `arr.sort((a, b) => compareTickets(a, b, mode))`.
+//
+// Design note: `smart` and `position` are deliberately identical today —
+// drag-driven manual order with no due-date primary. An earlier attempt
+// had smart float dated tickets to the top, which made the comparator's
+// primary key beat any drag-updated position (drag silently snapped back).
+// The path forward for "dated tickets naturally rise to the top" is smart
+// initial-position assignment at ticket-create time, not view-time sort;
+// see PHASES.md follow-ups.
 export function compareTickets(a: TicketSummary, b: TicketSummary, mode: SortMode): number {
   switch (mode) {
-    case "position":
-      // Higher position = top.
-      return effectivePosition(b) - effectivePosition(a);
     case "smart":
+    case "position":
+      return effectivePosition(b) - effectivePosition(a);
     case "due_date": {
       const da = dueOrInfinity(a);
       const db = dueOrInfinity(b);
-      if (da !== db) return da - db; // earlier dates first; ∞ tickets fall through to position
-      // Same due bucket (incl. both undated) → defer to position.
+      if (da !== db) return da - db; // earlier dates first; null due dates fall to the bottom
       return effectivePosition(b) - effectivePosition(a);
     }
     case "priority": {
@@ -110,11 +117,10 @@ export function compareTickets(a: TicketSummary, b: TicketSummary, mode: SortMod
     }
     case "updated":
       return Date.parse(b.updated_at) - Date.parse(a.updated_at); // recent first
-    case "created": {
+    case "created":
       // TicketSummary doesn't carry created_at directly; epoch-ms position is
       // the create-time stamp by default, so position is a good proxy when no
       // drag has happened. Fall back to position.
       return effectivePosition(b) - effectivePosition(a);
-    }
   }
 }
