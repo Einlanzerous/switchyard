@@ -50,5 +50,44 @@ export function registerProjectTools(server: McpServer): void {
       };
     },
   );
+
+  server.registerTool(
+    "get_project_statuses",
+    {
+      title: "Get project statuses",
+      description:
+        "Return the ordered list of statuses defined on a project. Call this BEFORE " +
+        "`transition_ticket` to discover the `status_id` you need to pass — status IDs " +
+        "are project-scoped (different projects can have differently-named statuses with " +
+        "different IDs even in the same category). Each status carries a `category` " +
+        "(`backlog`/`planning`/`in_progress`/`blocked`/`closed`) which is the stable " +
+        "machine-readable bucket; `display_name` is what users see and can vary per project.",
+      inputSchema: {
+        project_key: z
+          .string()
+          .describe("Project key (e.g. `SWY`, `LOOP`). Case-sensitive, uppercase."),
+      },
+    },
+    async ({ project_key }) => {
+      const client = getClient();
+      const { data, error } = await client.GET("/v1/projects/{key}/statuses", {
+        params: { path: { key: project_key } },
+      });
+      if (error) {
+        return {
+          isError: true,
+          content: [{ type: "text", text: formatApiError(error) }],
+        };
+      }
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(data?.items ?? [], null, 2),
+          },
+        ],
+      };
+    },
+  );
 }
 
