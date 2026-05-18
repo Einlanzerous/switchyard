@@ -14,6 +14,11 @@
 
 import { defineConfig, devices } from "@playwright/test";
 
+// E2E runs Vite on a port distinct from local dev (:5173) so the suite can
+// be kicked while a developer still has `bun run dev:client` up on the
+// self-hosted runner. Override via E2E_VITE_PORT if needed.
+const VITE_PORT = process.env.E2E_VITE_PORT ?? "5273";
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
@@ -25,7 +30,7 @@ export default defineConfig({
   // charts may need longer locally — bump per-test if needed.
   timeout: 30_000,
   use: {
-    baseURL: process.env.E2E_BASE_URL ?? "http://localhost:5173",
+    baseURL: process.env.E2E_BASE_URL ?? `http://localhost:${VITE_PORT}`,
     trace: "on-first-retry",
     // Allow tests to run against an already-running dev server (CI), but
     // also boot one if invoked locally without a server up. See webServer
@@ -62,9 +67,10 @@ export default defineConfig({
     // `bun --cwd` works when invoked from the client/ directory; the
     // command is run from where `playwright test` was executed (we run
     // from client/, so `bun run dev` resolves to the workspace's dev
-    // script).
-    command: "bun run dev",
-    url: "http://localhost:5173",
+    // script). Pass --port through so Vite binds to our chosen E2E port
+    // instead of the default :5173 (which dev may have).
+    command: `bun run dev -- --port ${VITE_PORT} --strictPort`,
+    url: `http://localhost:${VITE_PORT}`,
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
     stdout: "pipe",
