@@ -2,16 +2,17 @@
   "name": "switchyard",
   "version": "0.0.0",
   "private": true,
-  "workspaces": ["shared", "server", "client"],
+  "workspaces": ["shared", "server", "client", "mcp"],
   "scripts": {
     "dev:server": "cd server && bun run dev",
     "dev:client": "cd client && bun run dev",
+    "dev:mcp": "cd mcp && bun run dev",
     "build": "(cd client && bun run build) && (cd server && bun run build)",
     "openapi:gen": "cd server && bun run openapi:gen",
-    "api:gen": "(cd server && bun run openapi:gen) && (cd client && bun run api:gen)",
+    "api:gen": "(cd server && bun run openapi:gen) && (cd client && bun run api:gen) && (cd mcp && bun run api:gen)",
     "db:generate": "cd server && bun run db:generate",
     "db:migrate": "cd server && bun run db:migrate",
-    "typecheck": "tsc -b shared server client"
+    "typecheck": "tsc -b shared server client mcp"
   },
   "devDependencies": {
     "typescript": "^5.6.0"
