@@ -215,3 +215,180 @@ describe("move_ticket", () => {
     }
   });
 });
+
+// Error-path coverage: each tool surfaces switchyard's `{error:{code,message}}`
+// envelope through formatApiError as `switchyard error [<code>]: <message>`
+// and sets isError on the tool result. One representative error code per tool
+// — mixing 401 / 404 / 409 / 422 / 500 so the helper is exercised across the
+// full envelope-emitting range.
+describe("error paths", () => {
+  test("list_tickets surfaces 401 unauthorized", async () => {
+    const recorder = installFetchRecorder({
+      status: 401,
+      body: { error: { code: "unauthorized", message: "missing or invalid token" } },
+    });
+    const { client, close } = await connectTestClient();
+    try {
+      const res = await client.callTool({ name: "list_tickets", arguments: {} });
+      expect(res.isError).toBe(true);
+      const text = (res.content as Array<{ type: string; text: string }>)[0]!.text;
+      expect(text).toContain("switchyard error [unauthorized]");
+      expect(text).toContain("missing or invalid token");
+    } finally {
+      await close();
+      recorder.restore();
+    }
+  });
+
+  test("get_ticket surfaces 404 not_found", async () => {
+    const recorder = installFetchRecorder({
+      status: 404,
+      body: { error: { code: "not_found", message: "ticket SWY-99999 not found" } },
+    });
+    const { client, close } = await connectTestClient();
+    try {
+      const res = await client.callTool({
+        name: "get_ticket",
+        arguments: { id_or_key: "SWY-99999" },
+      });
+      expect(res.isError).toBe(true);
+      const text = (res.content as Array<{ type: string; text: string }>)[0]!.text;
+      expect(text).toContain("switchyard error [not_found]");
+      expect(text).toContain("ticket SWY-99999 not found");
+    } finally {
+      await close();
+      recorder.restore();
+    }
+  });
+
+  test("create_ticket surfaces 422 unprocessable", async () => {
+    const recorder = installFetchRecorder({
+      status: 422,
+      body: { error: { code: "unprocessable", message: "title is required" } },
+    });
+    const { client, close } = await connectTestClient();
+    try {
+      const res = await client.callTool({
+        name: "create_ticket",
+        arguments: { project_key: "SWY", type: "task", title: "" },
+      });
+      expect(res.isError).toBe(true);
+      const text = (res.content as Array<{ type: string; text: string }>)[0]!.text;
+      expect(text).toContain("switchyard error [unprocessable]");
+      expect(text).toContain("title is required");
+    } finally {
+      await close();
+      recorder.restore();
+    }
+  });
+
+  test("update_ticket surfaces 404 not_found", async () => {
+    const recorder = installFetchRecorder({
+      status: 404,
+      body: { error: { code: "not_found", message: "ticket NOPE-1 not found" } },
+    });
+    const { client, close } = await connectTestClient();
+    try {
+      const res = await client.callTool({
+        name: "update_ticket",
+        arguments: { id_or_key: "NOPE-1", title: "x" },
+      });
+      expect(res.isError).toBe(true);
+      const text = (res.content as Array<{ type: string; text: string }>)[0]!.text;
+      expect(text).toContain("switchyard error [not_found]");
+    } finally {
+      await close();
+      recorder.restore();
+    }
+  });
+
+  test("transition_ticket surfaces 422 (resolution required on close)", async () => {
+    const recorder = installFetchRecorder({
+      status: 422,
+      body: {
+        error: {
+          code: "unprocessable",
+          message: "resolution is required when target status category is closed",
+        },
+      },
+    });
+    const { client, close } = await connectTestClient();
+    try {
+      const res = await client.callTool({
+        name: "transition_ticket",
+        arguments: { id_or_key: "SWY-1", status_id: "s-closed" },
+      });
+      expect(res.isError).toBe(true);
+      const text = (res.content as Array<{ type: string; text: string }>)[0]!.text;
+      expect(text).toContain("switchyard error [unprocessable]");
+      expect(text).toContain("resolution is required");
+    } finally {
+      await close();
+      recorder.restore();
+    }
+  });
+
+  test("comment_on_ticket surfaces 404 not_found", async () => {
+    const recorder = installFetchRecorder({
+      status: 404,
+      body: { error: { code: "not_found", message: "ticket SWY-9 not found" } },
+    });
+    const { client, close } = await connectTestClient();
+    try {
+      const res = await client.callTool({
+        name: "comment_on_ticket",
+        arguments: { id_or_key: "SWY-9", body: "x" },
+      });
+      expect(res.isError).toBe(true);
+      const text = (res.content as Array<{ type: string; text: string }>)[0]!.text;
+      expect(text).toContain("switchyard error [not_found]");
+    } finally {
+      await close();
+      recorder.restore();
+    }
+  });
+
+  test("move_ticket surfaces 409 conflict (destination key exists)", async () => {
+    const recorder = installFetchRecorder({
+      status: 409,
+      body: {
+        error: {
+          code: "conflict",
+          message: "destination project NEWREPO has no compatible status",
+        },
+      },
+    });
+    const { client, close } = await connectTestClient();
+    try {
+      const res = await client.callTool({
+        name: "move_ticket",
+        arguments: { id_or_key: "INCUBATOR-3", project_key: "NEWREPO" },
+      });
+      expect(res.isError).toBe(true);
+      const text = (res.content as Array<{ type: string; text: string }>)[0]!.text;
+      expect(text).toContain("switchyard error [conflict]");
+    } finally {
+      await close();
+      recorder.restore();
+    }
+  });
+
+  test("formatApiError falls back when envelope is malformed", async () => {
+    const recorder = installFetchRecorder({
+      status: 500,
+      body: { unexpected: "shape" },
+    });
+    const { client, close } = await connectTestClient();
+    try {
+      const res = await client.callTool({ name: "list_tickets", arguments: {} });
+      expect(res.isError).toBe(true);
+      const text = (res.content as Array<{ type: string; text: string }>)[0]!.text;
+      expect(text).toContain("switchyard error [unknown_error]");
+      expect(text).toContain("(no message)");
+    } finally {
+      await close();
+      recorder.restore();
+    }
+  });
+});
+
