@@ -5,6 +5,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client.js";
+import { formatApiError } from "../errors.js";
 
 export function registerProjectTools(server: McpServer): void {
   server.registerTool(
@@ -51,11 +52,3 @@ export function registerProjectTools(server: McpServer): void {
   );
 }
 
-// Switchyard's error envelope is `{ error: { code, message, details? } }`.
-// Surface the message; agents can act on it.
-function formatApiError(err: unknown): string {
-  const e = err as { error?: { code?: string; message?: string } };
-  const code = e?.error?.code ?? "unknown_error";
-  const message = e?.error?.message ?? "(no message)";
-  return `switchyard error [${code}]: ${message}`;
-}
