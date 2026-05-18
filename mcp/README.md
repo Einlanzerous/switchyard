@@ -95,13 +95,26 @@ No backend required.
 
 ## Smoke test (manual)
 
+Drive every tool against a live backend in one shot:
+
 ```sh
-# Confirm tools/list works without any client
+SWITCHYARD_TOKEN=sw_... SWITCHYARD_URL=http://localhost:4012 \
+  bun mcp/scripts/smoke.ts [--project SWY]
+```
+
+The script spawns the MCP server via stdio, exercises every tool
+(creates a transient `[smoke <timestamp>]` ticket, mutates it,
+optionally moves it cross-project if multiple projects exist, then
+transitions it to closed with `resolution=done`), and prints a
+PASS/FAIL line per tool. Exit code = number of failures.
+
+For just confirming the server boots and registers tools (no backend
+needed):
+
+```sh
 (printf '%s\n' \
   '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"smoke","version":"0"}}}' \
   '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
   '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'; \
- sleep 0.5) | SWITCHYARD_TOKEN=... SWITCHYARD_URL=... bun src/index.ts
+ sleep 0.5) | SWITCHYARD_TOKEN=test SWITCHYARD_URL=http://localhost:4012 bun src/index.ts
 ```
-
-You should see a JSON-RPC `initialize` response followed by the tools list.

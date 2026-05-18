@@ -69,3 +69,44 @@ describe("get_project_statuses", () => {
     }
   });
 });
+
+describe("error paths", () => {
+  test("list_projects surfaces 401 unauthorized envelope", async () => {
+    const recorder = installFetchRecorder({
+      status: 401,
+      body: { error: { code: "unauthorized", message: "missing or invalid token" } },
+    });
+    const { client, close } = await connectTestClient();
+    try {
+      const res = await client.callTool({ name: "list_projects", arguments: {} });
+      expect(res.isError).toBe(true);
+      const text = (res.content as Array<{ type: string; text: string }>)[0]!.text;
+      expect(text).toContain("switchyard error [unauthorized]");
+      expect(text).toContain("missing or invalid token");
+    } finally {
+      await close();
+      recorder.restore();
+    }
+  });
+
+  test("get_project_statuses surfaces 404 not_found envelope", async () => {
+    const recorder = installFetchRecorder({
+      status: 404,
+      body: { error: { code: "not_found", message: "project NOPE not found" } },
+    });
+    const { client, close } = await connectTestClient();
+    try {
+      const res = await client.callTool({
+        name: "get_project_statuses",
+        arguments: { project_key: "NOPE" },
+      });
+      expect(res.isError).toBe(true);
+      const text = (res.content as Array<{ type: string; text: string }>)[0]!.text;
+      expect(text).toContain("switchyard error [not_found]");
+      expect(text).toContain("project NOPE not found");
+    } finally {
+      await close();
+      recorder.restore();
+    }
+  });
+});

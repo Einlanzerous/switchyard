@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 const props = defineProps<{
   boardPath: string;
   insightsPath: string;
-  // Optional: when set, renders a third "Setup" tab containing the
+  // Optional: when set, renders a third "Admin" tab containing the
   // project's recurring templates, project-scoped automations, and
   // project settings as sub-tabs. Project-scoped views pass this;
   // board-scoped views don't (those concerns are project-bound).
@@ -27,7 +27,7 @@ const tabs = computed(() => {
     { key: "insights", label: "Insights", icon: BarChart2, path: props.insightsPath },
   ];
   if (props.setupPath) {
-    base.push({ key: "setup", label: "Setup", icon: SettingsIcon, path: props.setupPath });
+    base.push({ key: "setup", label: "Admin", icon: SettingsIcon, path: props.setupPath });
   }
   return base;
 });
