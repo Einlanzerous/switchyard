@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.18.1](https://github.com/Einlanzerous/switchyard/compare/v2.18.0...v2.18.1) (2026-05-18)
+
+
+### Bug Fixes
+
+* **deploy:** include mcp workspace in Dockerfile bun install context ([7f910a1](https://github.com/Einlanzerous/switchyard/commit/7f910a16f3b71854e67994fe062af8ef026c474f))
+* **deploy:** include mcp workspace in Dockerfile bun install context ([5aa776e](https://github.com/Einlanzerous/switchyard/commit/5aa776e85c9436e989ec80688dbc3298154b5f01))
+
 ## [2.18.0](https://github.com/Einlanzerous/switchyard/compare/v2.17.0...v2.18.0) (2026-05-18)
 
 
