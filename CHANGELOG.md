@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.18.0](https://github.com/Einlanzerous/switchyard/compare/v2.17.0...v2.18.0) (2026-05-18)
+
+
+### Features
+
+* SWY-36 — add get_project_statuses MCP tool ([98be7ad](https://github.com/Einlanzerous/switchyard/commit/98be7ad77548c56b5a030c34c78e0642c7ab4f41))
+* SWY-36 — add query_my_open composed MCP tool ([ac92ae6](https://github.com/Einlanzerous/switchyard/commit/ac92ae6d4c4b817da252f7b9554817996e010734))
+* SWY-36 — add v1 ticket MCP tool surface ([231939e](https://github.com/Einlanzerous/switchyard/commit/231939eb8c1d68a759f1788b5b2aec2a013d555a))
+* SWY-36 Phase 5.0 — switchyard MCP server (v1 tool surface) ([b4bb79c](https://github.com/Einlanzerous/switchyard/commit/b4bb79c99dafe150d11c8eddf6c0461e43d5e0f6))
+* SWY-36 Phase 5.0 — switchyard MCP server scaffold ([28608ba](https://github.com/Einlanzerous/switchyard/commit/28608bae7dff15928ff8baf3bec1791a9dfbebe6))
+
 ## [2.17.0](https://github.com/Einlanzerous/switchyard/compare/v2.16.0...v2.17.0) (2026-05-18)
 
 
