@@ -59,12 +59,15 @@ export function mount(app: OpenAPIHono) {
 
     if (q.cursor) {
       const cur = decodeCursor(q.cursor);
-      if (!cur) throw badRequest("invalid cursor");
       // events are ordered by (created_at DESC, id DESC); cursor matches the
-      // shape that buildPage/encodeCursor produces (u=created_at, i=id).
+      // shape that buildPage/encodeCursor produces (k=created_at, i=id).
+      // created_at is non-null by construction, so a null k means a
+      // hand-crafted cursor — treat as invalid.
+      if (!cur || cur.k === null) throw badRequest("invalid cursor");
+      const k = cur.k;
       conds.push(or(
-        lt(schema.events.created_at, cur.u),
-        and(eq(schema.events.created_at, cur.u), lt(schema.events.id, cur.i))!,
+        lt(schema.events.created_at, k),
+        and(eq(schema.events.created_at, k), lt(schema.events.id, cur.i))!,
       )!);
     }
 
@@ -76,7 +79,7 @@ export function mount(app: OpenAPIHono) {
     const has_more = rows.length > limit;
     const items = (has_more ? rows.slice(0, limit) : rows).map(mapEvent);
     const last = has_more ? rows[limit - 1] : null;
-    const next_cursor = last ? encodeCursor({ u: last.created_at, i: last.id }) : null;
+    const next_cursor = last ? encodeCursor({ k: last.created_at, i: last.id }) : null;
 
     return c.json({ items, page: { next_cursor, has_more } }, 200);
   }) as any);

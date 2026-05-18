@@ -6,12 +6,23 @@ import { useInfiniteQuery } from "@tanstack/vue-query";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
 import type { TicketFilters } from "./useTicketFilters";
+import { NATURAL_DIR, type TicketSortState } from "./useTicketSort";
 
 const PAGE_SIZE = 50;
 
-export function useTicketsList(filters: ComputedRef<TicketFilters>) {
+export function useTicketsList(
+  filters: ComputedRef<TicketFilters>,
+  sort?: ComputedRef<TicketSortState>,
+) {
   const query = useInfiniteQuery({
-    queryKey: computed(() => queryKeys.tickets(filters.value as Record<string, unknown>)),
+    queryKey: computed(() => {
+      const by = sort?.value.sort_by ?? "updated_at";
+      return queryKeys.tickets({
+        ...(filters.value as Partial<Record<string, unknown>>),
+        sort_by: by,
+        sort_order: sort?.value.sort_order ?? NATURAL_DIR[by],
+      } as never);
+    }),
     initialPageParam: undefined as string | undefined,
     queryFn: async ({ pageParam }) => {
       const f = filters.value;
@@ -29,6 +40,8 @@ export function useTicketsList(filters: ComputedRef<TicketFilters>) {
       for (const [k, v] of Object.entries(f.customFields)) {
         q[`cf.${k}`] = v;
       }
+      if (sort && sort.value.sort_by !== "updated_at") q.sort_by = sort.value.sort_by;
+      if (sort?.value.sort_order) q.sort_order = sort.value.sort_order;
       if (pageParam) q.cursor = pageParam;
 
       const { data, error } = await api.GET("/v1/tickets", {

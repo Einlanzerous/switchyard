@@ -12,7 +12,7 @@ import { computed, type ComputedRef } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
-import { effectivePosition } from "@/lib/positions";
+import { compareTickets, type SortMode } from "@/lib/positions";
 import type { Status, StatusCategory, TicketSummary } from "@switchyard/shared";
 
 export const CATEGORY_ORDER: StatusCategory[] = [
@@ -44,6 +44,7 @@ const PAGE_LIMIT = 200;
 export function useProjectBoard(
   projectKey: ComputedRef<string | null>,
   showEpics: ComputedRef<boolean> = computed(() => false),
+  sortMode: ComputedRef<SortMode> = computed(() => "smart"),
 ) {
   const enabled = computed(() => projectKey.value !== null);
 
@@ -151,9 +152,10 @@ export function useProjectBoard(
       const inCat = byCategory.get(cat);
       if (!inCat || inCat.length === 0) return [];
       const head = inCat[0]!;
-      // Sort by effective position descending — manual reorder writes a
-      // position; legacy rows fall through to updated_at via effectivePosition,
-      // so all cards live on the same numeric axis.
+      // Sort mode is "guidance, not restriction": the default `smart` mode
+      // floats dated tickets to the top while keeping position as the
+      // tiebreaker (drag still works). Other modes are explicit user picks.
+      const mode = sortMode.value;
       const ticketsInCol = tickets.value
         .filter((t) => t.status.category === cat)
         .filter((t) => showEpics.value || t.type !== "epic")
@@ -161,7 +163,7 @@ export function useProjectBoard(
           if (cat !== "closed") return true;
           return new Date(t.updated_at).getTime() >= closedCutoffMs;
         })
-        .sort((a, b) => effectivePosition(b) - effectivePosition(a));
+        .sort((a, b) => compareTickets(a, b, mode));
       return [{
         category: cat,
         displayName: head.display_name,

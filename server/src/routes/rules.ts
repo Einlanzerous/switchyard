@@ -208,8 +208,8 @@ export function mount(app: OpenAPIHono) {
     const conds: SQL[] = [eq(schema.ruleFirings.rule_id, id)];
     if (q.cursor) {
       const cur = decodeCursor(q.cursor);
-      if (!cur) throw badRequest("invalid cursor");
-      conds.push(lt(schema.ruleFirings.created_at, cur.u));
+      if (!cur || cur.k === null) throw badRequest("invalid cursor");
+      conds.push(lt(schema.ruleFirings.created_at, cur.k));
     }
 
     const rows = await db.select().from(schema.ruleFirings)
@@ -221,7 +221,7 @@ export function mount(app: OpenAPIHono) {
     const slice = has_more ? rows.slice(0, limit) : rows;
     const items = slice.map(mapRuleFiring);
     const last = has_more ? slice[slice.length - 1] : null;
-    const next_cursor = last ? encodeCursor({ u: last.created_at, i: last.id }) : null;
+    const next_cursor = last ? encodeCursor({ k: last.created_at, i: last.id }) : null;
     return c.json({ items, page: { next_cursor, has_more } }, 200);
   }) as any);
 

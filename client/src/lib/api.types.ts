@@ -5119,6 +5119,8 @@ export interface paths {
                     updated_before?: string;
                     due?: "overdue" | "this_week" | "none";
                     include_deleted?: boolean | null;
+                    sort_by?: "updated_at" | "due_date" | "created_at" | "priority";
+                    sort_order?: "asc" | "desc";
                     cursor?: string;
                     limit?: number;
                 };

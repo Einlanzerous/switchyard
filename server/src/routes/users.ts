@@ -147,8 +147,8 @@ export function mount(app: OpenAPIHono) {
       const cur = decodeCursor(q.cursor);
       if (!cur) throw badRequest("invalid cursor");
       conds.push(or(
-        sql`${schema.notifications.created_at} < ${cur.u}`,
-        sql`(${schema.notifications.created_at} = ${cur.u} AND ${schema.notifications.id} < ${cur.i})`
+        sql`${schema.notifications.created_at} < ${cur.k}`,
+        sql`(${schema.notifications.created_at} = ${cur.k} AND ${schema.notifications.id} < ${cur.i})`
       )!);
     }
 
@@ -238,7 +238,7 @@ export function mount(app: OpenAPIHono) {
     });
 
     const last = has_more ? trimmed[trimmed.length - 1] : null;
-    const next_cursor = last ? encodeCursor({ u: last.created_at, i: last.id }) : null;
+    const next_cursor = last ? encodeCursor({ k: last.created_at, i: last.id }) : null;
     return c.json({ items, page: { next_cursor, has_more } }, 200);
   }) as any);
 

@@ -11,10 +11,12 @@ import { Switch } from "@/components/ui/switch";
 import BoardColumn from "@/components/tickets/BoardColumn.vue";
 import InsightsTabs from "@/components/dashboard/InsightsTabs.vue";
 import ProjectHeaderLabel from "@/components/projects/ProjectHeaderLabel.vue";
+import SortMenu from "@/components/tickets/SortMenu.vue";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
 import { useUiStore } from "@/stores/ui";
 import { useProjectBoard, type BoardColumn as Col } from "@/composables/useProjectBoard";
+import { SORT_MODES, type SortMode } from "@/lib/positions";
 
 const ui = useUiStore();
 import type { Resolution, TicketSummary } from "@switchyard/shared";
@@ -39,7 +41,22 @@ function setShowEpics(next: boolean) {
   router.replace({ query: q });
 }
 
-const { project, columns, isLoading, error, refetch, closedWindowDays } = useProjectBoard(projectKey, showEpics);
+// Sort mode also rides the URL. Default `smart` keeps the board looking
+// identical to today when nobody has due dates set; once dates exist, those
+// cards float to the top of each column.
+const VALID_MODES = new Set(SORT_MODES.map((m) => m.value));
+const sortMode = computed<SortMode>(() => {
+  const v = route.query.sort;
+  return typeof v === "string" && VALID_MODES.has(v as SortMode) ? (v as SortMode) : "smart";
+});
+function setSortMode(next: SortMode) {
+  const q = { ...route.query };
+  if (next === "smart") delete q.sort;
+  else q.sort = next;
+  router.replace({ query: q });
+}
+
+const { project, columns, isLoading, error, refetch, closedWindowDays } = useProjectBoard(projectKey, showEpics, sortMode);
 
 // ─── drop → transition wiring ────────────────────────────────────────────────
 
@@ -338,6 +355,12 @@ const errMessage = computed(() => {
           />
           Show epics
         </label>
+        <SortMenu
+          :model-value="sortMode"
+          :options="SORT_MODES"
+          label="Sort"
+          @update:model-value="setSortMode"
+        />
         <Button variant="outline" size="sm" class="h-8" @click="viewAsList">
           <List class="h-3.5 w-3.5 mr-1.5" /> List
         </Button>

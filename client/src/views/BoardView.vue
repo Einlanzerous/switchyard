@@ -11,7 +11,8 @@ import BoardCell from "@/components/boards/BoardCell.vue";
 import SwimlaneSelector, { type SwimlaneBy } from "@/components/boards/SwimlaneSelector.vue";
 import EditBoardDialog from "@/components/boards/EditBoardDialog.vue";
 import InsightsTabs from "@/components/dashboard/InsightsTabs.vue";
-import { effectivePosition } from "@/lib/positions";
+import SortMenu from "@/components/tickets/SortMenu.vue";
+import { compareTickets, SORT_MODES, type SortMode } from "@/lib/positions";
 import { useBoardDetail } from "@/composables/useBoards";
 import { useUiStore } from "@/stores/ui";
 import { api } from "@/lib/api";
@@ -38,6 +39,20 @@ const { board, columns, statusLookup, isLoading, error } = useBoardDetail(boardI
 const swimlaneBy = ref<SwimlaneBy>("none");
 const showEdit = ref(false);
 const ui = useUiStore();
+
+// Sort mode rides the URL; default `smart` means dated tickets float to the
+// top across projects — the explicit cross-board pain point Jira can't solve.
+const VALID_MODES = new Set(SORT_MODES.map((m) => m.value));
+const sortMode = computed<SortMode>(() => {
+  const v = route.query.sort;
+  return typeof v === "string" && VALID_MODES.has(v as SortMode) ? (v as SortMode) : "smart";
+});
+function setSortMode(next: SortMode) {
+  const q = { ...route.query };
+  if (next === "smart") delete q.sort;
+  else q.sort = next;
+  router.replace({ query: q });
+}
 
 // Default project for the create dialog: first project on the board. Users
 // can pick another from the project select inside the dialog.
@@ -112,10 +127,13 @@ function groupByCategory(tickets: TicketSummary[]): Map<StatusCategory, TicketSu
     const arr = out.get(t.status.category);
     if (arr) arr.push(t);
   }
-  // Sort by effective position descending — manual reorders win, legacy rows
-  // fall through to updated_at via effectivePosition.
+  // Sort mode is guidance, not restriction: `smart` floats dated tickets to
+  // the top, position still wins as the tiebreaker so manual drag still
+  // matters. Other modes are explicit user picks (priority, recently
+  // updated, etc.).
+  const mode = sortMode.value;
   for (const arr of out.values()) {
-    arr.sort((a, b) => effectivePosition(b) - effectivePosition(a));
+    arr.sort((a, b) => compareTickets(a, b, mode));
   }
   return out;
 }
@@ -326,6 +344,12 @@ const errMessage = computed(() => {
         />
         <div class="flex-1 min-w-0" />
         <SwimlaneSelector v-model="swimlaneBy" />
+        <SortMenu
+          :model-value="sortMode"
+          :options="SORT_MODES"
+          label="Sort"
+          @update:model-value="setSortMode"
+        />
         <Button variant="outline" size="sm" class="h-8" :disabled="!board" @click="showEdit = true">
           <Pencil class="h-3.5 w-3.5 mr-1.5" /> Edit
         </Button>

@@ -7,6 +7,7 @@ import {
   Ticket, TicketSummary, CreateTicket, UpdateTicket, TransitionTicket, MoveTicket,
   TicketListFilters, Event, paginated, Pagination,
   StatusCategory, TicketType,
+  type TicketSortBy, type TicketSortOrder,
   type TicketSummary as ApiTicketSummary,
   type EventType,
 } from "@switchyard/shared";
@@ -17,7 +18,10 @@ import { idempotency } from "../lib/idempotency.js";
 import { errorResponses, okJson, createdJson, noContent, checkScope, z, idempotencyHeader } from "./_helpers.js";
 import { mapEvent, mapTicketSummary, mapStatusRef, mapUserRef, mapProjectRef } from "../lib/mappers.js";
 import { resolveTicket, getProjectByKey, getProjectById, getStatusById, getUserById } from "../lib/lookups.js";
-import { buildPage, cursorOrderBy, cursorWhere, decodeCursor } from "../lib/pagination.js";
+import {
+  buildPage, cursorOrderBy, cursorWhere, cursorWhereSorted, decodeCursor,
+  sortedOrderBy, type SortKey,
+} from "../lib/pagination.js";
 import { writeEvent } from "../lib/events.js";
 import {
   loadTicketDetail, loadTicketSummary, allocateTicketNumber, fetchExternalRefsByTicket,
@@ -31,6 +35,71 @@ const idOrKey = z.string().min(1);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const STATUS_CATEGORIES = new Set<string>(StatusCategory.options);
 const TICKET_TYPES = new Set<string>(TicketType.options);
+
+// Priority ordinal — sortable integer expression for cursor pagination and
+// ORDER BY. Returns NULL when the row's priority is NULL so the SortKey's
+// nulls-last machinery does the right thing.
+const PRIORITY_ORDINAL = sql<number>`CASE ${schema.tickets.priority}
+  WHEN 'critical' THEN 4
+  WHEN 'high' THEN 3
+  WHEN 'medium' THEN 2
+  WHEN 'low' THEN 1
+END`;
+
+// Natural sort direction per key — when the client doesn't specify
+// sort_order, this is what they get.
+const NATURAL_DIR: Record<TicketSortBy, "asc" | "desc"> = {
+  updated_at: "desc",
+  due_date: "asc",
+  created_at: "desc",
+  priority: "desc",
+};
+
+// Map (sort_by, sort_order) → the SortKey passed to cursorWhereSorted /
+// sortedOrderBy AND the matching keyOf accessor used to compute next_cursor.
+// Keeping these two in lockstep is the whole point of the function — drift
+// here means the cursor encodes a different value than the WHERE clause
+// compares against.
+type TicketRow = typeof schema.tickets.$inferSelect;
+
+function resolveTicketSort(
+  sort_by: TicketSortBy | undefined,
+  sort_order: TicketSortOrder | undefined,
+): { key: SortKey; keyOf: (t: TicketRow) => string | null } {
+  const by = sort_by ?? "updated_at";
+  const dir = sort_order ?? NATURAL_DIR[by];
+
+  switch (by) {
+    case "updated_at":
+      return {
+        key: { col: schema.tickets.updated_at, dir, nullable: false },
+        keyOf: (t) => String(t.updated_at),
+      };
+    case "created_at":
+      return {
+        key: { col: schema.tickets.created_at, dir, nullable: false },
+        keyOf: (t) => String(t.created_at),
+      };
+    case "due_date":
+      return {
+        key: { col: schema.tickets.due_date, dir, nullable: true },
+        keyOf: (t) => t.due_date === null ? null : String(t.due_date),
+      };
+    case "priority":
+      return {
+        key: { col: PRIORITY_ORDINAL, dir, nullable: true },
+        keyOf: (t) => {
+          switch (t.priority) {
+            case "critical": return "4";
+            case "high": return "3";
+            case "medium": return "2";
+            case "low": return "1";
+            default: return null;
+          }
+        },
+      };
+  }
+}
 
 const list = createRoute({
   method: "get", path: "/v1/tickets", tags: [tag], summary: "List tickets",
@@ -218,10 +287,12 @@ export function mount(app: OpenAPIHono) {
       );
     }
 
+    const sort = resolveTicketSort(q.sort_by, q.sort_order);
+
     if (q.cursor) {
       const cur = decodeCursor(q.cursor);
       if (!cur) throw badRequest("invalid cursor");
-      conds.push(cursorWhere(schema.tickets.updated_at, schema.tickets.id, cur));
+      conds.push(cursorWhereSorted(sort.key, schema.tickets.id, cur));
     }
 
     const assignee = alias(schema.users, "assignee");
@@ -240,7 +311,7 @@ export function mount(app: OpenAPIHono) {
       .leftJoin(assignee, eq(schema.tickets.assignee_id, assignee.id))
       .innerJoin(reporter, eq(schema.tickets.reporter_id, reporter.id))
       .where(conds.length > 0 ? and(...conds) : undefined)
-      .orderBy(...cursorOrderBy(schema.tickets.updated_at, schema.tickets.id))
+      .orderBy(...sortedOrderBy(sort.key, schema.tickets.id))
       .limit(limit + 1);
 
     const ticketIds = rows.map((r) => r.t.id);
@@ -261,7 +332,16 @@ export function mount(app: OpenAPIHono) {
       })
     );
 
-    return c.json(buildPage(summaries, limit), 200);
+    // Cursor encodes the sort column's value for the last visible row so the
+    // next page picks up exactly where this one ended.
+    const summaryToRow = new Map(rows.map((r) => [r.t.id, r.t]));
+    return c.json(
+      buildPage(summaries, limit, (s) => {
+        const row = summaryToRow.get(s.id);
+        return row ? sort.keyOf(row) : null;
+      }),
+      200,
+    );
   }) as any);
 
   // ─── detail ──────────────────────────────────────────────────────────────
@@ -762,10 +842,11 @@ export function mount(app: OpenAPIHono) {
     const conds: SQL[] = [eq(schema.events.ticket_id, ticket.id)];
     if (q.cursor) {
       const cur = decodeCursor(q.cursor);
-      if (!cur) throw badRequest("invalid cursor");
+      if (!cur || cur.k === null) throw badRequest("invalid cursor");
+      const k = cur.k;
       conds.push(or(
-        lt(schema.events.created_at, cur.u),
-        and(eq(schema.events.created_at, cur.u), lt(schema.events.id, cur.i))!,
+        lt(schema.events.created_at, k),
+        and(eq(schema.events.created_at, k), lt(schema.events.id, cur.i))!,
       )!);
     }
 
@@ -779,7 +860,7 @@ export function mount(app: OpenAPIHono) {
     const items = slice.map(mapEvent);
     const last = has_more ? slice[slice.length - 1] : null;
     const next_cursor = last
-      ? Buffer.from(JSON.stringify({ u: last.created_at, i: last.id }), "utf8").toString("base64url")
+      ? Buffer.from(JSON.stringify({ k: last.created_at, i: last.id }), "utf8").toString("base64url")
       : null;
 
     return c.json({ items, page: { next_cursor, has_more } }, 200);

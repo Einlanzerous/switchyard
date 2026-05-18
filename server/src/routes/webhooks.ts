@@ -189,11 +189,12 @@ export function mount(app: OpenAPIHono) {
     const conds: SQL[] = [eq(schema.webhookDeliveries.subscription_id, id)];
     if (q.cursor) {
       const cur = decodeCursor(q.cursor);
-      if (!cur) throw badRequest("invalid cursor");
+      if (!cur || cur.k === null) throw badRequest("invalid cursor");
+      const k = cur.k;
       conds.push(or(
-        lt(schema.webhookDeliveries.created_at, cur.u),
+        lt(schema.webhookDeliveries.created_at, k),
         and(
-          eq(schema.webhookDeliveries.created_at, cur.u),
+          eq(schema.webhookDeliveries.created_at, k),
           lt(schema.webhookDeliveries.id, cur.i),
         )!,
       )!);
@@ -208,7 +209,7 @@ export function mount(app: OpenAPIHono) {
     const slice = has_more ? rows.slice(0, limit) : rows;
     const items = slice.map(mapWebhookDelivery);
     const last = has_more ? slice[slice.length - 1] : null;
-    const next_cursor = last ? encodeCursor({ u: last.created_at, i: last.id }) : null;
+    const next_cursor = last ? encodeCursor({ k: last.created_at, i: last.id }) : null;
 
     return c.json({ items, page: { next_cursor, has_more } }, 200);
   }) as any);
