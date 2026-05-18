@@ -9,6 +9,7 @@ COPY tsconfig.base.json ./
 COPY shared/package.json ./shared/
 COPY server/package.json ./server/
 COPY client/package.json ./client/
+COPY mcp/package.json ./mcp/
 
 RUN bun install --frozen-lockfile || bun install
 
