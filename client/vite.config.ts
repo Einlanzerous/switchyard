@@ -2,11 +2,13 @@ import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import { fileURLToPath, URL } from "node:url";
 
-// Dev-server proxy target. Defaults to the deployed backend at :4002 (the
-// way the user runs local dev), but CI overrides this so the E2E suite
-// can talk to a backend booted against switchyard_test rather than the
-// shared deployed instance reading prod data. See .github/workflows/e2e.yml.
-const apiProxyTarget = process.env.VITE_API_PROXY_TARGET ?? "http://localhost:4002";
+// Dev-server proxy target. Defaults to a locally-running backend on :4012
+// (start it with `PORT=4012 bun run dev:server` pointed at switchyard_test
+// so dev never writes to prod data). CI overrides this so the E2E suite can
+// talk to its own backend; the deployed prod backend on :4002 can be
+// targeted explicitly via `VITE_API_PROXY_TARGET=http://localhost:4002` when
+// you need read-only debugging against live data.
+const apiProxyTarget = process.env.VITE_API_PROXY_TARGET ?? "http://localhost:4012";
 
 export default defineConfig({
   plugins: [vue()],
