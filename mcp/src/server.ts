@@ -6,6 +6,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerProjectTools } from "./tools/projects.js";
+import { registerTicketTools } from "./tools/tickets.js";
 
 export function buildServer(): McpServer {
   const server = new McpServer(
@@ -23,6 +24,7 @@ export function buildServer(): McpServer {
   );
 
   registerProjectTools(server);
+  registerTicketTools(server);
 
   return server;
 }
