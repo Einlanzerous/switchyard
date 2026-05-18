@@ -15,7 +15,7 @@ The human sees a UI. The agents see a clean, typed, idempotent HTTP API with cur
 
 ## What's shipped
 
-Phases 1–4 are complete; Phase 5 (cross-system orchestration via plugins + observability) is the next milestone. See [`PHASES.md`](./PHASES.md) for the full plan and architectural decisions.
+Phases 1–4 are complete and Phase 5.0 (switchyard MCP server) has landed; remaining Phase 5 milestones (observability, plugin contract, Cline integration spike) are the next chunk. See [`PHASES.md`](./PHASES.md) for the full plan and architectural decisions.
 
 ### Phase 1 — Backend API
 
