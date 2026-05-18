@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeAll } from "bun:test";
-import { connectTestClient } from "./helpers.js";
+import { connectTestClient, installFetchRecorder } from "./helpers.js";
 
 beforeAll(() => {
   process.env.SWITCHYARD_TOKEN = "test-token";
@@ -96,6 +96,28 @@ describe("query_my_open", () => {
     } finally {
       await close();
       globalThis.fetch = originalFetch;
+    }
+  });
+
+  test("surfaces 401 from /users/me before reaching /v1/tickets", async () => {
+    // The recorder responds to every call; here the /users/me call returns
+    // 401 first, so the tool short-circuits and never queries /v1/tickets.
+    const recorder = installFetchRecorder({
+      status: 401,
+      body: { error: { code: "unauthorized", message: "missing or invalid token" } },
+    });
+    const { client, close } = await connectTestClient();
+    try {
+      const res = await client.callTool({ name: "query_my_open", arguments: {} });
+      expect(res.isError).toBe(true);
+      const text = (res.content as Array<{ type: string; text: string }>)[0]!.text;
+      expect(text).toContain("switchyard error [unauthorized]");
+      // Only the /users/me call should have happened.
+      expect(recorder.calls).toHaveLength(1);
+      expect(recorder.calls[0]!.url).toContain("/v1/users/me");
+    } finally {
+      await close();
+      recorder.restore();
     }
   });
 });
