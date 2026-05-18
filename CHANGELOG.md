@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.17.0](https://github.com/Einlanzerous/switchyard/compare/v2.16.0...v2.17.0) (2026-05-18)
+
+
+### Features
+
+* SWY-44 — Phase 4.8 sort tickets by due date (incl. cross-board) ([0f3482a](https://github.com/Einlanzerous/switchyard/commit/0f3482acb17bb4f7a8281cc6aa5df301cae7056f))
+* SWY-44 — Phase 4.8 sort tickets by due date (incl. cross-board) ([ed78f85](https://github.com/Einlanzerous/switchyard/commit/ed78f854d1dbb5a2231d0829e5d33b0ce716ffd0))
+* SWY-54 + 55 + 56 — Phase 4.12 deploy disruption reduction ([012fab7](https://github.com/Einlanzerous/switchyard/commit/012fab7a568df4008ab279b7ea98d15a5e775144))
+* SWY-54 + 55 + 56 — Phase 4.12 deploy disruption reduction ([d1b8ef0](https://github.com/Einlanzerous/switchyard/commit/d1b8ef004b3fdccc8d840e6e9fbfd8ec4a804481))
+
+
+### Bug Fixes
+
+* focus the actual &lt;input&gt; on the login view ([851fb82](https://github.com/Einlanzerous/switchyard/commit/851fb82e042e5ec2a8a64c9a52907bf90ec0fab6))
+* smart sort drops due-date primary so drag wins ([95aa400](https://github.com/Einlanzerous/switchyard/commit/95aa40068379acc182c114987dac1316a8019614))
+
 ## [2.16.0](https://github.com/Einlanzerous/switchyard/compare/v2.15.0...v2.16.0) (2026-05-15)
 
 
