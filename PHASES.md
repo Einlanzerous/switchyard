@@ -412,28 +412,35 @@ Out of scope for Phase 4 (incl. 4.5):
 - "Run rule now" debug button.
 - True zero-downtime deploys (blue/green) — deferred to Phase 5; 4.12a is expected to cover most cases.
 
-## Phase 5 — Cross-system orchestration (plugins + observability)
+## Phase 5 — Agent orchestration & observability
 
-Phase 5 graduates switchyard from "task tracker with an agent-friendly API" to "orchestration cockpit for many projects" — without absorbing every other system's identity. Tracked as **SWY-45 epic**.
+Phase 5 hardens switchyard as the **agent-facing source of truth** — the place every coding agent (today: Claude, Gemma 31b via imperium-loop; tomorrow: optionally Cline) reads and writes work — and instruments the agentic pipeline so cycle-time decisions stop being vibes. Tracked as **SWY-45 epic**.
 
 ### Locked decisions for Phase 5
 
-- **Switchyard renders, plugins own their data.** External systems (imperium-loop first, others later) surface read-only widgets via a small plugin contract. We do NOT bring live agent execution state into switchyard's DB.
+- **Imperium-loop stays whole.** The n8n + Servo-Signal + Autosavant pipeline keeps running as-is. Phase 5 adds infrastructure imperium-loop can *optionally* consume (MCP server), not a replacement.
+- **MCP server first, not last.** Originally deferred behind a "skill teaches conventions" bet. The launch of Cline Kanban (Feb 2026) and the broader 2026 reality of MCP as the canonical agent integration protocol changes the calculus — MCP is now the bridge every consumer (imperium-loop nodes, Claude Code, Cline experiments, future tools) benefits from equally.
+- **Hand-curated MCP, generated types underneath (Option C).** ~8–10 tools shaped for LLM consumption — descriptions written for agents, composed workflows where useful, invariants the OpenAPI schema can't express (PATCH-vs-transition, idempotency, etc.) encoded in tool docs. Request/response TypeScript shapes come from `api.types.ts` (already generated) so HTTP plumbing stays current even when the maintained MCP surface lags behind new endpoints. Auto-gen alone was rejected because tool descriptions are noise and the 50+ endpoint surface bloats agent context with admin tools agents shouldn't call.
+- **Cline is exploration, not foundation.** We don't build *for* Cline; we build the MCP server and skill for the current setup (imperium-loop's agents) and test whether Cline Kanban consumes it via the standard MCP path. If yes, great. If no, no architectural reshuffle.
 - **Observability before zero-downtime deploys.** You can't tune what you can't see; capacity decisions wait on data. Blue/green deploy lands in Phase 5 only if Phase 4.12a turns out to be insufficient.
-- **No big-bang MCP server.** A skill (loadable by Claude Code, Gemini CLI, etc.) teaches the conventions; MCP only earns its keep when a real consumer hits a wall the skill can't fix.
+- **Switchyard renders, plugins own their data.** Plugin contract (5.2) lets external systems surface read-only widgets in switchyard without polluting its DB. Comes after MCP because MCP is what unlocks broader agent integration; plugin contract is the inverse direction (external → switchyard UI).
 
 ### Milestones
 
-- **5.0 — Integration plugin contract ⏳ (SWY-47).** Define and ship a small contract so external systems can surface live state inside switchyard without polluting its data model. Three pull endpoints per registered plugin (`/ticket/:key/activity`, `/project/:key/kpis`, `/webhook` for push updates) + a `integration_plugins` table for registration (name, base_url, auth_token_hash, enabled, capabilities). Switchyard caches responses 30s and skips plugins that don't respond < 1s. UI: drawer Integrations row + project Insights "From integrations" KPI tile row + Settings → Integrations admin. Imperium-loop is the first consumer (n8n workflow `switchyard-plugin` exposes the three endpoints).
+- **5.0 — Switchyard MCP server ⏳ (SWY-36).** New top-level `mcp/` package. Stdio transport (Claude Desktop, Cline, Claude Code, Gemini CLI install patterns); HTTP transport optional for remote consumers. Hand-curated tool surface:
+  - **Reads:** `list_tickets` (filter shape mirrors `/v1/tickets` incl. SWY-44 `sort_by`), `get_ticket`, `list_projects`, `get_project_statuses`, `query_my_open` (sugar over list_tickets).
+  - **Writes:** `create_ticket`, `update_ticket` (PATCH, no status — the invariant is in the tool description), `transition_ticket` (status change with required resolution when closing, optional comment), `comment_on_ticket`, `move_ticket` (Phase 4.10 feature).
+  - **Auth:** `SWITCHYARD_TOKEN` env per actor (`claude`, `n8n-cogitation`, etc. — same per-agent token model in use today). `SWITCHYARD_URL` env defaults to `http://localhost:4002`.
+  - **HTTP plumbing:** openapi-fetch against `api.types.ts` (generated from `openapi.yaml`), copied or symlinked into `mcp/`. New REST endpoint doesn't auto-land in MCP — explicit curation by design.
+  - **Distribution:** `bun link` for local dev, eventually `npm publish` as `@switchyard/mcp` once stable.
+  - **Out of scope:** attachments (multipart over MCP is awkward — defer until a consumer asks); webhook/rule subscriptions (separate primitive); resource-style ticket pages (start tools-only).
 - **5.1 — Observability for the agentic pipeline ⏳ (SWY-48).** Decision document FIRST — measure custom-metric volume vs. Datadog free tier, then pick between Datadog / OpenTelemetry + Grafana / SigNoz / in-house build. Once chosen, emit structured metrics from every service family (n8n cogitation-engine, servo-signal, autosavant-bot, switchyard backend, Anthropic/Gemini API spend). Four dashboards (bottleneck / cost-per-ticket / cycle health / capacity headroom) and five alerts (HITL stalls, cycle-time regressions, API rate-limit hits, cost spikes, sandbox zombies). Surface 3 KPI tiles in switchyard via the SWY-47 plugin contract; deep dashboards live in the chosen backend.
-- **5.2 — AI tool integration (skill-first; MCP optional) ⏳ (SWY-36).** Ship a switchyard skill loadable by Claude Code, plus parallel materials for Gemini CLI and any other shell-capable LLM tool. The skill teaches:
-  - Auth: bearer-token format `sw_<32>`; minting per-tool tokens via `POST /v1/users/{id}/tokens`; the canonical agent users (`claude`, `n8n-cogitation`, `servo-signal`, etc.) and what `rules-engine` is.
-  - Conventions: cursor pagination, idempotency keys, structured error envelope, `Idempotency-Key` header.
-  - Common workflows: create ticket, transition (vs PATCH — PATCH never changes status), comment, query "my open tickets", attach a file.
-  - Webhook + rule signing: how to verify HMAC; Node + Python snippets.
-  - Pointers: `openapi.yaml`, `GET /v1/openapi.json`, the "How agents use this API" README section.
-
-  MCP server is deferred. The REST API was designed for agent consumption in Phase 1; a skill loads the conventions into the LLM's working context without adding a new moving part. MCP earns its keep when one of these shows up: LLM tool that can't shell out (Cursor, Codeium, gated-Bash configs); resource subscriptions wanted (live ticket counts in an IDE sidebar); cross-client tool catalog where re-loading the skill per client is friction. If/when MCP lands, it should be a thin wrapper over `openapi.yaml` — generated, not hand-rolled, so it doesn't drift.
+- **5.2 — Integration plugin contract ⏳ (SWY-47).** Lets external systems surface live state inside switchyard without polluting its data model. Three pull endpoints per registered plugin (`/ticket/:key/activity`, `/project/:key/kpis`, `/webhook` for push updates) + an `integration_plugins` table for registration (name, base_url, auth_token_hash, enabled, capabilities). Switchyard caches responses 30s and skips plugins that don't respond < 1s. UI: drawer Integrations row + project Insights "From integrations" KPI tile row + Settings → Integrations admin. Imperium-loop is the first consumer (n8n workflow `switchyard-plugin` exposes the three endpoints, surfacing live agent run-state on the relevant tickets).
+- **5.3 — Cline integration spike ⏳ (new ticket TBD).** Treat as exploration, not strategic dependency. Decision document FIRST: does Cline Kanban (the agents running inside it) consume the switchyard MCP server out of the box, and does that produce a usable workflow? Test plan:
+  - Install switchyard MCP server in a fresh Cline Kanban setup.
+  - Mint a per-actor token (`cline-magos` or similar) against `switchyard_test`.
+  - Try driving a real-ish workflow: dictate a ticket via Vox-Dictate path → switchyard → trigger Cline Kanban agent → agent reads ticket via MCP, works in worktree, comments back on the ticket → ticket transitions on PR merge.
+  - **Outcomes:** (a) works end-to-end → keep Cline as an optional consumer alongside imperium-loop, document the setup. (b) partial / clunky → write down the gaps, defer further work. (c) "fuck it, we build it ourselves" → file follow-ups for native worktree-per-card / agent invocation features on switchyard's own kanban. This third path is only entertained if the first two reveal blockers worth the cost of building our own.
 
 ### Candidates queued but not yet ticketed
 

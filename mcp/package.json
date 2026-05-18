@@ -1,0 +1,27 @@
+{
+  "name": "@switchyard/mcp",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Model Context Protocol server for switchyard. Lets MCP-aware agents (Claude Desktop, Claude Code, Cline, Gemini CLI, etc.) read and write switchyard tickets through a hand-curated tool surface.",
+  "bin": {
+    "switchyard-mcp": "./src/index.ts"
+  },
+  "main": "./src/index.ts",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "build": "bun build src/index.ts --target=node --outdir=dist",
+    "test": "bun test",
+    "api:gen": "bunx openapi-typescript ../openapi.yaml -o ./src/api.types.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "openapi-fetch": "^0.13.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.14",
+    "openapi-typescript": "^7.4.0"
+  }
+}
