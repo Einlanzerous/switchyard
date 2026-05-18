@@ -12,9 +12,24 @@ plumbing stays in lockstep with the REST API automatically.
 
 ## Status
 
-Phase 5.0 in flight. Working today: scaffold, stdio transport, `list_projects`.
-Full tool surface (`list_tickets`, `create_ticket`, `transition_ticket`,
-`comment_on_ticket`, etc.) lands in follow-up commits on the same branch.
+Phase 5.0 v1 tool surface complete. Stdio transport, in-memory test
+harness, nine tools registered:
+
+| Tool | Kind | Purpose |
+|---|---|---|
+| `list_projects` | read | Project discovery / routing |
+| `get_project_statuses` | read | Resolve status UUIDs before transitioning |
+| `list_tickets` | read | Search/filter with full `/v1/tickets` filter shape |
+| `get_ticket` | read | Fetch one ticket by key or UUID |
+| `query_my_open` | read | Sugar for "what's on my plate" |
+| `create_ticket` | write | New ticket; omit `status_id` for project default |
+| `update_ticket` | write | PATCH; **never** changes status (use `transition_ticket`) |
+| `transition_ticket` | write | Status change; resolution required on close; optional atomic comment |
+| `comment_on_ticket` | write | Standalone comment |
+| `move_ticket` | write | Cross-project move (allocates new key, alias preserved) |
+
+Out of scope for this phase (deferred): attachments, webhook/rule
+subscriptions, resource-style ticket pages.
 
 ## Configuration
 
@@ -64,6 +79,19 @@ Claude Code MCP config):
 Cline's MCP config lives under the gear icon → MCP Servers. Same shape as
 above. The switchyard MCP server will appear in the agent's tool list once
 saved; no restart required (Cline hot-reloads MCP configs).
+
+## Tests
+
+```sh
+bun run test:mcp     # from repo root
+# or
+cd mcp && bun test
+```
+
+Uses the MCP SDK's `InMemoryTransport` to wire a client and the real
+server through paired transports in-process, then mocks global `fetch`
+to assert each tool calls the right endpoint with the right body shape.
+No backend required.
 
 ## Smoke test (manual)
 
