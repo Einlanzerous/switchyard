@@ -103,3 +103,59 @@ END $$;
 UPDATE tickets
    SET position = EXTRACT(EPOCH FROM updated_at) * 1000
  WHERE position IS NULL;
+
+-- ─── LLM observability (SWY-48 / Phase 5.1) ─────────────────────────────────
+-- model_pricing periods must not overlap for any (model, provider) pair,
+-- or the llm_observations_with_cost view would multiply observation rows
+-- across overlapping pricing periods. Postgres tstzrange + EXCLUDE handles
+-- this declaratively. btree_gist is needed for the equality piece.
+CREATE EXTENSION IF NOT EXISTS btree_gist;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'model_pricing_no_overlap'
+  ) THEN
+    ALTER TABLE model_pricing
+      ADD CONSTRAINT model_pricing_no_overlap
+      EXCLUDE USING gist (
+        model WITH =,
+        provider WITH =,
+        tstzrange(effective_from, COALESCE(effective_to, 'infinity'::timestamptz)) WITH &&
+      );
+  END IF;
+END $$;
+
+-- Cost-on-the-fly view. Joins each observation to the model_pricing row
+-- whose [effective_from, effective_to) range contains occurred_at. Local
+-- models seeded with zero rates resolve to cost_usd = 0 without special-
+-- casing. NULL pricing (no matching row) yields NULL cost_usd, which the
+-- UI surfaces as "unpriced" so the gap is visible.
+CREATE OR REPLACE VIEW llm_observations_with_cost AS
+SELECT
+  o.*,
+  p.input_usd_per_mtok,
+  p.output_usd_per_mtok,
+  p.cache_creation_multiplier,
+  p.cache_read_multiplier,
+  CASE
+    WHEN p.id IS NULL THEN NULL
+    ELSE (
+      (o.input_tokens / 1000000.0) * p.input_usd_per_mtok
+      + (o.output_tokens / 1000000.0) * p.output_usd_per_mtok
+      + (COALESCE(o.cache_creation_input_tokens, 0) / 1000000.0)
+          * p.input_usd_per_mtok * p.cache_creation_multiplier
+      + (COALESCE(o.cache_read_input_tokens, 0) / 1000000.0)
+          * p.input_usd_per_mtok * p.cache_read_multiplier
+    )
+  END AS cost_usd
+FROM llm_observations o
+LEFT JOIN model_pricing p
+  ON p.model = o.model
+  AND p.provider = o.provider
+  AND o.occurred_at >= p.effective_from
+  AND (p.effective_to IS NULL OR o.occurred_at < p.effective_to);
+
+COMMENT ON VIEW llm_observations_with_cost IS
+  'Observations joined to point-in-time pricing. cost_usd is NULL when no pricing row covers occurred_at.';

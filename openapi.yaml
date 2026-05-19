@@ -2387,6 +2387,7 @@ paths:
                               - users:manage
                               - rules:manage
                               - targets:manage
+                              - llm-obs:write
                               - admin
                         last_used_at:
                           type: string
@@ -32245,6 +32246,301 @@ paths:
                 required:
                   - items
                   - page
+        "400":
+          description: bad request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "401":
+          description: unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "403":
+          description: forbidden
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "404":
+          description: not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "409":
+          description: conflict
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "422":
+          description: unprocessable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "500":
+          description: internal
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+  /v1/llm-observations:
+    post:
+      tags:
+        - LLM Observations
+      summary: Bulk-write LLM per-call observations
+      description: Accept up to 500 observations per request. Each observation may
+        carry a `dedup_key` for at-most-once writes via `INSERT ... ON CONFLICT
+        DO NOTHING` — safe to retry a partially-applied batch. Unknown
+        service/operation/model/provider values land successfully and surface in
+        the response's `pending_captured` for admin review.
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 128
+          required: false
+          name: idempotency-key
+          in: header
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                observations:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      occurred_at:
+                        type: string
+                        format: date-time
+                      ticket_key:
+                        type: string
+                        minLength: 1
+                        maxLength: 64
+                      service:
+                        type: string
+                        minLength: 1
+                        maxLength: 128
+                      operation:
+                        type: string
+                        minLength: 1
+                        maxLength: 128
+                      model:
+                        type: string
+                        minLength: 1
+                        maxLength: 128
+                      provider:
+                        type: string
+                        minLength: 1
+                        maxLength: 128
+                      input_tokens:
+                        type: integer
+                        minimum: 0
+                      output_tokens:
+                        type: integer
+                        minimum: 0
+                      cache_creation_input_tokens:
+                        type: integer
+                        minimum: 0
+                      cache_read_input_tokens:
+                        type: integer
+                        minimum: 0
+                      latency_ms:
+                        type: integer
+                        minimum: 0
+                      error_code:
+                        type: string
+                        minLength: 1
+                        maxLength: 64
+                      dedup_key:
+                        type: string
+                        minLength: 1
+                        maxLength: 256
+                      metadata:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - occurred_at
+                      - service
+                      - operation
+                      - model
+                      - provider
+                      - input_tokens
+                      - output_tokens
+                      - latency_ms
+                  minItems: 1
+                  maxItems: 500
+              required:
+                - observations
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accepted:
+                    type: integer
+                    minimum: 0
+                  deduplicated:
+                    type: integer
+                    minimum: 0
+                  pending_captured:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        dimension:
+                          type: string
+                          enum:
+                            - service
+                            - operation
+                            - model
+                            - provider
+                        value:
+                          type: string
+                      required:
+                        - dimension
+                        - value
+                required:
+                  - accepted
+                  - deduplicated
+                  - pending_captured
         "400":
           description: bad request
           content:

@@ -963,3 +963,179 @@ export const ticketAliases = pgTable(
     ticketIdx: index("ticket_aliases_ticket_idx").on(t.ticket_id),
   })
 );
+
+// ─── LLM observability (SWY-48 / Phase 5.1) ─────────────────────────────────
+// Raw per-call LLM observations emitted by every pipeline service (n8n-
+// cogitation, servo-signal, autosavant-bot). Cost is NOT stored — see the
+// llm_observations_with_cost view in triggers.sql, which joins to
+// model_pricing at query time so we never need to backfill on price changes.
+
+export const llmObservations = pgTable(
+  "llm_observations",
+  {
+    id: id(),
+    occurred_at: timestamp("occurred_at", { withTimezone: true, mode: "string" }).notNull(),
+    actor_id: uuid("actor_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    // Nullable: ambient ops (Scribe routing decisions) happen before a ticket
+    // exists. UI groups these as "Ambient" in the cost leaderboard.
+    ticket_id: uuid("ticket_id").references(() => tickets.id, { onDelete: "set null" }),
+    service: varchar("service", { length: 64 }).notNull(),
+    operation: varchar("operation", { length: 64 }).notNull(),
+    model: varchar("model", { length: 128 }).notNull(),
+    provider: varchar("provider", { length: 64 }).notNull(),
+    input_tokens: integer("input_tokens").notNull(),
+    output_tokens: integer("output_tokens").notNull(),
+    cache_creation_input_tokens: integer("cache_creation_input_tokens"),
+    cache_read_input_tokens: integer("cache_read_input_tokens"),
+    latency_ms: integer("latency_ms").notNull(),
+    error_code: varchar("error_code", { length: 64 }),
+    // Per-observation natural key for at-most-once writes. Partial unique
+    // index where not null lets emitters retry partial batches safely.
+    // Suggested shape: `<service>:<execution_id>:<node_or_op>:<turn>`.
+    dedup_key: varchar("dedup_key", { length: 256 }),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    created_at: createdAt(),
+  },
+  (t) => ({
+    occurredAtIdx: index("llm_observations_occurred_at_idx").on(sql`${t.occurred_at} DESC`),
+    // Composite for per-ticket cost decomposition + HITL stall detector's
+    // "max(occurred_at) WHERE ticket_id = X" absence-of-data query.
+    ticketIdx: index("llm_observations_ticket_idx").on(t.ticket_id, sql`${t.occurred_at} DESC`),
+    serviceOpIdx: index("llm_observations_service_op_idx").on(
+      t.service,
+      t.operation,
+      t.occurred_at,
+    ),
+    actorIdx: index("llm_observations_actor_idx").on(t.actor_id, t.occurred_at),
+    // Unique on dedup_key — lets the route use INSERT ... ON CONFLICT
+    // (dedup_key) DO NOTHING. Postgres treats NULL as distinct in unique
+    // indexes by default, so observations without a dedup_key (NULL) don't
+    // collide with each other — equivalent to a partial unique WHERE NOT
+    // NULL, but inference-friendly for ON CONFLICT (which requires the
+    // arbiter index predicate to match exactly).
+    dedupKeyUnique: uniqueIndex("llm_observations_dedup_key_unique").on(t.dedup_key),
+    tokensNonNeg: check(
+      "llm_observations_tokens_non_negative",
+      sql`${t.input_tokens} >= 0 AND ${t.output_tokens} >= 0 AND ${t.latency_ms} >= 0`,
+    ),
+  }),
+);
+
+// Pricing table consumed by the llm_observations_with_cost view. Periods
+// must not overlap for (model, provider) — a tstzrange exclusion constraint
+// in triggers.sql enforces that. effective_to NULL = currently in effect.
+export const modelPricing = pgTable(
+  "model_pricing",
+  {
+    id: id(),
+    model: varchar("model", { length: 128 }).notNull(),
+    provider: varchar("provider", { length: 64 }).notNull(),
+    input_usd_per_mtok: doublePrecision("input_usd_per_mtok").notNull(),
+    output_usd_per_mtok: doublePrecision("output_usd_per_mtok").notNull(),
+    // Multipliers applied to input_usd_per_mtok for cache reads/writes.
+    // Anthropic: cache create = 1.25x input, cache read = 0.1x input.
+    // Providers without prompt caching: leave both as 1.0 (or 0.0 to ignore).
+    cache_creation_multiplier: doublePrecision("cache_creation_multiplier")
+      .notNull()
+      .default(1.0),
+    cache_read_multiplier: doublePrecision("cache_read_multiplier").notNull().default(0.1),
+    effective_from: timestamp("effective_from", { withTimezone: true, mode: "string" }).notNull(),
+    effective_to: timestamp("effective_to", { withTimezone: true, mode: "string" }),
+    notes: text("notes"),
+    created_at: createdAt(),
+  },
+  (t) => ({
+    modelProviderIdx: index("model_pricing_model_provider_idx").on(t.model, t.provider),
+    nonNegRates: check(
+      "model_pricing_non_negative",
+      sql`${t.input_usd_per_mtok} >= 0 AND ${t.output_usd_per_mtok} >= 0 AND ${t.cache_creation_multiplier} >= 0 AND ${t.cache_read_multiplier} >= 0`,
+    ),
+  }),
+);
+
+// Hourly-rolled aggregates that drive the global Insights → LLM tab tiles.
+// Cost is frozen at rollup time (computed via the cost view, persisted here)
+// so price changes don't retroactively rewrite history. Daily rollups
+// persist forever; raw rows age out at llm_obs_retention_days.
+export const llmObservationsDaily = pgTable(
+  "llm_observations_daily",
+  {
+    id: id(),
+    // Truncated to the day in UTC. The rollup job runs hourly and updates
+    // "today's" row in place via ON CONFLICT.
+    bucket_date: timestamp("bucket_date", { withTimezone: true, mode: "string" }).notNull(),
+    service: varchar("service", { length: 64 }).notNull(),
+    operation: varchar("operation", { length: 64 }).notNull(),
+    model: varchar("model", { length: 128 }).notNull(),
+    provider: varchar("provider", { length: 64 }).notNull(),
+    // Nullable for cross-actor or cross-ticket rollups; we rollup at the
+    // full-dimension grain so the UI can filter/group on any of them.
+    actor_id: uuid("actor_id").references(() => users.id, { onDelete: "set null" }),
+    ticket_id: uuid("ticket_id").references(() => tickets.id, { onDelete: "set null" }),
+    call_count: integer("call_count").notNull(),
+    input_tokens: bigint("input_tokens", { mode: "number" }).notNull(),
+    output_tokens: bigint("output_tokens", { mode: "number" }).notNull(),
+    cache_creation_tokens: bigint("cache_creation_tokens", { mode: "number" }).notNull(),
+    cache_read_tokens: bigint("cache_read_tokens", { mode: "number" }).notNull(),
+    sum_latency_ms: bigint("sum_latency_ms", { mode: "number" }).notNull(),
+    p50_latency_ms: integer("p50_latency_ms").notNull(),
+    p95_latency_ms: integer("p95_latency_ms").notNull(),
+    p99_latency_ms: integer("p99_latency_ms").notNull(),
+    cost_usd_at_rollup: doublePrecision("cost_usd_at_rollup").notNull(),
+    error_count: integer("error_count").notNull(),
+    rolled_up_at: timestamp("rolled_up_at", { withTimezone: true, mode: "string" })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => ({
+    // Upsert key: one row per full dimension tuple per day.
+    bucketDimsUnique: uniqueIndex("llm_observations_daily_bucket_dims_unique").on(
+      t.bucket_date,
+      t.service,
+      t.operation,
+      t.model,
+      t.provider,
+      t.actor_id,
+      t.ticket_id,
+    ),
+    bucketIdx: index("llm_observations_daily_bucket_idx").on(sql`${t.bucket_date} DESC`),
+    ticketIdx: index("llm_observations_daily_ticket_idx").on(t.ticket_id, t.bucket_date),
+  }),
+);
+
+// Warn-list capture: dimension values seen in incoming observations that
+// aren't in system_settings.llm_obs_known_values. Surfaced in Admin →
+// Observability (5.1.2) with one-click promote (add to known_values) or
+// reject (future writes 422). Until then, capture only — endpoint still
+// writes the raw observation.
+export const llmObsPendingValues = pgTable(
+  "llm_obs_pending_values",
+  {
+    id: id(),
+    // "service" / "operation" / "model" / "provider"
+    dimension: varchar("dimension", { length: 32 }).notNull(),
+    value: varchar("value", { length: 128 }).notNull(),
+    first_seen_at: timestamp("first_seen_at", { withTimezone: true, mode: "string" })
+      .notNull()
+      .default(sql`now()`),
+    last_seen_at: timestamp("last_seen_at", { withTimezone: true, mode: "string" })
+      .notNull()
+      .default(sql`now()`),
+    observation_count: integer("observation_count").notNull().default(0),
+    // Set when an admin promotes (added to known_values) or rejects (future
+    // writes with this value return 422). NULL = pending review.
+    resolved_at: timestamp("resolved_at", { withTimezone: true, mode: "string" }),
+    resolution: varchar("resolution", { length: 16 }), // "promoted" | "rejected"
+  },
+  (t) => ({
+    dimValueUnique: uniqueIndex("llm_obs_pending_values_dim_value_unique").on(
+      t.dimension,
+      t.value,
+    ),
+    unresolvedIdx: index("llm_obs_pending_values_unresolved_idx")
+      .on(t.dimension, t.last_seen_at)
+      .where(sql`${t.resolved_at} IS NULL`),
+  }),
+);
