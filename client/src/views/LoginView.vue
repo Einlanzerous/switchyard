@@ -1,17 +1,30 @@
 <script setup lang="ts">
-import { ref, onMounted, useTemplateRef } from "vue";
+import { ref, onMounted, onBeforeUnmount, useTemplateRef, computed, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useQueryClient } from "@tanstack/vue-query";
-import { Loader2, KeyRound } from "lucide-vue-next";
+import { Loader2, KeyRound, QrCode, Camera, X } from "lucide-vue-next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { api, setStoredToken } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
 
+// BarcodeDetector isn't in lib.dom yet. Minimal shape for the calls we make.
+declare global {
+  interface Window {
+    BarcodeDetector?: {
+      new (opts?: { formats?: string[] }): {
+        detect: (source: CanvasImageSource) => Promise<Array<{ rawValue: string }>>;
+      };
+    };
+  }
+}
+
 const router = useRouter();
 const route = useRoute();
 const queryClient = useQueryClient();
+
+const mode = ref<"paste" | "scan">("paste");
 
 const token = ref("");
 const error = ref<string | null>(null);
@@ -22,7 +35,17 @@ const submitting = ref(false);
 // if the wrapper structure ever changes.
 const inputEl = useTemplateRef<{ $el?: HTMLInputElement } | null>("inputEl");
 
+const scanSupported = computed(
+  () => typeof window !== "undefined" && "BarcodeDetector" in window,
+);
+
+const videoEl = useTemplateRef<HTMLVideoElement>("videoEl");
+const scanError = ref<string | null>(null);
+let stream: MediaStream | null = null;
+let detectTimer: number | null = null;
+
 onMounted(() => inputEl.value?.$el?.focus?.());
+onBeforeUnmount(stopScan);
 
 async function submit() {
   const trimmed = token.value.trim();
@@ -52,6 +75,59 @@ async function submit() {
   const next = (route.query.next as string) || "/";
   router.replace(next);
 }
+
+async function startScan() {
+  scanError.value = null;
+  if (!window.BarcodeDetector) {
+    scanError.value = "Your browser doesn't support QR scanning.";
+    return;
+  }
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment" },
+      audio: false,
+    });
+    if (videoEl.value) {
+      videoEl.value.srcObject = stream;
+      await videoEl.value.play();
+    }
+    const detector = new window.BarcodeDetector({ formats: ["qr_code"] });
+    detectTimer = window.setInterval(async () => {
+      if (!videoEl.value || videoEl.value.readyState < 2) return;
+      try {
+        const codes = await detector.detect(videoEl.value);
+        const value = codes[0]?.rawValue?.trim();
+        if (value) {
+          token.value = value;
+          stopScan();
+          mode.value = "paste";
+          submit();
+        }
+      } catch {
+        // BarcodeDetector occasionally throws while the video is warming up — swallow and retry.
+      }
+    }, 200);
+  } catch (e: any) {
+    scanError.value = e?.message ?? "Couldn't access the camera.";
+  }
+}
+
+function stopScan() {
+  if (detectTimer !== null) {
+    window.clearInterval(detectTimer);
+    detectTimer = null;
+  }
+  if (stream) {
+    for (const track of stream.getTracks()) track.stop();
+    stream = null;
+  }
+  if (videoEl.value) videoEl.value.srcObject = null;
+}
+
+watch(mode, (m) => {
+  if (m === "scan") startScan();
+  else stopScan();
+});
 </script>
 
 <template>
@@ -62,10 +138,20 @@ async function submit() {
           <KeyRound class="h-5 w-5 text-primary-foreground" />
         </div>
         <CardTitle class="text-2xl">switchyard</CardTitle>
-        <CardDescription>Paste an API token to continue.</CardDescription>
+        <CardDescription>
+          {{
+            mode === "scan"
+              ? "Point your camera at a QR code from /settings/tokens."
+              : "Paste an API token to continue."
+          }}
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <form class="space-y-3" @submit.prevent="submit">
+        <form
+          v-if="mode === 'paste'"
+          class="space-y-3"
+          @submit.prevent="submit"
+        >
           <Input
             ref="inputEl"
             v-model="token"
@@ -87,7 +173,43 @@ async function submit() {
             <Loader2 v-if="submitting" class="h-4 w-4 mr-2 animate-spin" />
             {{ submitting ? "Verifying…" : "Log in" }}
           </Button>
+          <Button
+            v-if="scanSupported"
+            type="button"
+            variant="ghost"
+            class="w-full"
+            @click="mode = 'scan'"
+          >
+            <QrCode class="h-4 w-4 mr-2" /> Scan QR instead
+          </Button>
         </form>
+        <div v-else class="space-y-3">
+          <div class="relative aspect-square rounded-md overflow-hidden bg-black">
+            <video
+              ref="videoEl"
+              class="absolute inset-0 w-full h-full object-cover"
+              autoplay
+              muted
+              playsinline
+            />
+            <div class="absolute inset-6 border-2 border-white/40 rounded-md pointer-events-none" />
+          </div>
+          <p v-if="scanError" class="text-sm text-destructive" role="alert">
+            {{ scanError }}
+          </p>
+          <p v-else class="text-xs text-muted-foreground text-center inline-flex items-center justify-center w-full">
+            <Camera class="h-3 w-3 mr-1" />
+            Scanning… hold steady on the code.
+          </p>
+          <Button
+            type="button"
+            variant="ghost"
+            class="w-full"
+            @click="mode = 'paste'"
+          >
+            <X class="h-4 w-4 mr-2" /> Cancel
+          </Button>
+        </div>
       </CardContent>
       <CardFooter class="text-xs text-muted-foreground">
         <p>
