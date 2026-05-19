@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.20.0](https://github.com/Einlanzerous/switchyard/compare/v2.19.0...v2.20.0) (2026-05-19)
+
+
+### Features
+
+* SWY-48 5.1.0 — llm_observations schema + bulk endpoint ([b1d383d](https://github.com/Einlanzerous/switchyard/commit/b1d383d41ba3163c14991057425ec9d2586799ac))
+* SWY-48 5.1.0 — llm_observations schema + bulk endpoint ([b9aeb88](https://github.com/Einlanzerous/switchyard/commit/b9aeb882d922fe03ae951f837dbf29cf1fecc474))
+
 ## [2.19.0](https://github.com/Einlanzerous/switchyard/compare/v2.18.1...v2.19.0) (2026-05-18)
 
 
