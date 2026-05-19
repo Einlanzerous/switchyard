@@ -1689,7 +1689,7 @@ export interface paths {
                                 /** Format: uuid */
                                 user_id: string;
                                 name: string;
-                                scopes: ("tickets:read" | "tickets:write" | "comments:write" | "attachments:write" | "webhooks:manage" | "projects:manage" | "users:manage" | "rules:manage" | "targets:manage" | "admin")[];
+                                scopes: ("tickets:read" | "tickets:write" | "comments:write" | "attachments:write" | "webhooks:manage" | "projects:manage" | "users:manage" | "rules:manage" | "targets:manage" | "llm-obs:write" | "admin")[];
                                 /** Format: date-time */
                                 last_used_at: string | null;
                                 /** Format: date-time */
@@ -1850,7 +1850,7 @@ export interface paths {
                          *       "admin"
                          *     ]
                          */
-                        scopes?: ("tickets:read" | "tickets:write" | "comments:write" | "attachments:write" | "webhooks:manage" | "projects:manage" | "users:manage" | "rules:manage" | "targets:manage" | "admin")[];
+                        scopes?: ("tickets:read" | "tickets:write" | "comments:write" | "attachments:write" | "webhooks:manage" | "projects:manage" | "users:manage" | "rules:manage" | "targets:manage" | "llm-obs:write" | "admin")[];
                     };
                 };
             };
@@ -1867,7 +1867,7 @@ export interface paths {
                             /** Format: uuid */
                             user_id: string;
                             name: string;
-                            scopes: ("tickets:read" | "tickets:write" | "comments:write" | "attachments:write" | "webhooks:manage" | "projects:manage" | "users:manage" | "rules:manage" | "targets:manage" | "admin")[];
+                            scopes: ("tickets:read" | "tickets:write" | "comments:write" | "attachments:write" | "webhooks:manage" | "projects:manage" | "users:manage" | "rules:manage" | "targets:manage" | "llm-obs:write" | "admin")[];
                             /** Format: date-time */
                             last_used_at: string | null;
                             /** Format: date-time */
@@ -20967,6 +20967,205 @@ export interface paths {
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/llm-observations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk-write LLM per-call observations
+         * @description Accept up to 500 observations per request. Each observation may carry a `dedup_key` for at-most-once writes via `INSERT ... ON CONFLICT DO NOTHING` — safe to retry a partially-applied batch. Unknown service/operation/model/provider values land successfully and surface in the response's `pending_captured` for admin review.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: {
+                    "idempotency-key"?: string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        observations: {
+                            /** Format: date-time */
+                            occurred_at: string;
+                            ticket_key?: string;
+                            service: string;
+                            operation: string;
+                            model: string;
+                            provider: string;
+                            input_tokens: number;
+                            output_tokens: number;
+                            cache_creation_input_tokens?: number;
+                            cache_read_input_tokens?: number;
+                            latency_ms: number;
+                            error_code?: string;
+                            dedup_key?: string;
+                            metadata?: {
+                                [key: string]: unknown;
+                            };
+                        }[];
+                    };
+                };
+            };
+            responses: {
+                /** @description ok */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            accepted: number;
+                            deduplicated: number;
+                            pending_captured: {
+                                /** @enum {string} */
+                                dimension: "service" | "operation" | "model" | "provider";
+                                value: string;
+                            }[];
+                        };
+                    };
+                };
+                /** @description bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description unprocessable */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description internal */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;

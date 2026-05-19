@@ -15,10 +15,11 @@
     "seed:swy": "bun scripts/seed-switchyard-project.ts",
     "seed:test-e2e": "bun scripts/seed-test-fixtures.ts",
     "seed:imperium-fields": "bun scripts/seed-imperium-loop-fields.ts",
+    "seed:model-pricing": "bun scripts/seed-model-pricing.ts",
     "openapi:gen": "DATABASE_URL=postgres://codegen@localhost:5432/codegen bun src/lib/openapi-gen.ts",
-    "test": "bun test",
+    "test": "bun test --parallel=1",
     "test:unit": "bun test test/lib/pagination.test.ts test/lib/hmac.test.ts",
-    "test:integration": "bun test test/lib/seed.test.ts test/integration/webhooks.test.ts"
+    "test:integration": "bun test --parallel=1 test/lib/seed.test.ts test/integration/webhooks.test.ts"
   },
   "dependencies": {
     "@hono/zod-openapi": "^0.18.3",
