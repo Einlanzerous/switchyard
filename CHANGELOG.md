@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.21.0](https://github.com/Einlanzerous/switchyard/compare/v2.20.0...v2.21.0) (2026-05-21)
+
+
+### Features
+
+* **qr-login:** wrap QR as /login?token=... URL + drop Apple defaults ([81ee524](https://github.com/Einlanzerous/switchyard/commit/81ee524ddcb54e14f5d7bd8ec90135f16f2b4434))
+* SWY-63 — QR-code device login + README restructure ([b93f675](https://github.com/Einlanzerous/switchyard/commit/b93f67558e0cc371f383ca3f7571a6124486a2c0))
+* SWY-63 — QR-code device login + README restructure ([aa5f983](https://github.com/Einlanzerous/switchyard/commit/aa5f983a90d6acb73b6863d8359b93aa1315ee57))
+
 ## [2.20.0](https://github.com/Einlanzerous/switchyard/compare/v2.19.0...v2.20.0) (2026-05-19)
 
 
