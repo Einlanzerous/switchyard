@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import ColorPicker from "@/components/ColorPicker.vue";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
 
@@ -254,14 +255,8 @@ const deleteMutation = useMutation({
             />
           </div>
           <div class="space-y-1.5">
-            <Label for="proj-color">Color (#RRGGBB)</Label>
-            <div class="flex items-center gap-2">
-              <span
-                class="inline-block h-7 w-7 rounded border"
-                :style="color ? { backgroundColor: color } : undefined"
-              />
-              <Input id="proj-color" v-model="color" placeholder="#3b82f6" class="font-mono" />
-            </div>
+            <Label>Color</Label>
+            <ColorPicker v-model="color" />
           </div>
           <div class="space-y-1.5">
             <Label for="proj-repo">Repo URL</Label>
