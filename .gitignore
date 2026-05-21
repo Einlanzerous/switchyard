@@ -36,6 +36,9 @@ client/playwright/.auth/
 .env.local
 .env.*.local
 
+# Claude Code MCP config — contains a bearer token; set up per clone
+.mcp.json
+
 # Logs
 *.log
 

@@ -43,6 +43,131 @@ describe("list_projects", () => {
   });
 });
 
+describe("get_project", () => {
+  test("calls GET /v1/projects/:key with the project key in the path", async () => {
+    const recorder = installFetchRecorder({
+      body: { id: "p1", key: "SWY", name: "Switchyard", repo_url: null },
+    });
+    const { client, close } = await connectTestClient();
+    try {
+      const res = await client.callTool({
+        name: "get_project",
+        arguments: { project_key: "SWY" },
+      });
+      expect(res.isError).toBeFalsy();
+      const call = recorder.calls[0]!;
+      expect(call.method).toBe("GET");
+      expect(call.url).toContain("/v1/projects/SWY");
+      expect(call.url).not.toContain("/statuses");
+    } finally {
+      await close();
+      recorder.restore();
+    }
+  });
+
+  test("rejects malformed keys at the schema layer", async () => {
+    const { client, close } = await connectTestClient();
+    try {
+      const res = await client.callTool({
+        name: "get_project",
+        arguments: { project_key: "sw y" },
+      });
+      // Zod validation runs server-side before fetch — no HTTP call should fire.
+      expect(res.isError).toBe(true);
+    } finally {
+      await close();
+    }
+  });
+});
+
+describe("create_project", () => {
+  test("POSTs /v1/projects with the supplied body", async () => {
+    const recorder = installFetchRecorder({
+      body: {
+        id: "new-uuid",
+        key: "FLOW",
+        name: "Flow Project",
+        description: "test",
+        color: null,
+        repo_url: "https://github.com/foo/flow",
+        archived_at: null,
+      },
+    });
+    const { client, close } = await connectTestClient();
+    try {
+      const res = await client.callTool({
+        name: "create_project",
+        arguments: {
+          key: "FLOW",
+          name: "Flow Project",
+          description: "test",
+          repo_url: "https://github.com/foo/flow",
+        },
+      });
+      expect(res.isError).toBeFalsy();
+      const call = recorder.calls[0]!;
+      expect(call.method).toBe("POST");
+      expect(call.url).toContain("/v1/projects");
+      const body = call.body as Record<string, unknown>;
+      expect(body.key).toBe("FLOW");
+      expect(body.name).toBe("Flow Project");
+      expect(body.repo_url).toBe("https://github.com/foo/flow");
+    } finally {
+      await close();
+      recorder.restore();
+    }
+  });
+
+  test("surfaces 409 conflict envelope on duplicate key", async () => {
+    const recorder = installFetchRecorder({
+      status: 409,
+      body: { error: { code: "conflict", message: "project key SWY already exists" } },
+    });
+    const { client, close } = await connectTestClient();
+    try {
+      const res = await client.callTool({
+        name: "create_project",
+        arguments: { key: "SWY", name: "Switchyard" },
+      });
+      expect(res.isError).toBe(true);
+      const text = (res.content as Array<{ type: string; text: string }>)[0]!.text;
+      expect(text).toContain("switchyard error [conflict]");
+      expect(text).toContain("already exists");
+    } finally {
+      await close();
+      recorder.restore();
+    }
+  });
+});
+
+describe("list_labels", () => {
+  test("calls GET /v1/labels and unwraps items", async () => {
+    const recorder = installFetchRecorder({
+      body: {
+        items: [
+          { id: "l1", name: "bug", color: "#ef4444" },
+          { id: "l2", name: "docs", color: "#3b82f6" },
+        ],
+      },
+    });
+    const { client, close } = await connectTestClient();
+    try {
+      const res = await client.callTool({ name: "list_labels", arguments: {} });
+      expect(res.isError).toBeFalsy();
+      const call = recorder.calls[0]!;
+      expect(call.method).toBe("GET");
+      expect(call.url).toContain("/v1/labels");
+      const text = (res.content as Array<{ type: string; text: string }>)[0]!.text;
+      const parsed = JSON.parse(text);
+      expect(Array.isArray(parsed)).toBe(true);
+      expect(parsed).toHaveLength(2);
+    } finally {
+      await close();
+      recorder.restore();
+    }
+  });
+});
+
 describe("get_project_statuses", () => {
   test("calls GET /v1/projects/:key/statuses with the project key in the path", async () => {
     const recorder = installFetchRecorder({
