@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.23.0](https://github.com/Einlanzerous/switchyard/compare/v2.22.0...v2.23.0) (2026-05-21)
+
+
+### Features
+
+* SWY-66 — projects UI polish, color picker, contrast guard ([a3fbf71](https://github.com/Einlanzerous/switchyard/commit/a3fbf713c2a7d55868f84b351ec83501b9a72fa4))
+* SWY-66 — projects UI polish, color picker, contrast guard ([a57bb4d](https://github.com/Einlanzerous/switchyard/commit/a57bb4dc856d70ffc5c5fdbd1305044e19038111))
+* SWY-67 — ticket drawer + detail nits ([3fce925](https://github.com/Einlanzerous/switchyard/commit/3fce92573be54069fc64eebde8fd0b9f60fe2665))
+* SWY-67 — ticket drawer + detail nits ([8a917c8](https://github.com/Einlanzerous/switchyard/commit/8a917c8ec09c830acd7b45adfe527bcf8894a397))
+
+
+### Bug Fixes
+
+* **SWY-66:** ColorPicker → popover trigger, wire missed SettingsProject ([42ec6e2](https://github.com/Einlanzerous/switchyard/commit/42ec6e2cab2ae8c2e8e45437127df5234641fd7e))
+* **SWY-66:** ColorPicker trigger sizing + named swatch readout ([389396e](https://github.com/Einlanzerous/switchyard/commit/389396e843da24c35e5678415e325e4d8c271de5))
+* **SWY-67:** rename Add chip → Link on links + external refs ([c33a39d](https://github.com/Einlanzerous/switchyard/commit/c33a39dbb04e1c985f43c36ad758eb3ab52a2c2b))
+
 ## [2.22.0](https://github.com/Einlanzerous/switchyard/compare/v2.21.0...v2.22.0) (2026-05-21)
 
 
