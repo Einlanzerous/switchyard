@@ -100,9 +100,12 @@ const createMutation = useMutation({
     qc.invalidateQueries({ queryKey: queryKeys.userTokens(auth.me!.id) });
     if (data?.token) {
       fresh.value = { token: data.token, name: data.name };
-      // White background + medium ECC so the code survives glare / off-angle
-      // phone shots; tailnet-only deploy means embedding the bearer is fine.
-      qrCodeUrl.value = await QRCode.toDataURL(data.token, {
+      // Encode a login URL so a native phone scanner opens the browser
+      // directly at /login with the token pre-filled, instead of treating the
+      // raw bearer as a web search string. Same-origin keeps tailnet-only
+      // deploys intact.
+      const loginUrl = `${window.location.origin}/login?token=${encodeURIComponent(data.token)}`;
+      qrCodeUrl.value = await QRCode.toDataURL(loginUrl, {
         errorCorrectionLevel: "M",
         margin: 2,
         width: 256,
@@ -236,7 +239,7 @@ function relative(iso: string | null): string {
           <div class="space-y-3">
             <div class="space-y-1.5">
               <Label for="t-name">Name</Label>
-              <Input id="t-name" v-model="newName" placeholder="e.g. iPhone 2026-05" autofocus />
+              <Input id="t-name" v-model="newName" placeholder="e.g. tablet 2026-05" autofocus />
             </div>
             <div class="space-y-1.5">
               <Label>Scopes</Label>

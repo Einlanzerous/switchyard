@@ -22,9 +22,12 @@ Per-agent tokens are the norm — mint one per actor (`claude`, `n8n-cogitation`
 correctly.
 
 A freshly-minted token can also be encoded as a QR code on the
-`/settings/tokens` "show secret once" banner. Phones / tablets can scan it
-from the `/login` page (Chromium-based browsers and iOS Safari ≥ 17) instead
-of copy-pasting.
+`/settings/tokens` "show secret once" banner. The QR wraps the token in a
+`${origin}/login?token=…` URL so any phone's native scanner opens the
+browser directly at `/login` with the bearer pre-filled. The `/login` view
+also has an in-app "Scan QR" affordance for browsers that ship the
+`BarcodeDetector` API. Either path beats copy-pasting the bearer between
+devices.
 
 ## Idempotency
 

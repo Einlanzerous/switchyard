@@ -44,8 +44,38 @@ const scanError = ref<string | null>(null);
 let stream: MediaStream | null = null;
 let detectTimer: number | null = null;
 
-onMounted(() => inputEl.value?.$el?.focus?.());
+onMounted(() => {
+  // QR codes minted in /settings/tokens encode `${origin}/login?token=...`
+  // so a phone's native scanner can hand-off into this view with the
+  // bearer pre-filled. Strip the param from the URL on submit so it isn't
+  // left in browser history.
+  const fromQuery = typeof route.query.token === "string" ? route.query.token : null;
+  if (fromQuery) {
+    token.value = fromQuery;
+    const { token: _drop, ...rest } = route.query;
+    router.replace({ path: route.path, query: rest });
+    submit();
+    return;
+  }
+  inputEl.value?.$el?.focus?.();
+});
 onBeforeUnmount(stopScan);
+
+// Accept either a raw token string or a full /login?token=... URL — the
+// latter is what gets minted by SettingsTokens today. Falls through to the
+// raw value for any other shape so an older QR (pre-URL-wrapping) still works.
+function extractToken(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return trimmed;
+  try {
+    const url = new URL(trimmed);
+    const t = url.searchParams.get("token");
+    if (t) return t;
+  } catch {
+    // not a URL — fall through
+  }
+  return trimmed;
+}
 
 async function submit() {
   const trimmed = token.value.trim();
@@ -96,9 +126,9 @@ async function startScan() {
       if (!videoEl.value || videoEl.value.readyState < 2) return;
       try {
         const codes = await detector.detect(videoEl.value);
-        const value = codes[0]?.rawValue?.trim();
+        const value = codes[0]?.rawValue;
         if (value) {
-          token.value = value;
+          token.value = extractToken(value);
           stopScan();
           mode.value = "paste";
           submit();
