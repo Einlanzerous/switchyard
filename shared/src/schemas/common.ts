@@ -9,7 +9,34 @@ export const ProjectKey = z
 
 export const TicketKey = z.string().regex(/^[A-Z][A-Z0-9]{1,9}-[1-9][0-9]*$/, "format: KEY-123");
 
-export const HexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+// Hex color with a relative-luminance guard: rejects values too close to the
+// app's light or dark theme backgrounds so projects + labels stay visible on
+// both themes. Bounds (0.08–0.9) are a WCAG-flavored heuristic, not the strict
+// 4.5:1 contrast spec — we only need to keep the swatch distinguishable from
+// the surface it sits on, not pass-against-text.
+export const LUMINANCE_LOWER = 0.08;
+export const LUMINANCE_UPPER = 0.9;
+
+function relativeLuminance(hex: string): number {
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  const channel = (c: number) =>
+    c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+}
+
+export function isContrastSafe(hex: string): boolean {
+  const L = relativeLuminance(hex);
+  return L >= LUMINANCE_LOWER && L <= LUMINANCE_UPPER;
+}
+
+export const HexColor = z
+  .string()
+  .regex(/^#[0-9a-fA-F]{6}$/, "Color must be a 6-digit hex like #3b82f6.")
+  .refine(isContrastSafe, {
+    message: `Color is too close to a theme background; pick a value with relative luminance between ${LUMINANCE_LOWER} and ${LUMINANCE_UPPER}.`,
+  });
 
 // Cursor pagination — opaque base64-encoded payload from server.
 export const Cursor = z.string().min(1);
