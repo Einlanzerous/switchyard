@@ -15,6 +15,64 @@ export interface FetchCall {
   headers: Record<string, string>;
 }
 
+// Multi-call mock: respond differently per URL substring match. Useful for
+// composed tools (e.g. transition_ticket_by_category) that fan out across
+// several endpoints in one tool invocation.
+export function installFetchRouter(
+  routes: Array<{
+    match: string | ((url: string, method: string) => boolean);
+    status?: number;
+    body: unknown;
+  }>,
+): { calls: FetchCall[]; restore: () => void } {
+  const calls: FetchCall[] = [];
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    let url: string;
+    let method: string;
+    let bodyText: string | undefined;
+    const headers: Record<string, string> = {};
+
+    if (input instanceof Request) {
+      url = input.url;
+      method = input.method.toUpperCase();
+      bodyText = await input.clone().text().catch(() => undefined);
+      input.headers.forEach((v, k) => { headers[k.toLowerCase()] = v; });
+    } else {
+      url = typeof input === "string" ? input : input.toString();
+      method = (init?.method ?? "GET").toUpperCase();
+      if (init?.body && typeof init.body === "string") bodyText = init.body;
+      const h = init?.headers;
+      if (h && typeof h === "object" && !Array.isArray(h)) {
+        for (const [k, v] of Object.entries(h)) headers[k.toLowerCase()] = String(v);
+      }
+    }
+
+    let body: unknown = undefined;
+    if (bodyText) {
+      try { body = JSON.parse(bodyText); } catch { body = bodyText; }
+    }
+    calls.push({ url, method, body, headers });
+
+    const route = routes.find((r) =>
+      typeof r.match === "string" ? url.includes(r.match) : r.match(url, method),
+    );
+    if (!route) {
+      return new Response(JSON.stringify({ error: { code: "internal", message: "no route" } }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    return new Response(JSON.stringify(route.body), {
+      status: route.status ?? 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof fetch;
+
+  return { calls, restore: () => { globalThis.fetch = originalFetch; } };
+}
+
 export function installFetchRecorder(
   response: { status?: number; body: unknown },
 ): { calls: FetchCall[]; restore: () => void } {
