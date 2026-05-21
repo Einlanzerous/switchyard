@@ -30,6 +30,12 @@ type CanonicalLabel = {
 };
 
 export const RULES_ENGINE_USER_NAME = "rules-engine";
+// System actor for external-ref state updates (GitHub poller + webhook
+// receiver). Kept distinct from `rules-engine` because the events.ts
+// loop-prevention skips rule-authored events — folding the poller under
+// `rules-engine` would (and did) silently drop `ticket.external_ref_state_changed`
+// before any rule could see it.
+export const EXTERNAL_REF_POLLER_USER_NAME = "external-ref-poller";
 
 // Labels shipped with every install. New ones added here will appear on
 // next migrate run; existing rows are never touched (so an admin's color
@@ -53,6 +59,10 @@ const CANONICAL_USERS: CanonicalUser[] = [
   // The rule dispatcher uses this id to skip events authored by rules, which
   // is how we prevent infinite-loop fan-out without tracking causation chains.
   { name: RULES_ENGINE_USER_NAME, type: "agent" },
+  // System actor for the external-ref state-change pipeline (GitHub poller
+  // + webhook receiver). Must NOT be `rules-engine` — see comment on
+  // EXTERNAL_REF_POLLER_USER_NAME above.
+  { name: EXTERNAL_REF_POLLER_USER_NAME, type: "agent" },
 ];
 
 export async function seed(): Promise<void> {

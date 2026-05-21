@@ -106,7 +106,7 @@ export async function handlePullRequestEvent(payload: {
     merged_at?: string | null;
     head?: { ref?: string };
   };
-}, opts: { keyPrefix: string; rulesEngineUserId: string }): Promise<number> {
+}, opts: { keyPrefix: string; pollerUserId: string }): Promise<number> {
   const pr = payload.pull_request;
   const title = pr.title ?? "";
   const branch = pr.head?.ref ?? "";
@@ -124,10 +124,13 @@ export async function handlePullRequestEvent(payload: {
   const newState = pullRequestStateFromPayload(payload.action, pr);
   const nowIso = new Date().toISOString();
 
-  // rulesEngineActor for the audit trail — webhook events aren't user-
-  // initiated, same actor convention as scheduled rules.
-  const [rulesEngine] = await db.select().from(schema.users)
-    .where(eq(schema.users.id, opts.rulesEngineUserId)).limit(1);
+  // System actor for the audit trail. Must NOT be `rules-engine` — the
+  // events.ts loop-prevention drops rule-authored events before the
+  // dispatcher sees them, which would silently kill any rule listening
+  // on `ticket.external_ref_state_changed`. Caller (external.ts) supplies
+  // the `external-ref-poller` system user id.
+  const [pollerUser] = await db.select().from(schema.users)
+    .where(eq(schema.users.id, opts.pollerUserId)).limit(1);
 
   let updated = 0;
   for (const ticket of tickets) {
@@ -150,13 +153,13 @@ export async function handlePullRequestEvent(payload: {
           title,
           polled_at: nowIso,
           polled_state_changed_at: nowIso,
-          created_by: opts.rulesEngineUserId,
+          created_by: opts.pollerUserId,
         }).returning();
 
         const summary = await loadTicketSummary(ticket, tx as any);
         await writeEvent(tx as any, {
           event_type: "ticket.external_ref_added",
-          actor: rulesEngine ? mapUserRef(rulesEngine) : null,
+          actor: pollerUser ? mapUserRef(pollerUser) : null,
           ticket: summary,
           project_id: ticket.project_id,
           extras: { external_ref_id: created?.id, kind, url, source: "github_webhook" },
@@ -188,7 +191,7 @@ export async function handlePullRequestEvent(payload: {
         const summary = await loadTicketSummary(ticket, tx as any);
         await writeEvent(tx as any, {
           event_type: "ticket.external_ref_state_changed",
-          actor: rulesEngine ? mapUserRef(rulesEngine) : null,
+          actor: pollerUser ? mapUserRef(pollerUser) : null,
           ticket: summary,
           project_id: ticket.project_id,
           extras: {

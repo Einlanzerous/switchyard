@@ -14,6 +14,7 @@ import { env } from "../../env.js";
 import { writeEvent } from "../events.js";
 import { mapUserRef } from "../mappers.js";
 import { loadTicketSummary } from "../tickets.js";
+import { EXTERNAL_REF_POLLER_USER_NAME } from "../seed.js";
 import { parseGitHubUrl } from "./detectKind.js";
 import type { ExternalRefState } from "@switchyard/shared";
 
@@ -224,14 +225,17 @@ async function emitStateChanged(
   const [ticket] = await db.select().from(schema.tickets)
     .where(eq(schema.tickets.id, row.ticket_id)).limit(1);
   if (!ticket) return;
-  const [rulesEngine] = await db.select().from(schema.users)
-    .where(eq(schema.users.name, "rules-engine")).limit(1);
+  // Authored as `external-ref-poller`, NOT `rules-engine`. events.ts
+  // loop-prevention skips rule-authored events; using the rules engine
+  // here would drop the rule fan-out and prevent auto-close on PR merge.
+  const [pollerUser] = await db.select().from(schema.users)
+    .where(eq(schema.users.name, EXTERNAL_REF_POLLER_USER_NAME)).limit(1);
 
   await db.transaction(async (tx) => {
     const summary = await loadTicketSummary(ticket, tx as any);
     await writeEvent(tx as any, {
       event_type: "ticket.external_ref_state_changed",
-      actor: rulesEngine ? mapUserRef(rulesEngine) : null,
+      actor: pollerUser ? mapUserRef(pollerUser) : null,
       ticket: summary,
       project_id: ticket.project_id,
       extras: {

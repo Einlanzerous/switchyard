@@ -12,6 +12,7 @@ import { db } from "../db.js";
 import { env } from "../env.js";
 import { verifyHmac } from "../lib/hmac.js";
 import { handlePullRequestEvent } from "../lib/externalRefs/githubWebhook.js";
+import { EXTERNAL_REF_POLLER_USER_NAME } from "../lib/seed.js";
 import { errorResponses, okJson, z } from "./_helpers.js";
 
 const tag = "External";
@@ -81,21 +82,24 @@ export function mount(app: OpenAPIHono) {
       return c.json({ ok: true, message: "malformed pull_request payload, ignored" }, 200);
     }
 
-    // Resolve the rules-engine user id for the audit actor. Cached
+    // Resolve the external-ref-poller user id for the audit actor. Cached
     // once at process start would be nicer; this is a webhook hot
     // path so the lookup adds one query per delivery — acceptable.
-    const [rulesEngine] = await db.select({ id: schema.users.id }).from(schema.users)
-      .where(eq(schema.users.name, "rules-engine")).limit(1);
-    if (!rulesEngine) {
+    // NOT `rules-engine`: events authored by the rules engine are skipped
+    // by the dispatcher's loop-prevention, which would silently drop the
+    // auto-close-on-PR-merge rule.
+    const [pollerUser] = await db.select({ id: schema.users.id }).from(schema.users)
+      .where(eq(schema.users.name, EXTERNAL_REF_POLLER_USER_NAME)).limit(1);
+    if (!pollerUser) {
       return c.json(
-        { error: { code: "internal" as const, message: "rules-engine user not seeded" } },
+        { error: { code: "internal" as const, message: "external-ref-poller user not seeded" } },
         500,
       );
     }
 
     const updated = await handlePullRequestEvent(
       payload as any,
-      { keyPrefix: env.EXTERNAL_REF_KEY_PREFIX, rulesEngineUserId: rulesEngine.id },
+      { keyPrefix: env.EXTERNAL_REF_KEY_PREFIX, pollerUserId: pollerUser.id },
     );
     return c.json({ ok: true, updated }, 200);
   }) as any);
