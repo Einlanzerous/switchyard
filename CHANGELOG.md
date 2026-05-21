@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.22.0](https://github.com/Einlanzerous/switchyard/compare/v2.21.0...v2.22.0) (2026-05-21)
+
+
+### Features
+
+* SWY-64 — MCP create_project + get_project + list_labels ([47496f4](https://github.com/Einlanzerous/switchyard/commit/47496f4058b57d18c12e5dcc8a00265b32298299))
+* SWY-64 + SWY-65 — MCP create_project, DX polish, null clears ([35d0413](https://github.com/Einlanzerous/switchyard/commit/35d0413384d62429468db1cfc81ba0a1f3930b6f))
+* SWY-65 — MCP DX polish (multi-status, by-category sugar, comments, null clears) ([b1a99e1](https://github.com/Einlanzerous/switchyard/commit/b1a99e13ec854a9b757912f145390cf07f65d67f))
+
 ## [2.21.0](https://github.com/Einlanzerous/switchyard/compare/v2.20.0...v2.21.0) (2026-05-21)
 
 
