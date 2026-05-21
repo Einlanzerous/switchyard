@@ -1,11 +1,17 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { useMutation, useQueryClient } from "@tanstack/vue-query";
-import { ArrowLeft, Trash2, Loader2 } from "lucide-vue-next";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
+import {
+  ArrowLeft, Trash2, Loader2, MoreHorizontal, FolderInput,
+} from "lucide-vue-next";
 import { toast } from "vue-sonner";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import TicketBody from "@/components/tickets/TicketBody.vue";
+import MoveTicketDialog from "@/components/tickets/MoveTicketDialog.vue";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
 
@@ -17,6 +23,21 @@ const idOrKey = computed(() => {
   const v = route.params.idOrKey;
   return typeof v === "string" ? v : Array.isArray(v) ? (v[0] ?? "") : "";
 });
+
+// Fetched here so the … menu's Move action has the ticket payload MoveTicketDialog
+// needs. TicketBody fetches the same key — same cache entry, no double round-trip.
+const ticketQuery = useQuery({
+  queryKey: computed(() => queryKeys.ticket(idOrKey.value)),
+  enabled: computed(() => idOrKey.value.length > 0),
+  queryFn: async () => {
+    const { data, error } = await api.GET("/v1/tickets/{idOrKey}", {
+      params: { path: { idOrKey: idOrKey.value } },
+    });
+    if (error) throw error;
+    return data;
+  },
+});
+const ticket = computed(() => ticketQuery.data.value ?? null);
 
 function back() {
   // Try to fall back to the ticket list if there's no nav history (deep link).
@@ -53,6 +74,12 @@ const deleteMut = useMutation({
     confirming.value = false;
   },
 });
+
+const moveDialogOpen = ref(false);
+function openMoveDialog() { moveDialogOpen.value = true; }
+function onMoved(newKey: string) {
+  router.replace(`/tickets/${newKey}`);
+}
 </script>
 
 <template>
@@ -62,14 +89,29 @@ const deleteMut = useMutation({
         <ArrowLeft class="h-3.5 w-3.5 mr-1.5" /> Back
       </Button>
       <div v-if="!confirming" class="flex items-center">
-        <Button
-          variant="ghost"
-          size="sm"
-          class="h-8 px-2 text-muted-foreground hover:text-destructive"
-          @click="confirming = true"
-        >
-          <Trash2 class="h-3.5 w-3.5 mr-1.5" /> Delete
-        </Button>
+        <DropdownMenu v-if="ticket">
+          <DropdownMenuTrigger as-child>
+            <Button
+              variant="ghost"
+              size="icon"
+              class="h-8 w-8 text-muted-foreground"
+              aria-label="More actions"
+            >
+              <MoreHorizontal class="h-3.5 w-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem class="cursor-pointer" @click="openMoveDialog">
+              <FolderInput class="h-3.5 w-3.5 mr-2" /> Move to project…
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              class="cursor-pointer text-destructive focus:text-destructive"
+              @click="confirming = true"
+            >
+              <Trash2 class="h-3.5 w-3.5 mr-2" /> Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       <div v-else class="flex items-center gap-2">
         <Button variant="ghost" size="sm" class="h-8" @click="confirming = false">
@@ -88,5 +130,12 @@ const deleteMut = useMutation({
       </div>
     </div>
     <TicketBody :id-or-key="idOrKey" />
+
+    <MoveTicketDialog
+      v-if="ticket"
+      v-model:open="moveDialogOpen"
+      :ticket="ticket"
+      @moved="onMoved"
+    />
   </div>
 </template>

@@ -78,16 +78,14 @@ function statePillClass(state: string): string {
     <div class="flex items-center gap-2 text-xs text-muted-foreground">
       <Link2 class="h-3.5 w-3.5" />
       <span>External references ({{ refs.length }})</span>
-      <Button
+      <button
         v-if="!formOpen"
         type="button"
-        variant="ghost"
-        size="sm"
-        class="ml-auto -my-1 h-6 px-1.5 text-xs"
+        class="inline-flex items-center gap-1 rounded-md border border-dashed px-1.5 h-5 text-[10px] text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors"
         @click="formOpen = true"
       >
-        <Plus class="h-3 w-3 mr-1" /> Add
-      </Button>
+        <Plus class="h-2.5 w-2.5" /> Add
+      </button>
     </div>
 
     <ul v-if="refs.length > 0" class="space-y-1">
