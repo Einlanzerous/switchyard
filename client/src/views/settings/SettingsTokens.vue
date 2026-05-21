@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import QRCode from "qrcode";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
 import {
   Plus, Loader2, Trash2, Copy, KeyRound, AlertTriangle,
@@ -68,6 +69,7 @@ watch(showCreate, (v) => {
     newName.value = "";
     scopes.value = new Set(["tickets:read", "tickets:write", "comments:write"]);
     fresh.value = null;
+    qrCodeUrl.value = null;
   }
 });
 
@@ -79,6 +81,7 @@ function toggleScope(s: ApiTokenScope) {
 }
 
 const fresh = ref<{ token: string; name: string } | null>(null);
+const qrCodeUrl = ref<string | null>(null);
 
 const createMutation = useMutation({
   mutationFn: async () => {
@@ -93,10 +96,21 @@ const createMutation = useMutation({
     if (error) throw error;
     return data;
   },
-  onSuccess: (data) => {
+  onSuccess: async (data) => {
     qc.invalidateQueries({ queryKey: queryKeys.userTokens(auth.me!.id) });
     if (data?.token) {
       fresh.value = { token: data.token, name: data.name };
+      // Encode a login URL so a native phone scanner opens the browser
+      // directly at /login with the token pre-filled, instead of treating the
+      // raw bearer as a web search string. Same-origin keeps tailnet-only
+      // deploys intact.
+      const loginUrl = `${window.location.origin}/login?token=${encodeURIComponent(data.token)}`;
+      qrCodeUrl.value = await QRCode.toDataURL(loginUrl, {
+        errorCorrectionLevel: "M",
+        margin: 2,
+        width: 256,
+        color: { dark: "#000000", light: "#ffffff" },
+      });
     }
   },
 });
@@ -225,7 +239,7 @@ function relative(iso: string | null): string {
           <div class="space-y-3">
             <div class="space-y-1.5">
               <Label for="t-name">Name</Label>
-              <Input id="t-name" v-model="newName" placeholder="e.g. n8n-cogitation" autofocus />
+              <Input id="t-name" v-model="newName" placeholder="e.g. tablet 2026-05" autofocus />
             </div>
             <div class="space-y-1.5">
               <Label>Scopes</Label>
@@ -281,6 +295,18 @@ function relative(iso: string | null): string {
           </DialogHeader>
           <div class="rounded-md border bg-muted/40 p-3 font-mono text-xs break-all">
             {{ fresh.token }}
+          </div>
+          <div v-if="qrCodeUrl" class="mt-4 flex flex-col items-center gap-2">
+            <div class="rounded-md bg-white p-2">
+              <img
+                :src="qrCodeUrl"
+                alt="QR code encoding the new token"
+                class="w-40 h-40 block"
+              />
+            </div>
+            <p class="text-[11px] text-muted-foreground text-center">
+              Scan from <code class="font-mono">/login</code> on another device.
+            </p>
           </div>
           <DialogFooter>
             <Button variant="ghost" @click="copyFresh">
