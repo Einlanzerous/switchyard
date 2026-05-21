@@ -63,11 +63,12 @@ Full deep-dive: [`docs/agents.md`](./docs/agents.md).
 
 ### MCP server
 
-A hand-curated Model Context Protocol surface for Claude Desktop / Claude Code / Cline / Gemini CLI / anything that speaks MCP. Nine tools shaped for agent consumption — descriptions written for LLMs, invariants the OpenAPI schema can't express (PATCH never changes status, idempotency, etc.) encoded in tool docs. Request/response shapes come from the same generated `api.types.ts` as the web client so the plumbing stays in lockstep.
+A hand-curated Model Context Protocol surface for Claude Desktop / Claude Code / Cline / Gemini CLI / anything that speaks MCP. **Fifteen tools** shaped for agent consumption — descriptions written for LLMs, invariants the OpenAPI schema can't express (PATCH never changes status, idempotency, `status_id` project-scoping, resolution required on close) encoded in tool docs. Request/response shapes come from the same generated `api.types.ts` as the web client so the plumbing stays in lockstep.
 
-Reads: `list_projects` / `get_project_statuses` / `list_tickets` / `get_ticket` / `query_my_open`. Writes: `create_ticket` / `update_ticket` / `transition_ticket` / `comment_on_ticket` / `move_ticket`.
+- **Reads** — `list_projects`, `get_project`, `get_project_statuses`, `list_labels`, `list_tickets` (multi-status via array or `open: true` shortcut), `get_ticket`, `get_ticket_comments`, `query_my_open`.
+- **Writes** — `create_project` (auto-seeds the canonical 5 statuses), `create_ticket`, `update_ticket` (PATCH; `null` clears `assignee_id` / `parent_id` / `due_date`), `transition_ticket`, `transition_ticket_by_category` (sugar — skips the `get_project_statuses` round-trip), `comment_on_ticket`, `move_ticket`.
 
-Stdio transport (Claude Desktop, Cline, Claude Code, Gemini CLI). Setup details: [`mcp/README.md`](./mcp/README.md).
+Stdio transport (Claude Desktop, Cline, Claude Code, Gemini CLI). Setup, full tool descriptions, and the in-memory test harness: [`mcp/README.md`](./mcp/README.md).
 
 ### Operations & observability
 

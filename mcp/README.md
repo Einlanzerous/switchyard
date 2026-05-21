@@ -12,7 +12,7 @@ plumbing stays in lockstep with the REST API automatically.
 
 ## Status
 
-Stdio transport, in-memory test harness, fourteen tools registered:
+Stdio transport, in-memory test harness, fifteen tools registered:
 
 | Tool | Kind | Purpose |
 |---|---|---|
