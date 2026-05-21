@@ -84,7 +84,7 @@ function statePillClass(state: string): string {
         class="inline-flex items-center gap-1 rounded-md border border-dashed px-1.5 h-5 text-[10px] text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors"
         @click="formOpen = true"
       >
-        <Plus class="h-2.5 w-2.5" /> Add
+        <Plus class="h-2.5 w-2.5" /> Link
       </button>
     </div>
 
