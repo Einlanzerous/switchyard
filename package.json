@@ -4,6 +4,7 @@
   "private": true,
   "workspaces": ["shared", "server", "client", "mcp"],
   "scripts": {
+    "dev": "concurrently -n server,client -c blue,green 'bun run dev:server' 'bun run dev:client'",
     "dev:server": "cd server && bun run dev",
     "dev:client": "cd client && bun run dev",
     "dev:mcp": "cd mcp && bun run dev",
@@ -22,6 +23,7 @@
     "typecheck": "tsc -b shared server client mcp"
   },
   "devDependencies": {
+    "concurrently": "^9.1.0",
     "typescript": "^5.6.0"
   },
   "packageManager": "bun@1.3.13"
