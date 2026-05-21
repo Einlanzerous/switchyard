@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { isContrastSafe } from "@switchyard/shared";
-import { SWATCHES } from "./colorPalette";
+import { SWATCHES, swatchName } from "./colorPalette";
 
 const props = defineProps<{
   modelValue: string;
@@ -42,6 +42,16 @@ const validHex = computed(() => HEX_RE.test(props.modelValue));
 const validContrast = computed(
   () => validHex.value && isContrastSafe(props.modelValue),
 );
+
+// Human-readable suffix shown next to the hex on the trigger button. Named
+// swatches resolve to "red" / "blue" / etc.; anything else valid resolves to
+// "manual"; an empty value yields no suffix at all.
+const nameLabel = computed<string | null>(() => {
+  if (!props.modelValue) return null;
+  const named = swatchName(props.modelValue);
+  if (named) return named;
+  return validHex.value ? "manual" : null;
+});
 const error = computed(() => {
   if (!props.modelValue) return null;
   if (!validHex.value) return "Color must be a 6-digit hex like #3b82f6.";
@@ -67,27 +77,32 @@ function onInput(v: string) {
       <button
         type="button"
         :class="[
-          'inline-flex items-center gap-2 rounded-md border bg-background px-2 py-1 text-xs transition-colors',
-          error ? 'border-destructive' : 'hover:bg-accent/40',
+          'flex w-72 max-w-full items-center justify-between gap-2 rounded-md border bg-background px-3 h-9 text-sm transition-colors',
+          error ? 'border-destructive' : 'hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
         ]"
       >
-        <span
-          class="inline-block h-4 w-4 rounded border shrink-0"
-          :style="modelValue ? { backgroundColor: modelValue } : undefined"
-        />
-        <span class="font-mono text-muted-foreground tabular-nums">
-          {{ modelValue || "—" }}
+        <span class="flex items-center gap-2 min-w-0">
+          <span
+            class="inline-block h-5 w-5 rounded border shrink-0"
+            :style="modelValue ? { backgroundColor: modelValue } : undefined"
+          />
+          <span class="font-mono text-xs text-muted-foreground tabular-nums">
+            {{ modelValue || "—" }}
+          </span>
+          <span v-if="nameLabel" class="text-xs text-muted-foreground truncate">
+            — {{ nameLabel }}
+          </span>
         </span>
-        <ChevronDown class="h-3 w-3 text-muted-foreground" />
+        <ChevronDown class="h-4 w-4 text-muted-foreground shrink-0" />
       </button>
     </PopoverTrigger>
-    <PopoverContent align="start" class="w-56 p-3 space-y-2">
-      <div class="grid grid-cols-6 gap-1.5">
+    <PopoverContent align="start" class="w-72 p-3 space-y-2.5">
+      <div class="grid grid-cols-6 gap-2">
         <button
           v-for="c in SWATCHES"
           :key="c"
           type="button"
-          class="relative h-7 w-7 rounded-md border-2 transition"
+          class="relative h-8 w-8 rounded-md border-2 transition"
           :class="[
             modelValue.toLowerCase() === c.toLowerCase() ? 'border-foreground' : 'border-transparent',
             usedSet.has(c.toLowerCase()) && modelValue.toLowerCase() !== c.toLowerCase() ? 'opacity-50' : '',
@@ -99,7 +114,7 @@ function onInput(v: string) {
       </div>
       <Input
         :model-value="modelValue"
-        class="font-mono text-xs h-7"
+        class="font-mono text-xs h-8"
         placeholder="#3b82f6"
         maxlength="7"
         @update:model-value="onInput(String($event))"
