@@ -1,11 +1,18 @@
-// Project-related MCP tools. Small surface: list (for routing decisions)
-// and get-statuses (needed before transitioning a ticket, since transitions
-// reference status IDs that are project-scoped).
+// Project-related MCP tools. Surface: project + label discovery (list,
+// get, statuses), and project creation. Status/transition mutation and
+// label CRUD stay deferred — admin paths, not agent paths.
 
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client.js";
 import { formatApiError } from "../errors.js";
+
+const PROJECT_KEY = z
+  .string()
+  .regex(
+    /^[A-Z][A-Z0-9]{1,9}$/,
+    "Project key must be 2–10 chars, uppercase alphanumeric, starting with a letter (e.g. `SWY`, `LOOP`).",
+  );
 
 export function registerProjectTools(server: McpServer): void {
   server.registerTool(
@@ -34,6 +41,133 @@ export function registerProjectTools(server: McpServer): void {
           },
         },
       });
+      if (error) {
+        return {
+          isError: true,
+          content: [{ type: "text", text: formatApiError(error) }],
+        };
+      }
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(data?.items ?? [], null, 2),
+          },
+        ],
+      };
+    },
+  );
+
+  server.registerTool(
+    "get_project",
+    {
+      title: "Get project",
+      description:
+        "Fetch a single project by key. Useful before `create_project` to check " +
+        "whether a key is already taken — calling `create_project` on an existing " +
+        "key returns a 409 conflict. Returns the project metadata (name, description, " +
+        "color, repo_url, archived state). For the project's statuses, call " +
+        "`get_project_statuses` instead.",
+      inputSchema: {
+        project_key: PROJECT_KEY.describe(
+          "Project key (e.g. `SWY`). Case-sensitive, uppercase.",
+        ),
+      },
+    },
+    async ({ project_key }) => {
+      const client = getClient();
+      const { data, error } = await client.GET("/v1/projects/{key}", {
+        params: { path: { key: project_key } },
+      });
+      if (error) {
+        return {
+          isError: true,
+          content: [{ type: "text", text: formatApiError(error) }],
+        };
+      }
+      return {
+        content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+      };
+    },
+  );
+
+  server.registerTool(
+    "create_project",
+    {
+      title: "Create project",
+      description:
+        "Create a new switchyard project. Call this once per repo / new initiative — " +
+        "the project key is **immutable** after creation, so pick deliberately. " +
+        "Convention: 2–10 uppercase alphanumeric chars starting with a letter, " +
+        "matching the eventual ticket prefix you want (`LOOP-42`, `FLOW-7`, " +
+        "`INCUBATOR-3`). " +
+        "The project is automatically seeded with the canonical default statuses — " +
+        "Backlog (default) / Planning / In Progress / Blocked / Closed — so no " +
+        "follow-up `get_project_statuses` + status-creation calls are needed for " +
+        "typical workflows. " +
+        "Idempotency is on the caller: returns 409 on a duplicate key. Prefer " +
+        "checking with `get_project` first when in doubt.",
+      inputSchema: {
+        key: PROJECT_KEY.describe(
+          "Project key (immutable). 2–10 uppercase alphanumeric chars starting with a letter.",
+        ),
+        name: z
+          .string()
+          .min(1)
+          .max(200)
+          .describe("Human-readable project name."),
+        description: z
+          .string()
+          .max(10_000)
+          .optional()
+          .describe("Markdown description of the project (optional)."),
+        color: z
+          .string()
+          .regex(/^#[0-9a-fA-F]{6}$/)
+          .optional()
+          .describe("Hex color for UI accents, e.g. `#3b82f6`."),
+        repo_url: z
+          .string()
+          .url()
+          .max(2048)
+          .optional()
+          .describe(
+            "Canonical repo URL — surfaces as a link from the project header.",
+          ),
+      },
+    },
+    async (input) => {
+      const client = getClient();
+      const { data, error } = await client.POST("/v1/projects", {
+        body: input,
+      });
+      if (error) {
+        return {
+          isError: true,
+          content: [{ type: "text", text: formatApiError(error) }],
+        };
+      }
+      return {
+        content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+      };
+    },
+  );
+
+  server.registerTool(
+    "list_labels",
+    {
+      title: "List labels",
+      description:
+        "Return the global label catalog. Labels are shared across projects in " +
+        "switchyard, not per-project. Each label has an `id` (UUID), `name`, and " +
+        "`color`. Use the UUIDs in `create_ticket.label_ids` or " +
+        "`update_ticket.label_ids` to attach labels to a ticket. Label CRUD is not " +
+        "exposed via MCP — manage them in the web UI.",
+      inputSchema: {},
+    },
+    async () => {
+      const client = getClient();
+      const { data, error } = await client.GET("/v1/labels", {});
       if (error) {
         return {
           isError: true,

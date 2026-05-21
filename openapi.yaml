@@ -9115,12 +9115,15 @@ paths:
                   enum: *a7
                 parent_id:
                   type: string
+                  nullable: true
                   format: uuid
                 assignee_id:
                   type: string
+                  nullable: true
                   format: uuid
                 due_date:
                   type: string
+                  nullable: true
                   format: date-time
                 label_ids:
                   type: array

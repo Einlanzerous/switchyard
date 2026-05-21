@@ -6304,11 +6304,11 @@ export interface paths {
                         /** @enum {string} */
                         priority?: "low" | "medium" | "high" | "critical";
                         /** Format: uuid */
-                        parent_id?: string;
+                        parent_id?: string | null;
                         /** Format: uuid */
-                        assignee_id?: string;
+                        assignee_id?: string | null;
                         /** Format: date-time */
-                        due_date?: string;
+                        due_date?: string | null;
                         label_ids?: string[];
                         metadata?: {
                             [key: string]: unknown;

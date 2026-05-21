@@ -11,6 +11,14 @@ import { formatApiError } from "../errors.js";
 const TICKET_TYPE = z.enum(["spike", "task", "bug", "epic"]);
 const PRIORITY = z.enum(["low", "medium", "high", "critical"]);
 const RESOLUTION = z.enum(["done", "released", "cancelled"]);
+const STATUS_CATEGORY = z.enum([
+  "backlog",
+  "planning",
+  "in_progress",
+  "blocked",
+  "closed",
+]);
+const OPEN_CATEGORIES = ["backlog", "planning", "in_progress", "blocked"] as const;
 
 export function registerTicketTools(server: McpServer): void {
   server.registerTool(
@@ -31,11 +39,22 @@ export function registerTicketTools(server: McpServer): void {
           .optional()
           .describe("Project key to scope results, e.g. `SWY`."),
         status: z
-          .string()
+          .union([z.string(), z.array(z.string())])
           .optional()
           .describe(
-            "Status filter. Accepts a category (e.g. `in_progress`) or a status UUID. " +
-              "Single value only — the underlying API does not support negation or arrays.",
+            "Status filter. Accepts a category (e.g. `in_progress`), a status UUID, " +
+              "or an array of either (combined with OR — the underlying API supports " +
+              "comma-separated values + mixed UUID/category). For the common 'any " +
+              "non-closed ticket' case, use the `open: true` shortcut instead of " +
+              "enumerating the four open categories.",
+          ),
+        open: z
+          .boolean()
+          .optional()
+          .describe(
+            "Convenience shortcut: when true, returns tickets in any non-closed " +
+              "category (backlog / planning / in_progress / blocked). Mutually " +
+              "exclusive with an explicit `status` — supplying both is an error.",
           ),
         type: TICKET_TYPE.optional().describe("Filter by ticket type."),
         label: z.string().optional().describe("Label name filter."),
@@ -89,9 +108,28 @@ export function registerTicketTools(server: McpServer): void {
       },
     },
     async (input) => {
+      const { open, status, ...rest } = input;
+      if (open !== undefined && status !== undefined) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text: "Pass either `open: true` or `status`, not both.",
+            },
+          ],
+        };
+      }
+      let resolvedStatus: string | undefined;
+      if (open) resolvedStatus = OPEN_CATEGORIES.join(",");
+      else if (Array.isArray(status)) resolvedStatus = status.join(",");
+      else if (typeof status === "string") resolvedStatus = status;
+
       const client = getClient();
       const { data, error } = await client.GET("/v1/tickets", {
-        params: { query: input },
+        params: {
+          query: { ...rest, ...(resolvedStatus ? { status: resolvedStatus } : {}) },
+        },
       });
       if (error) {
         return {
@@ -112,8 +150,9 @@ export function registerTicketTools(server: McpServer): void {
       description:
         "Fetch a single ticket by key (e.g. `SWY-47`) or UUID. Returns the full " +
         "ticket payload including description, status, assignee, labels, external_refs, " +
-        "metadata, and comment count. For just the comments, follow up with a separate " +
-        "call (not yet exposed as an MCP tool — request via the REST API if needed).",
+        "metadata, and all comments inline. For just the comments without the rest " +
+        "of the payload (lighter response, paginates separately), use " +
+        "`get_ticket_comments`.",
       inputSchema: {
         id_or_key: z
           .string()
@@ -217,9 +256,27 @@ export function registerTicketTools(server: McpServer): void {
         priority: PRIORITY.optional().describe("New priority."),
         assignee_id: z
           .string()
+          .nullable()
           .optional()
-          .describe("New assignee user UUID. Pass empty string to clear (if API supports)."),
-        due_date: z.string().optional().describe("New ISO-8601 due date."),
+          .describe(
+            "New assignee user UUID. Pass `null` to clear; omit the key to leave " +
+              "unchanged. Empty string is rejected — `null` is the canonical clear value.",
+          ),
+        parent_id: z
+          .string()
+          .nullable()
+          .optional()
+          .describe(
+            "New parent epic UUID. Pass `null` to detach; omit to leave unchanged. " +
+              "Parent must be an `epic`-type ticket in the same project.",
+          ),
+        due_date: z
+          .string()
+          .nullable()
+          .optional()
+          .describe(
+            "New ISO-8601 due date. Pass `null` to clear; omit to leave unchanged.",
+          ),
         label_ids: z
           .array(z.string())
           .optional()
@@ -330,6 +387,165 @@ export function registerTicketTools(server: McpServer): void {
         {
           params: { path: { idOrKey: id_or_key } },
           body: { body },
+        },
+      );
+      if (error) {
+        return {
+          isError: true,
+          content: [{ type: "text", text: formatApiError(error) }],
+        };
+      }
+      return {
+        content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+      };
+    },
+  );
+
+  server.registerTool(
+    "transition_ticket_by_category",
+    {
+      title: "Transition ticket by category (sugar)",
+      description:
+        "Move a ticket to a status identified by `category` instead of a `status_id` " +
+        "UUID. Saves the `get_project_statuses` round-trip when you just want to land " +
+        "the ticket in the canonical `closed` / `in_progress` / `blocked` / etc. bucket " +
+        "and don't care about the specific project-scoped status row. " +
+        "Internally: looks up the ticket's project, finds the status with the matching " +
+        "category, calls the normal transition path. Same guards apply (transitions " +
+        "table, resolution-required-on-close, epic-close). " +
+        "Returns an error if the project has more than one status in the requested " +
+        "category (rare; means the project has redefined the canonical seed) — in that " +
+        "case fall back to `transition_ticket` with the explicit UUID.",
+      inputSchema: {
+        id_or_key: z.string().describe("Ticket key (e.g. `SWY-47`) or UUID."),
+        category: STATUS_CATEGORY.describe(
+          "Target status category. The MCP server picks the unique status with this " +
+            "category in the ticket's project.",
+        ),
+        resolution: RESOLUTION.optional().describe(
+          "REQUIRED when `category === 'closed'`. Same semantics as `transition_ticket`.",
+        ),
+        comment: z
+          .string()
+          .optional()
+          .describe(
+            "Optional comment body attached atomically with the transition.",
+          ),
+        position: z
+          .number()
+          .optional()
+          .describe("Optional position within the destination column."),
+      },
+    },
+    async ({ id_or_key, category, resolution, comment, position }) => {
+      const client = getClient();
+      const ticket = await client.GET("/v1/tickets/{idOrKey}", {
+        params: { path: { idOrKey: id_or_key } },
+      });
+      if (ticket.error) {
+        return {
+          isError: true,
+          content: [{ type: "text", text: formatApiError(ticket.error) }],
+        };
+      }
+      const projectKey = ticket.data?.project?.key;
+      if (!projectKey) {
+        return {
+          isError: true,
+          content: [
+            { type: "text", text: `ticket ${id_or_key} has no project key` },
+          ],
+        };
+      }
+      const statuses = await client.GET("/v1/projects/{key}/statuses", {
+        params: { path: { key: projectKey } },
+      });
+      if (statuses.error) {
+        return {
+          isError: true,
+          content: [{ type: "text", text: formatApiError(statuses.error) }],
+        };
+      }
+      const matches = (statuses.data?.items ?? []).filter(
+        (s) => s.category === category,
+      );
+      if (matches.length === 0) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text: `project ${projectKey} has no status with category '${category}'`,
+            },
+          ],
+        };
+      }
+      if (matches.length > 1) {
+        const names = matches.map((s) => `${s.display_name} (${s.id})`).join(", ");
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text:
+                `project ${projectKey} has ${matches.length} statuses with category ` +
+                `'${category}' (${names}); use transition_ticket with an explicit status_id`,
+            },
+          ],
+        };
+      }
+      const { data, error } = await client.POST(
+        "/v1/tickets/{idOrKey}/transition",
+        {
+          params: { path: { idOrKey: id_or_key } },
+          body: { status_id: matches[0]!.id, resolution, comment, position },
+        },
+      );
+      if (error) {
+        return {
+          isError: true,
+          content: [{ type: "text", text: formatApiError(error) }],
+        };
+      }
+      return {
+        content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+      };
+    },
+  );
+
+  server.registerTool(
+    "get_ticket_comments",
+    {
+      title: "Get ticket comments",
+      description:
+        "Fetch comments on a ticket, paginated. Lighter than `get_ticket` when you " +
+        "only need the comment thread (no description / labels / external_refs / " +
+        "metadata). Comments are markdown; each carries an author, timestamps, and " +
+        "any attached files.",
+      inputSchema: {
+        id_or_key: z.string().describe("Ticket key (e.g. `SWY-47`) or UUID."),
+        cursor: z
+          .string()
+          .optional()
+          .describe("Opaque pagination cursor from a previous response."),
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(200)
+          .optional()
+          .describe("Page size, 1–200. Default server-side is 50."),
+      },
+    },
+    async ({ id_or_key, cursor, limit }) => {
+      const client = getClient();
+      const { data, error } = await client.GET(
+        "/v1/tickets/{idOrKey}/comments",
+        {
+          params: {
+            path: { idOrKey: id_or_key },
+            query: { cursor, limit },
+          },
         },
       );
       if (error) {

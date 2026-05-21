@@ -12,24 +12,29 @@ plumbing stays in lockstep with the REST API automatically.
 
 ## Status
 
-Phase 5.0 v1 tool surface complete. Stdio transport, in-memory test
-harness, nine tools registered:
+Stdio transport, in-memory test harness, fourteen tools registered:
 
 | Tool | Kind | Purpose |
 |---|---|---|
 | `list_projects` | read | Project discovery / routing |
+| `get_project` | read | Fetch one project by key (idempotency check before `create_project`) |
 | `get_project_statuses` | read | Resolve status UUIDs before transitioning |
-| `list_tickets` | read | Search/filter with full `/v1/tickets` filter shape |
-| `get_ticket` | read | Fetch one ticket by key or UUID |
+| `list_labels` | read | Global label catalog (label UUIDs for ticket attach) |
+| `list_tickets` | read | Search/filter; `status` accepts array, plus `open: true` shortcut |
+| `get_ticket` | read | Fetch one ticket by key or UUID (includes comments inline) |
+| `get_ticket_comments` | read | Comments-only view, paginated (lighter than `get_ticket`) |
 | `query_my_open` | read | Sugar for "what's on my plate" |
+| `create_project` | write | New project; key is immutable; auto-seeded with 5 default statuses |
 | `create_ticket` | write | New ticket; omit `status_id` for project default |
-| `update_ticket` | write | PATCH; **never** changes status (use `transition_ticket`) |
-| `transition_ticket` | write | Status change; resolution required on close; optional atomic comment |
+| `update_ticket` | write | PATCH; **never** changes status. `null` clears `assignee_id` / `parent_id` / `due_date` |
+| `transition_ticket` | write | Status change by explicit `status_id`; resolution required on close |
+| `transition_ticket_by_category` | write | Sugar: pick the unique status in a category (skips the lookup) |
 | `comment_on_ticket` | write | Standalone comment |
 | `move_ticket` | write | Cross-project move (allocates new key, alias preserved) |
 
 Out of scope for this phase (deferred): attachments, webhook/rule
-subscriptions, resource-style ticket pages.
+subscriptions, resource-style ticket pages, label / status / transition
+CRUD.
 
 ## Configuration
 

@@ -78,9 +78,17 @@ export type CreateTicket = z.infer<typeof CreateTicket>;
 // through POST /v1/tickets/{idOrKey}/transition, which enforces the
 // transitions table and the epic-close guard. Use that endpoint for any
 // status mutation; PATCH covers everything else.
+//
+// Nullable fields (assignee_id, parent_id, due_date) accept `null` to clear
+// the existing value, since `undefined` already means "leave unchanged" in
+// PATCH semantics. The handler already supports the null-clear path
+// (server/src/routes/tickets.ts:495); the schema just needs to let it through.
 export const UpdateTicket = CreateTicket.omit({ project_key: true, type: true, status_id: true })
   .partial()
   .extend({
+    assignee_id: Uuid.nullable().optional(),
+    parent_id: Uuid.nullable().optional(),
+    due_date: Iso8601.nullable().optional(),
     label_ids: z.array(Uuid).optional(), // replaces full set when provided
     // Manual sort order. The drag-to-reorder UX computes a fractional value
     // between the new neighbors' positions; the server just stores it.
