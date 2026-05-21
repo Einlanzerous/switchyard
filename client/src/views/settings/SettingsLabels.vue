@@ -13,9 +13,11 @@ import {
 } from "@/components/ui/dialog";
 import LabelChip from "@/components/tickets/LabelChip.vue";
 import EmptyState from "@/components/EmptyState.vue";
+import ColorPicker from "@/components/ColorPicker.vue";
+import { pickUnusedSwatch } from "@/components/colorPalette";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
-import type { Label as LabelType } from "@switchyard/shared";
+import { isContrastSafe, type Label as LabelType } from "@switchyard/shared";
 
 const qc = useQueryClient();
 
@@ -36,18 +38,10 @@ const dialogOpen = ref(false);
 const draftName = ref("");
 const draftColor = ref("#3b82f6");
 
-// A small palette covering the common ticket-tag use cases. Users can still
-// type any 6-digit hex into the input to override.
-const SWATCHES = [
-  "#ef4444", "#f97316", "#f59e0b", "#eab308", "#84cc16", "#22c55e",
-  "#10b981", "#14b8a6", "#06b6d4", "#0ea5e9", "#3b82f6", "#6366f1",
-  "#8b5cf6", "#a855f7", "#d946ef", "#ec4899", "#f43f5e", "#64748b",
-];
-
 function openCreate() {
   editing.value = null;
   draftName.value = "";
-  draftColor.value = SWATCHES[Math.floor(Math.random() * SWATCHES.length)]!;
+  draftColor.value = pickUnusedSwatch(items.value.map((l) => l.color));
   dialogOpen.value = true;
 }
 
@@ -111,7 +105,9 @@ const deleteMutation = useMutation({
 });
 
 const validHex = computed(() => /^#[0-9a-fA-F]{6}$/.test(draftColor.value));
-const canSave = computed(() => draftName.value.trim().length > 0 && validHex.value);
+const canSave = computed(
+  () => draftName.value.trim().length > 0 && validHex.value && isContrastSafe(draftColor.value),
+);
 </script>
 
 <template>
@@ -191,28 +187,10 @@ const canSave = computed(() => draftName.value.trim().length > 0 && validHex.val
 
           <div class="space-y-1.5">
             <Label>Color</Label>
-            <div class="flex flex-wrap gap-1.5">
-              <button
-                v-for="c in SWATCHES"
-                :key="c"
-                type="button"
-                class="h-7 w-7 rounded-md border-2 transition"
-                :class="draftColor === c ? 'border-foreground' : 'border-transparent'"
-                :style="{ backgroundColor: c }"
-                :title="c"
-                @click="draftColor = c"
-              />
-            </div>
-            <Input
+            <ColorPicker
               v-model="draftColor"
-              class="font-mono text-xs"
-              placeholder="#3b82f6"
-              maxlength="7"
+              :used="items.map((l) => l.color)"
             />
-            <p
-              v-if="draftColor && !validHex"
-              class="text-xs text-destructive"
-            >Color must be a 6-digit hex like #3b82f6.</p>
           </div>
 
           <div v-if="previewLabel" class="pt-2 border-t flex items-center gap-2">

@@ -14,8 +14,28 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import ColorPicker from "@/components/ColorPicker.vue";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
+
+// Other projects' colors so the picker can mark them as taken (just a hint;
+// the user can still pick a duplicate for this project).
+const projectsQuery = useQuery({
+  queryKey: queryKeys.projects({ include_archived: true }),
+  queryFn: async () => {
+    const { data, error } = await api.GET("/v1/projects", {
+      params: { query: { limit: 200, include_archived: true } },
+    });
+    if (error) throw error;
+    return data;
+  },
+});
+const otherColors = computed(() =>
+  (projectsQuery.data.value?.items ?? [])
+    .filter((p) => p.key !== "")
+    .map((p) => p.color)
+    .filter((c): c is string => !!c)
+);
 
 const props = defineProps<{ projectKey: string }>();
 const router = useRouter();
@@ -115,14 +135,11 @@ function goToTransitions() { router.push(`/settings/projects/${props.projectKey}
             />
           </div>
           <div class="space-y-1.5">
-            <Label for="proj-color">Color (#RRGGBB)</Label>
-            <div class="flex items-center gap-2">
-              <span
-                class="inline-block h-7 w-7 rounded border"
-                :style="color ? { backgroundColor: color } : undefined"
-              />
-              <Input id="proj-color" v-model="color" placeholder="#3b82f6" class="font-mono" />
-            </div>
+            <Label>Color</Label>
+            <ColorPicker
+              v-model="color"
+              :used="otherColors.filter((c) => c.toLowerCase() !== (project?.color ?? '').toLowerCase())"
+            />
           </div>
           <div class="space-y-1.5">
             <Label for="proj-repo">Repo URL</Label>

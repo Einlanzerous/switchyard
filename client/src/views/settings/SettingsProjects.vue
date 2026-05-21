@@ -13,8 +13,11 @@ import { Badge } from "@/components/ui/badge";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import ColorPicker from "@/components/ColorPicker.vue";
+import { pickUnusedSwatch } from "@/components/colorPalette";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
+import { isContrastSafe } from "@switchyard/shared";
 
 const qc = useQueryClient();
 
@@ -30,15 +33,25 @@ const projectsQuery = useQuery({
 });
 const items = computed(() => projectsQuery.data.value?.items ?? []);
 
+// Reserve `Nch` width on the key column so 3- and 4-char keys line up flush.
+// Reactive to current rows; widens automatically if a longer key shows up.
+const maxKeyLen = computed(() => {
+  const lens = items.value.map((p) => p.key.length);
+  return lens.length === 0 ? 3 : Math.max(...lens);
+});
+
 const showCreate = ref(false);
 const newKey = ref("");
 const newName = ref("");
 const newDescription = ref("");
+const newColor = ref("#3b82f6");
 
 function openCreate() {
   newKey.value = "";
   newName.value = "";
   newDescription.value = "";
+  // Default to the first palette swatch not already in use across active projects.
+  newColor.value = pickUnusedSwatch(items.value.map((p) => p.color));
   showCreate.value = true;
 }
 
@@ -49,6 +62,7 @@ const createMutation = useMutation({
         key: newKey.value.trim().toUpperCase(),
         name: newName.value.trim(),
         description: newDescription.value.trim() || undefined,
+        color: newColor.value || undefined,
       },
     });
     if (error) throw error;
@@ -62,8 +76,11 @@ const createMutation = useMutation({
 });
 
 const validKey = computed(() => /^[A-Z][A-Z0-9]{1,9}$/.test(newKey.value.trim().toUpperCase()));
+const validColor = computed(
+  () => /^#[0-9a-fA-F]{6}$/.test(newColor.value) && isContrastSafe(newColor.value),
+);
 const canCreate = computed(() =>
-  validKey.value && newName.value.trim().length > 0
+  validKey.value && newName.value.trim().length > 0 && validColor.value
 );
 </script>
 
@@ -96,15 +113,22 @@ const canCreate = computed(() =>
             v-slot="{ navigate }"
           >
             <li
-              class="flex items-center gap-3 p-3 hover:bg-accent/40 cursor-pointer"
+              class="flex items-center gap-3 p-3 hover:bg-accent/40 cursor-pointer min-w-0"
               @click="navigate"
             >
-              <FolderKanban class="h-4 w-4 text-muted-foreground shrink-0" />
+              <FolderKanban
+                class="h-4 w-4 shrink-0"
+                :class="p.color ? '' : 'text-muted-foreground'"
+                :style="p.color ? { color: p.color } : undefined"
+              />
               <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2">
-                  <span class="font-mono text-xs text-muted-foreground">{{ p.key }}</span>
+                <div class="flex items-center gap-2 min-w-0">
+                  <span
+                    class="font-mono text-xs text-muted-foreground shrink-0"
+                    :style="{ minWidth: `${maxKeyLen}ch` }"
+                  >{{ p.key }}</span>
                   <span class="font-medium truncate">{{ p.name }}</span>
-                  <Badge v-if="p.archived_at" variant="secondary" class="text-[10px]">
+                  <Badge v-if="p.archived_at" variant="secondary" class="text-[10px] shrink-0">
                     <Archive class="h-2.5 w-2.5 mr-0.5" /> archived
                   </Badge>
                 </div>
@@ -112,7 +136,7 @@ const canCreate = computed(() =>
                   {{ p.description }}
                 </div>
               </div>
-              <ChevronRight class="h-4 w-4 text-muted-foreground" />
+              <ChevronRight class="h-4 w-4 text-muted-foreground shrink-0" />
             </li>
           </RouterLink>
         </ul>
@@ -159,6 +183,14 @@ const canCreate = computed(() =>
               rows="3"
               class="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring resize-y"
               placeholder="Optional"
+            />
+          </div>
+
+          <div class="space-y-1.5">
+            <Label>Color</Label>
+            <ColorPicker
+              v-model="newColor"
+              :used="items.map((p) => p.color)"
             />
           </div>
 

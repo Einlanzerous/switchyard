@@ -87,6 +87,15 @@ const archivedCount = computed(() =>
   allProjects.value.filter((p) => !!p.archived_at).length
 );
 
+// Reserve a fixed-character-width gutter for the project key column so 3-char
+// keys (SWY) line up flush with 4-char keys (APTR). Monospace + `ch` units
+// makes this exact. Reactive to whichever projects are currently visible —
+// will widen automatically if a longer key appears later (schema max 10).
+const maxKeyLen = computed(() => {
+  const lens = visible.value.map((p) => p.key.length);
+  return lens.length === 0 ? 3 : Math.max(...lens);
+});
+
 function open(key: string) {
   router.push(`/projects/${key}/board`);
 }
@@ -217,10 +226,17 @@ function onCreated(p: { key: string }) {
             class="flex items-center gap-3 p-3 cursor-pointer hover:bg-accent/40 transition-colors"
             @click="open(p.key)"
           >
-            <FolderKanban class="h-4 w-4 text-muted-foreground shrink-0" />
+            <FolderKanban
+              class="h-4 w-4 shrink-0"
+              :class="p.color ? '' : 'text-muted-foreground'"
+              :style="p.color ? { color: p.color } : undefined"
+            />
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2">
-                <span class="font-mono text-xs text-muted-foreground">{{ p.key }}</span>
+                <span
+                  class="font-mono text-xs text-muted-foreground shrink-0"
+                  :style="{ minWidth: `${maxKeyLen}ch` }"
+                >{{ p.key }}</span>
                 <span class="font-medium truncate">{{ p.name }}</span>
                 <Badge v-if="p.archived_at" variant="secondary" class="text-[10px]">
                   <Archive class="h-2.5 w-2.5 mr-0.5" /> archived
@@ -250,8 +266,15 @@ function onCreated(p: { key: string }) {
         @click="open(p.key)"
       >
         <div class="flex items-center gap-2 min-w-0">
-          <FolderKanban class="h-4 w-4 text-muted-foreground shrink-0" />
-          <span class="font-mono text-xs text-muted-foreground">{{ p.key }}</span>
+          <FolderKanban
+            class="h-4 w-4 shrink-0"
+            :class="p.color ? '' : 'text-muted-foreground'"
+            :style="p.color ? { color: p.color } : undefined"
+          />
+          <span
+            class="font-mono text-xs text-muted-foreground shrink-0"
+            :style="{ minWidth: `${maxKeyLen}ch` }"
+          >{{ p.key }}</span>
           <Badge v-if="p.archived_at" variant="secondary" class="text-[10px] ml-auto">
             <Archive class="h-2.5 w-2.5 mr-0.5" /> archived
           </Badge>
