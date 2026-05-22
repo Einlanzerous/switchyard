@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.23.1](https://github.com/Einlanzerous/switchyard/compare/v2.23.0...v2.23.1) (2026-05-22)
+
+
+### Bug Fixes
+
+* protect main branch ([#48](https://github.com/Einlanzerous/switchyard/issues/48)) ([c406929](https://github.com/Einlanzerous/switchyard/commit/c40692920087c0141a6cb8e4b43603e2276921c5))
+* SWY-69 — auto-close rule fires on PR merge (new external-ref-poller actor) ([#47](https://github.com/Einlanzerous/switchyard/issues/47)) ([aca0617](https://github.com/Einlanzerous/switchyard/commit/aca0617f67d5e0af40e9aef88a7d46cfb991dae7))
+
 ## [2.23.0](https://github.com/Einlanzerous/switchyard/compare/v2.22.0...v2.23.0) (2026-05-21)
 
 
