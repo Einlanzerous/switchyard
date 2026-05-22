@@ -1,20 +1,22 @@
 <script setup lang="ts">
-// Personal at-a-glance landing page. Phase 3.1 design.
+// Personal at-a-glance landing page.
 //
 // Layout (12-col grid, collapses to single column on small screens):
 //   row 1 — KPI strip (4 cards): open / in-progress / closed-this-week / cycle time
-//   row 2 — what needs me: my open tickets (8) + @mentions (4)
-//   row 3 — what's happening: recent activity (8) + stale rollup (4)
-//   row 4 — how are we doing: throughput (6) + status donut (6)
+//   row 2 — how are we doing: throughput (6) + status donut (6)
+//   row 3 — what's happening: recent activity (full width)
+//   row 4 — stale work (full width, only when there's something stale)
+//
+// Per-user noise (my open tickets, @mentions) deliberately lives off the
+// dashboard: open tickets are one click away via the profile menu's
+// "My tickets" link, and @mentions surface in the notification bell.
 //
 // Each widget owns its own data fetching so a slow query can't blank the
 // whole dashboard. Skeleton state is per-widget.
 
 import { computed } from "vue";
 import { useQuery } from "@tanstack/vue-query";
-import { useRouter } from "vue-router";
-import { Inbox, Activity, Clock, BarChart2, PieChart } from "lucide-vue-next";
-import { Button } from "@/components/ui/button";
+import { Activity, Clock, BarChart2, PieChart } from "lucide-vue-next";
 import { useAuthStore } from "@/stores/auth";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
@@ -24,13 +26,10 @@ import KpiCard from "@/components/dashboard/KpiCard.vue";
 import DashboardWidget from "@/components/dashboard/DashboardWidget.vue";
 import ActivityFeed from "@/components/dashboard/widgets/ActivityFeed.vue";
 import StaleRollupWidget from "@/components/dashboard/widgets/StaleRollup.vue";
-import MentionsWidget from "@/components/dashboard/widgets/MentionsWidget.vue";
-import MyOpenTickets from "@/components/dashboard/widgets/MyOpenTickets.vue";
 import ThroughputChart from "@/components/dashboard/widgets/ThroughputChart.vue";
 import StatusDonut from "@/components/dashboard/widgets/StatusDonut.vue";
 
 const auth = useAuthStore();
-const router = useRouter();
 
 // ─── KPI feeds ───────────────────────────────────────────────────────────────
 
@@ -175,41 +174,7 @@ const cycleDelta = computed(() => {
       />
     </div>
 
-    <!-- Row 2: What needs me ─────────────────────────────────────────────── -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
-      <DashboardWidget
-        title="My open tickets"
-        class="lg:col-span-8"
-        :padded="false"
-      >
-        <template #title-prefix>
-          <Inbox class="h-3.5 w-3.5 text-muted-foreground" />
-        </template>
-        <template #actions>
-          <Button
-            variant="ghost"
-            size="sm"
-            class="h-7 text-xs"
-            @click="router.push(`/tickets?assignee=${auth.me?.id}`)"
-          >
-            View all →
-          </Button>
-        </template>
-        <MyOpenTickets />
-      </DashboardWidget>
-
-      <MentionsWidget class="lg:col-span-4" />
-    </div>
-
-    <!-- Row 3: Recent activity (full width) ──────────────────────────────── -->
-    <DashboardWidget title="Recent activity" :padded="false">
-      <template #title-prefix>
-        <Activity class="h-3.5 w-3.5 text-muted-foreground" />
-      </template>
-      <ActivityFeed :limit="20" />
-    </DashboardWidget>
-
-    <!-- Row 4: How are we doing ──────────────────────────────────────────── -->
+    <!-- Row 2: How are we doing ──────────────────────────────────────────── -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
       <DashboardWidget title="Throughput" class="lg:col-span-6">
         <template #title-prefix>
@@ -229,7 +194,15 @@ const cycleDelta = computed(() => {
       </DashboardWidget>
     </div>
 
-    <!-- Row 5 (conditional): stale work, only when there's something to see.
+    <!-- Row 3: Recent activity (full width) ──────────────────────────────── -->
+    <DashboardWidget title="Recent activity" :padded="false">
+      <template #title-prefix>
+        <Activity class="h-3.5 w-3.5 text-muted-foreground" />
+      </template>
+      <ActivityFeed :limit="20" />
+    </DashboardWidget>
+
+    <!-- Row 4 (conditional): stale work, only when there's something to see.
          Full-width row at the bottom rather than a tall column upstairs.
          The widget itself still reads from useStaleRollup so the data is
          already in cache; we just gate the wrapper. -->
