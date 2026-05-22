@@ -2,7 +2,7 @@
 import { computed } from "vue";
 import { RouterLink, RouterView, useRoute } from "vue-router";
 import {
-  User as UserIcon, Key, Tag, FolderKanban, Users, Database, SlidersHorizontal,
+  User as UserIcon, Palette, Key, Tag, FolderKanban, Users, Database, SlidersHorizontal,
 } from "lucide-vue-next";
 import { cn } from "@/lib/utils";
 
@@ -14,6 +14,7 @@ const groups: NavGroup[] = [
     label: "Personal",
     items: [
       { to: "/settings/profile", label: "Profile", icon: UserIcon },
+      { to: "/settings/preferences", label: "Preferences", icon: Palette },
       { to: "/settings/tokens", label: "API tokens", icon: Key },
     ],
   },

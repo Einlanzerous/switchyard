@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Search, Sun, Moon, Monitor, LogOut, User as UserIcon } from "lucide-vue-next";
+import { Search, Inbox, LogOut, Settings as SettingsIcon } from "lucide-vue-next";
 import { Button } from "@/components/ui/button";
 import NotificationsBell from "./NotificationsBell.vue";
 import {
@@ -11,12 +11,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import UserAvatar from "@/components/UserAvatar.vue";
-import { useThemeStore } from "@/stores/theme";
 import { useAuthStore } from "@/stores/auth";
 import { useUiStore } from "@/stores/ui";
 import { useRouter } from "vue-router";
 
-const theme = useThemeStore();
 const auth = useAuthStore();
 const ui = useUiStore();
 const router = useRouter();
@@ -55,17 +53,6 @@ function logout() {
     <div class="flex-1 flex items-center justify-end gap-2">
       <NotificationsBell v-if="auth.isAuthenticated" />
 
-      <Button
-        variant="ghost"
-        size="icon"
-        :aria-label="`Theme: ${theme.mode}`"
-        @click="theme.cycle"
-      >
-        <Sun v-if="theme.mode === 'light'" class="h-4 w-4" />
-        <Moon v-else-if="theme.mode === 'dark'" class="h-4 w-4" />
-        <Monitor v-else class="h-4 w-4" />
-      </Button>
-
       <DropdownMenu v-if="auth.isAuthenticated">
         <DropdownMenuTrigger as-child>
           <Button variant="ghost" size="icon" class="rounded-full" aria-label="User menu">
@@ -77,8 +64,11 @@ function logout() {
             {{ auth.me?.name }} · {{ auth.me?.type }}
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
+          <DropdownMenuItem @click="router.push(`/tickets?assignee=${auth.me?.id}`)">
+            <Inbox class="h-4 w-4 mr-2" /> My tickets
+          </DropdownMenuItem>
           <DropdownMenuItem @click="router.push('/settings')">
-            <UserIcon class="h-4 w-4 mr-2" /> Settings
+            <SettingsIcon class="h-4 w-4 mr-2" /> Settings
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem @click="logout">

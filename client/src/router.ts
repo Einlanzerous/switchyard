@@ -19,6 +19,7 @@ import HealthView from "./views/HealthView.vue";
 // sharing the sidebar. /settings on its own redirects to the profile page.
 import SettingsLayout from "./views/settings/SettingsLayout.vue";
 import SettingsProfile from "./views/settings/SettingsProfile.vue";
+import SettingsPreferences from "./views/settings/SettingsPreferences.vue";
 import SettingsTokens from "./views/settings/SettingsTokens.vue";
 import SettingsLabels from "./views/settings/SettingsLabels.vue";
 import SettingsProjects from "./views/settings/SettingsProjects.vue";
@@ -79,6 +80,7 @@ export const router = createRouter({
       redirect: "/settings/profile",
       children: [
         { path: "profile", name: "settings-profile", component: SettingsProfile },
+        { path: "preferences", name: "settings-preferences", component: SettingsPreferences },
         { path: "tokens", name: "settings-tokens", component: SettingsTokens },
         { path: "labels", name: "settings-labels", component: SettingsLabels },
         { path: "projects", name: "settings-projects", component: SettingsProjects },

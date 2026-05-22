@@ -1,6 +1,7 @@
-// Dashboard E2E. KPI numerics render, charts mount without console
-// errors, mentions widget shows the empty state when test-user has no
-// inbound mentions.
+// Dashboard E2E. KPI numerics render and charts mount without console
+// errors. Per-user noise (my open tickets, @mentions) lives off the
+// dashboard now — open tickets are reachable from the profile menu and
+// @mentions from the notification bell — so neither has a home widget.
 //
 // Charts: ECharts renders to a <canvas> inside its container — we
 // can't introspect chart contents from the DOM, so the smoke test here
@@ -52,18 +53,14 @@ test.describe("dashboard (HomeView)", () => {
     ).toBe(true);
   });
 
-  test("mentions widget renders + window selector toggles", async ({ page }) => {
-    // The widget has a select with five window options. Click it and
-    // pick a different value; the widget should re-fetch.
-    const select = page.getByLabel(/Mentions window/i);
-    await expect(select).toBeVisible();
-    await select.selectOption("3");
-    // No specific data assertion — we just want the select to be
-    // interactive without errors. Logged console errors fail the test
-    // suite separately via the smoke spec's no-error guard.
-  });
-
   test("recent activity widget renders", async ({ page }) => {
     await expect(page.getByText(/Recent activity/i).first()).toBeVisible();
+  });
+
+  test("per-user widgets are no longer on the dashboard", async ({ page }) => {
+    // "My open tickets" and "Mentions" moved off the dashboard. Guard
+    // against a regression that reintroduces them here.
+    await expect(page.getByRole("heading", { name: /my open tickets/i })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: /^mentions$/i })).toHaveCount(0);
   });
 });
