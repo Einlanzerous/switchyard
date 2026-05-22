@@ -23,7 +23,11 @@ jobs:
       - uses: astral-sh/setup-uv@v5
 
       - name: Install graphify
-        run: uv tool install graphifyy
+        # graphifyy doesn't declare `anthropic` as a dependency, but the
+        # `claude` semantic backend imports it at runtime — inject it into
+        # the tool environment so `graphify extract` doesn't bail with
+        # "requires the anthropic package".
+        run: uv tool install graphifyy --with anthropic
 
       - name: Build knowledge graph
         env:
