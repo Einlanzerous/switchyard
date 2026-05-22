@@ -43,7 +43,9 @@ client/playwright/.auth/
 *.log
 
 # Local-dev attachment storage (production uses the /data/uploads docker volume)
-uploads/
+# Glob: catches `uploads/`, `uploads-dev/`, and any future variant a `UPLOAD_DIR`
+# env points at. The `.bootstrap-token` lives in there on first boot.
+uploads*/
 
 # Knowledge graph — large generated files stay local; cache + report are committed
 graphify-out/graph.html
