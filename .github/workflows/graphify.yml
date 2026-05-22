@@ -14,6 +14,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Admin-scoped PAT so the auto-commit push below authenticates as a
+          # repo admin and bypasses the `main` ruleset. The default GITHUB_TOKEN
+          # pushes as github-actions[bot], which the ruleset would block.
+          token: ${{ secrets.GRAPHIFY_PUSH_TOKEN }}
 
       - uses: astral-sh/setup-uv@v5
 
