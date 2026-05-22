@@ -44,6 +44,7 @@ client/playwright/.auth/
 
 # Local-dev attachment storage (production uses the /data/uploads docker volume)
 uploads/
+uploads-dev/
 
 # Knowledge graph — large generated files stay local; cache + report are committed
 graphify-out/graph.html
