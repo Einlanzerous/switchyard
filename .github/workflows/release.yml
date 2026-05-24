@@ -18,9 +18,26 @@ jobs:
       tag_name: ${{ steps.release.outputs.tag_name }}
       version: ${{ steps.release.outputs.version }}
     steps:
+      # Mint a short-lived installation token from our GitHub App so the
+      # release PR is created by the App identity rather than the default
+      # GITHUB_TOKEN. Events from GITHUB_TOKEN don't trigger other
+      # workflows (GitHub's anti-recursion safeguard), which is why the
+      # release PR's required `typecheck-and-test` / `e2e` checks never
+      # ran. An App-minted token is a real actor, so those checks fire.
+      # Requires repo (or org) secrets RELEASE_BOT_APP_ID +
+      # RELEASE_BOT_PRIVATE_KEY; the App needs Contents: write +
+      # Pull requests: write on this repo.
+      - name: Mint GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.RELEASE_BOT_APP_ID }}
+          private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
+
       - uses: googleapis/release-please-action@v4
         id: release
         with:
+          token: ${{ steps.app-token.outputs.token }}
           # `simple` is the right pick for switchyard: the project is a bun
           # workspace with three package.json files, none of which are
           # individually published. release-please tracks the version via
