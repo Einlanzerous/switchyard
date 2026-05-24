@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.24.0](https://github.com/Einlanzerous/switchyard/compare/v2.23.1...v2.24.0) (2026-05-24)
+
+
+### Features
+
+* SWY-71 — dashboard IA: profile-menu My tickets, theme in Settings, leaner home ([#51](https://github.com/Einlanzerous/switchyard/issues/51)) ([4e8ec3f](https://github.com/Einlanzerous/switchyard/commit/4e8ec3fc4ba7ada10ef1a3c33fdedc70822df173))
+
+
+### Bug Fixes
+
+* create release PR via GitHub App token so required checks run ([#54](https://github.com/Einlanzerous/switchyard/issues/54)) ([912c939](https://github.com/Einlanzerous/switchyard/commit/912c93984713d7c0a59bdcd0868200e99f78f412))
+* install anthropic in graphify CI so semantic extraction works ([#53](https://github.com/Einlanzerous/switchyard/issues/53)) ([046b6ba](https://github.com/Einlanzerous/switchyard/commit/046b6ba60c05fc95f56bbb7a9ea043b1ea34d81a))
+
 ## [2.23.1](https://github.com/Einlanzerous/switchyard/compare/v2.23.0...v2.23.1) (2026-05-22)
 
 
