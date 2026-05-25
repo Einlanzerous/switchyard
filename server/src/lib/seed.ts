@@ -65,9 +65,9 @@ const CANONICAL_USERS: CanonicalUser[] = [
   { name: EXTERNAL_REF_POLLER_USER_NAME, type: "agent" },
 ];
 
-export async function seed(): Promise<void> {
+export async function seed(opts: { bootstrapToken?: string } = {}): Promise<void> {
   const userIdsByName = await ensureUsers();
-  await ensureBootstrapToken(userIdsByName.get("magos")!);
+  await ensureBootstrapToken(userIdsByName.get("magos")!, opts.bootstrapToken);
   await ensureDefaultSettings();
   await ensureLabels();
   await ensureDefaultBoard();
@@ -178,10 +178,10 @@ async function ensureUsers(): Promise<Map<string, string>> {
   return result;
 }
 
-async function ensureBootstrapToken(magosId: string): Promise<void> {
-  // Path A: explicit BOOTSTRAP_TOKEN env — register it (idempotent on hash).
-  if (env.BOOTSTRAP_TOKEN) {
-    const hash = hashToken(env.BOOTSTRAP_TOKEN);
+async function ensureBootstrapToken(magosId: string, bootstrapToken: string | undefined): Promise<void> {
+  // Path A: explicit BOOTSTRAP_TOKEN — register it (idempotent on hash).
+  if (bootstrapToken) {
+    const hash = hashToken(bootstrapToken);
     const [existing] = await db
       .select({ id: schema.apiTokens.id })
       .from(schema.apiTokens)
@@ -190,7 +190,7 @@ async function ensureBootstrapToken(magosId: string): Promise<void> {
 
     if (existing) return;
 
-    const prefix = env.BOOTSTRAP_TOKEN.slice(0, 10);
+    const prefix = bootstrapToken.slice(0, 10);
     await db.insert(schema.apiTokens).values({
       user_id: magosId,
       name: "bootstrap",

@@ -24,7 +24,6 @@ beforeEach(async () => {
 
 describe("seed", () => {
   test("creates 8 canonical users on first run", async () => {
-    delete process.env.BOOTSTRAP_TOKEN;
     const { seed } = await import("../../src/lib/seed.js");
     await seed();
     const users = await testDb.select().from(schema.users);
@@ -43,7 +42,6 @@ describe("seed", () => {
   });
 
   test("re-running is a no-op (idempotent)", async () => {
-    delete process.env.BOOTSTRAP_TOKEN;
     const { seed } = await import("../../src/lib/seed.js");
     await seed();
     await seed();
@@ -52,7 +50,6 @@ describe("seed", () => {
   });
 
   test("auto-generates one bootstrap token when api_tokens is empty", async () => {
-    delete process.env.BOOTSTRAP_TOKEN;
     const { seed } = await import("../../src/lib/seed.js");
     await seed();
 
@@ -68,7 +65,6 @@ describe("seed", () => {
   });
 
   test("seeds the ready-for-agent canonical label (idempotent)", async () => {
-    delete process.env.BOOTSTRAP_TOKEN;
     const { seed } = await import("../../src/lib/seed.js");
     await seed();
     const labels = await testDb.select().from(schema.labels);
@@ -80,20 +76,18 @@ describe("seed", () => {
     expect(after.filter((l) => l.name === "ready-for-agent")).toHaveLength(1);
   });
 
-  test("explicit BOOTSTRAP_TOKEN env wins (registered, not regenerated)", async () => {
-    process.env.BOOTSTRAP_TOKEN = "sw_TESTBOOTSTRAPTOKEN0123456789ABCDEFGH";
+  test("explicit BOOTSTRAP_TOKEN wins (registered, not regenerated)", async () => {
+    const bootstrapToken = "sw_TESTBOOTSTRAPTOKEN0123456789ABCDEFGH";
     const { seed } = await import("../../src/lib/seed.js");
-    await seed();
+    await seed({ bootstrapToken });
 
     const tokens = await testDb.select().from(schema.apiTokens);
     expect(tokens).toHaveLength(1);
     expect(tokens[0]!.token_prefix).toBe("sw_TESTBOO");
 
-    // Second run with same env value: still one token.
-    await seed();
+    // Second run with same value: still one token.
+    await seed({ bootstrapToken });
     const after = await testDb.select().from(schema.apiTokens);
     expect(after).toHaveLength(1);
-
-    delete process.env.BOOTSTRAP_TOKEN;
   });
 });
