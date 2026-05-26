@@ -46,7 +46,7 @@ async function main() {
 
     await timed("seed", async () => {
       const { seed } = await import("./seed.js");
-      await seed();
+      await seed({ bootstrapToken: env.BOOTSTRAP_TOKEN });
     });
 
     console.log(`[migrate] done in ${Date.now() - overallStart}ms`);
