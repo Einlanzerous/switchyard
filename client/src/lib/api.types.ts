@@ -2214,6 +2214,7 @@ export interface paths {
                                 color: string | null;
                                 /** Format: uri */
                                 repo_url: string | null;
+                                default_test_cmd: string | null;
                                 /** Format: date-time */
                                 archived_at: string | null;
                                 board_closed_window_days: 7 | 14 | 30 | unknown | unknown;
@@ -2377,6 +2378,7 @@ export interface paths {
                         color?: string;
                         /** Format: uri */
                         repo_url?: string;
+                        default_test_cmd?: string;
                         board_closed_window_days?: 7 | 14 | 30;
                     };
                 };
@@ -2397,6 +2399,7 @@ export interface paths {
                             color: string | null;
                             /** Format: uri */
                             repo_url: string | null;
+                            default_test_cmd: string | null;
                             /** Format: date-time */
                             archived_at: string | null;
                             board_closed_window_days: 7 | 14 | 30 | unknown | unknown;
@@ -2577,6 +2580,7 @@ export interface paths {
                             color: string | null;
                             /** Format: uri */
                             repo_url: string | null;
+                            default_test_cmd: string | null;
                             /** Format: date-time */
                             archived_at: string | null;
                             board_closed_window_days: 7 | 14 | 30 | unknown | unknown;
@@ -2886,6 +2890,7 @@ export interface paths {
                         color?: string;
                         /** Format: uri */
                         repo_url?: string | null;
+                        default_test_cmd?: string | null;
                         board_closed_window_days?: 7 | 14 | 30 | unknown | unknown;
                         archived?: boolean;
                     };
@@ -2907,6 +2912,7 @@ export interface paths {
                             color: string | null;
                             /** Format: uri */
                             repo_url: string | null;
+                            default_test_cmd: string | null;
                             /** Format: date-time */
                             archived_at: string | null;
                             board_closed_window_days: 7 | 14 | 30 | unknown | unknown;

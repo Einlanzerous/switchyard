@@ -3081,6 +3081,10 @@ paths:
                           nullable: true
                           maxLength: 2048
                           format: uri
+                        default_test_cmd:
+                          type: string
+                          nullable: true
+                          maxLength: 2048
                         archived_at:
                           type: string
                           nullable: true
@@ -3115,6 +3119,7 @@ paths:
                         - description
                         - color
                         - repo_url
+                        - default_test_cmd
                         - archived_at
                         - board_closed_window_days
                         - created_at
@@ -3329,6 +3334,9 @@ paths:
                   type: string
                   maxLength: 2048
                   format: uri
+                default_test_cmd:
+                  type: string
+                  maxLength: 2048
                 board_closed_window_days:
                   anyOf:
                     - type: number
@@ -3374,6 +3382,10 @@ paths:
                     nullable: true
                     maxLength: 2048
                     format: uri
+                  default_test_cmd:
+                    type: string
+                    nullable: true
+                    maxLength: 2048
                   archived_at:
                     type: string
                     nullable: true
@@ -3408,6 +3420,7 @@ paths:
                   - description
                   - color
                   - repo_url
+                  - default_test_cmd
                   - archived_at
                   - board_closed_window_days
                   - created_at
@@ -3624,6 +3637,10 @@ paths:
                     nullable: true
                     maxLength: 2048
                     format: uri
+                  default_test_cmd:
+                    type: string
+                    nullable: true
+                    maxLength: 2048
                   archived_at:
                     type: string
                     nullable: true
@@ -3658,6 +3675,7 @@ paths:
                   - description
                   - color
                   - repo_url
+                  - default_test_cmd
                   - archived_at
                   - board_closed_window_days
                   - created_at
@@ -3863,6 +3881,10 @@ paths:
                   nullable: true
                   maxLength: 2048
                   format: uri
+                default_test_cmd:
+                  type: string
+                  nullable: true
+                  maxLength: 2048
                 board_closed_window_days:
                   anyOf:
                     - type: number
@@ -3909,6 +3931,10 @@ paths:
                     nullable: true
                     maxLength: 2048
                     format: uri
+                  default_test_cmd:
+                    type: string
+                    nullable: true
+                    maxLength: 2048
                   archived_at:
                     type: string
                     nullable: true
@@ -3943,6 +3969,7 @@ paths:
                   - description
                   - color
                   - repo_url
+                  - default_test_cmd
                   - archived_at
                   - board_closed_window_days
                   - created_at

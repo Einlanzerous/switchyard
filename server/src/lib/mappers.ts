@@ -57,6 +57,7 @@ export function mapProject(p: ProjectRow): Project {
     description: p.description,
     color: p.color,
     repo_url: p.repo_url,
+    default_test_cmd: p.default_test_cmd,
     archived_at: p.archived_at,
     board_closed_window_days: (p.board_closed_window_days ?? null) as Project["board_closed_window_days"],
     created_at: p.created_at,

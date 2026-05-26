@@ -97,6 +97,10 @@ export const projects = pgTable(
     // When set, the project header renders the project name as a link out.
     // Loose `text` so we accept any URL shape; the UI validates.
     repo_url: text("repo_url"),
+    // Default shell command pipeline-driven projects run for tickets that
+    // don't carry their own `metadata.test_cmd`. Loose `text` — the
+    // cogitation engine accepts any shell string.
+    default_test_cmd: text("default_test_cmd"),
     archived_at: timestamp("archived_at", { withTimezone: true, mode: "string" }),
     // Per-project override for the kanban Closed column window. NULL
     // means inherit the system setting (`board_closed_window_days`).
