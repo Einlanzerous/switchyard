@@ -12,6 +12,11 @@ export const Project = z
     // Canonical repo URL — surfaced as a link from the project header.
     // Loose `string().url()` validation; empty/null = no link.
     repo_url: z.string().url().max(2048).nullable(),
+    // Default shell command pipeline-driven projects run for tickets
+    // that don't carry their own `metadata.test_cmd`. Paired with
+    // `repo_url` so the cogitation engine can pick up a project ticket
+    // without per-ticket backfill.
+    default_test_cmd: z.string().max(2048).nullable(),
     archived_at: z.string().datetime({ offset: true }).nullable(),
     // Per-project override for the kanban Closed column window. NULL =
     // inherit the system setting (`board_closed_window_days`). The
@@ -39,6 +44,7 @@ export const CreateProject = z.object({
   description: z.string().max(10_000).optional(),
   color: HexColor.optional(),
   repo_url: z.string().url().max(2048).optional(),
+  default_test_cmd: z.string().max(2048).optional(),
   board_closed_window_days: ClosedWindowDays.optional(),
 });
 export type CreateProject = z.infer<typeof CreateProject>;
@@ -51,5 +57,7 @@ export const UpdateProject = CreateProject.omit({ key: true }).partial().extend(
   ]).optional(),
   // Null clears the repo_url link.
   repo_url: z.string().url().max(2048).nullable().optional(),
+  // Null clears the default test command (tickets fall back to their own metadata).
+  default_test_cmd: z.string().max(2048).nullable().optional(),
 });
 export type UpdateProject = z.infer<typeof UpdateProject>;

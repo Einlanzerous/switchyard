@@ -46,7 +46,13 @@ describe("list_projects", () => {
 describe("get_project", () => {
   test("calls GET /v1/projects/:key with the project key in the path", async () => {
     const recorder = installFetchRecorder({
-      body: { id: "p1", key: "SWY", name: "Switchyard", repo_url: null },
+      body: {
+        id: "p1",
+        key: "SWY",
+        name: "Switchyard",
+        repo_url: null,
+        default_test_cmd: "bun test",
+      },
     });
     const { client, close } = await connectTestClient();
     try {
@@ -90,6 +96,7 @@ describe("create_project", () => {
         description: "test",
         color: null,
         repo_url: "https://github.com/foo/flow",
+        default_test_cmd: "bun test",
         archived_at: null,
       },
     });
@@ -102,6 +109,7 @@ describe("create_project", () => {
           name: "Flow Project",
           description: "test",
           repo_url: "https://github.com/foo/flow",
+          default_test_cmd: "bun test",
         },
       });
       expect(res.isError).toBeFalsy();
@@ -112,6 +120,7 @@ describe("create_project", () => {
       expect(body.key).toBe("FLOW");
       expect(body.name).toBe("Flow Project");
       expect(body.repo_url).toBe("https://github.com/foo/flow");
+      expect(body.default_test_cmd).toBe("bun test");
     } finally {
       await close();
       recorder.restore();

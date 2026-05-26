@@ -66,8 +66,10 @@ export function registerProjectTools(server: McpServer): void {
         "Fetch a single project by key. Useful before `create_project` to check " +
         "whether a key is already taken — calling `create_project` on an existing " +
         "key returns a 409 conflict. Returns the project metadata (name, description, " +
-        "color, repo_url, archived state). For the project's statuses, call " +
-        "`get_project_statuses` instead.",
+        "color, archived state, and the two pipeline-relevant fields `repo_url` and " +
+        "`default_test_cmd` — the cogitation engine falls back to these when a ticket " +
+        "lacks its own `metadata.repo_url` / `metadata.test_cmd`). For the project's " +
+        "statuses, call `get_project_statuses` instead.",
       inputSchema: {
         project_key: PROJECT_KEY.describe(
           "Project key (e.g. `SWY`). Case-sensitive, uppercase.",
@@ -106,7 +108,11 @@ export function registerProjectTools(server: McpServer): void {
         "follow-up `get_project_statuses` + status-creation calls are needed for " +
         "typical workflows. " +
         "Idempotency is on the caller: returns 409 on a duplicate key. Prefer " +
-        "checking with `get_project` first when in doubt.",
+        "checking with `get_project` first when in doubt. " +
+        "For pipeline-driven projects (one repo, one test command for every ticket), " +
+        "set `repo_url` and `default_test_cmd` at creation — together they mark the " +
+        "project as pipeline-ready and let the cogitation engine pick up tickets " +
+        "without per-ticket `metadata.repo_url` / `metadata.test_cmd` backfill.",
       inputSchema: {
         key: PROJECT_KEY.describe(
           "Project key (immutable). 2–10 uppercase alphanumeric chars starting with a letter.",
@@ -132,7 +138,18 @@ export function registerProjectTools(server: McpServer): void {
           .max(2048)
           .optional()
           .describe(
-            "Canonical repo URL — surfaces as a link from the project header.",
+            "Canonical repo URL — surfaces as a link from the project header, " +
+            "and marks the project as pipeline-relevant (cogitation engine falls " +
+            "back to it when a ticket lacks `metadata.repo_url`).",
+          ),
+        default_test_cmd: z
+          .string()
+          .max(2048)
+          .optional()
+          .describe(
+            "Default shell command the pipeline runs for tickets in this project " +
+            "(e.g. `bun test`). Tickets without their own `metadata.test_cmd` fall " +
+            "back to this. Pair with `repo_url` to fully describe a pipeline-driven project.",
           ),
       },
     },
