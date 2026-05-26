@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.26.0](https://github.com/Einlanzerous/switchyard/compare/v2.25.0...v2.26.0) (2026-05-26)
+
+
+### Features
+
+* SWY-77 — divider above Comments, newest-first order, composer on top ([#59](https://github.com/Einlanzerous/switchyard/issues/59)) ([2eadcc0](https://github.com/Einlanzerous/switchyard/commit/2eadcc0788b8eef4391e589a11a9e54817c8c155))
+
 ## [2.25.0](https://github.com/Einlanzerous/switchyard/compare/v2.24.0...v2.25.0) (2026-05-26)
 
 
