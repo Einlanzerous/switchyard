@@ -84,6 +84,15 @@ const showLinkedWork = computed(() => {
   return true; // always render so users can add their first link
 });
 
+// Newest-first: real use is "what's the latest?", then read back as needed.
+// Sort defensively here rather than relying on API order.
+const sortedComments = computed(() => {
+  if (!ticket.value) return [];
+  return [...ticket.value.comments].sort((a, b) =>
+    b.created_at.localeCompare(a.created_at),
+  );
+});
+
 const qc = useQueryClient();
 
 const addLinkMutation = useMutation({
@@ -317,18 +326,19 @@ const removeLinkMutation = useMutation({
         </ul>
       </section>
 
-      <section>
+      <section class="border-t pt-6 mt-6">
         <h3 class="text-xs uppercase tracking-wider text-muted-foreground mb-3">
           Comments
         </h3>
-        <ul v-if="ticket.comments.length > 0" class="space-y-4">
-          <CommentItem v-for="c in ticket.comments" :key="c.id" :comment="c" />
-        </ul>
-        <p v-else class="text-sm text-muted-foreground italic mb-3">No comments yet.</p>
 
-        <div class="mt-4">
+        <div class="mb-4">
           <CommentComposer :ticket-key="ticket.key" />
         </div>
+
+        <ul v-if="sortedComments.length > 0" class="space-y-4">
+          <CommentItem v-for="c in sortedComments" :key="c.id" :comment="c" />
+        </ul>
+        <p v-else class="text-sm text-muted-foreground italic">No comments yet.</p>
       </section>
     </template>
 
