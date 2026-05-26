@@ -39,6 +39,9 @@ client/playwright/.auth/
 # Claude Code MCP config — contains a bearer token; set up per clone
 .mcp.json
 
+# Local secrets (GitHub app private keys, bot env files, etc.) — never commit
+.secrets/
+
 # Logs
 *.log
 
