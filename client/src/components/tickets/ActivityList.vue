@@ -40,7 +40,11 @@ const META: Record<EventType, { icon: any; verb: string }> = {
   "project.deleted": { icon: Trash2, verb: "deleted the project" },
 };
 
-const ordered = computed(() => [...props.events].reverse());
+// Newest-first. Server already returns DESC; sort defensively here so
+// we don't rely on transport order.
+const ordered = computed(() =>
+  [...props.events].sort((a, b) => b.occurred_at.localeCompare(a.occurred_at)),
+);
 
 function relative(iso: string): string {
   try { return formatDistanceToNow(new Date(iso), { addSuffix: true }); }
