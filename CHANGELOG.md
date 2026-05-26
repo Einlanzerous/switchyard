@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.25.0](https://github.com/Einlanzerous/switchyard/compare/v2.24.0...v2.25.0) (2026-05-26)
+
+
+### Features
+
+* SWY-75 — project-level default_test_cmd + pipeline-relevant MCP surface ([#57](https://github.com/Einlanzerous/switchyard/issues/57)) ([a28f11a](https://github.com/Einlanzerous/switchyard/commit/a28f11a9aae610d1f514537dcb404d7136ac15f5))
+* SWY-76 — MCP tools for ticket links (blocks / relates_to / duplicates) ([#58](https://github.com/Einlanzerous/switchyard/issues/58)) ([4c80a4a](https://github.com/Einlanzerous/switchyard/commit/4c80a4a2c58bed7fcc1d38e07156fd428fb0dea3))
+
+
+### Bug Fixes
+
+* SWY-62 — pass bootstrapToken to seed() instead of reading cached env ([#55](https://github.com/Einlanzerous/switchyard/issues/55)) ([1e97b2b](https://github.com/Einlanzerous/switchyard/commit/1e97b2b76502b7057691cfba8fa89c724aa5ed76))
+
 ## [2.24.0](https://github.com/Einlanzerous/switchyard/compare/v2.23.1...v2.24.0) (2026-05-24)
 
 
