@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.27.0](https://github.com/Einlanzerous/switchyard/compare/v2.26.0...v2.27.0) (2026-05-27)
+
+
+### Features
+
+* SWY-79 — unify status-category color palette ([#63](https://github.com/Einlanzerous/switchyard/issues/63)) ([f583faa](https://github.com/Einlanzerous/switchyard/commit/f583faa9c314f79cf22822c9ef2d9cd6e172efab))
+* SWY-80 — MCP tools for external_refs CRUD ([#61](https://github.com/Einlanzerous/switchyard/issues/61)) ([b70f53b](https://github.com/Einlanzerous/switchyard/commit/b70f53bdb71d764084fed82ce114fe8f425757ab))
+
 ## [2.26.0](https://github.com/Einlanzerous/switchyard/compare/v2.25.0...v2.26.0) (2026-05-26)
 
 
