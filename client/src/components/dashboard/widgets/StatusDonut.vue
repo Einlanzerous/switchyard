@@ -8,6 +8,7 @@ import { useQuery } from "@tanstack/vue-query";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
 import { useProjectStats } from "@/composables/useProjectStats";
+import { STATUS_HEX } from "@/lib/statusColors";
 import Chart from "@/components/charts/Chart.vue";
 
 const props = defineProps<{
@@ -66,11 +67,11 @@ const option = computed(() => {
       avoidLabelOverlap: true,
       label: { show: false },
       data: [
-        { name: "Backlog", value: c.backlog },
-        { name: "Planning", value: c.planning },
-        { name: "In Progress", value: c.in_progress },
-        { name: "Blocked", value: c.blocked },
-        { name: "Closed", value: c.closed },
+        { name: "Backlog", value: c.backlog, itemStyle: { color: STATUS_HEX.backlog } },
+        { name: "Planning", value: c.planning, itemStyle: { color: STATUS_HEX.planning } },
+        { name: "In Progress", value: c.in_progress, itemStyle: { color: STATUS_HEX.in_progress } },
+        { name: "Blocked", value: c.blocked, itemStyle: { color: STATUS_HEX.blocked } },
+        { name: "Closed", value: c.closed, itemStyle: { color: STATUS_HEX.closed } },
       ].filter((d) => d.value > 0),
     }],
   };
