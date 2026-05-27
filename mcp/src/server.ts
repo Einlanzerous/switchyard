@@ -8,6 +8,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerProjectTools } from "./tools/projects.js";
 import { registerTicketTools } from "./tools/tickets.js";
 import { registerTicketLinkTools } from "./tools/ticketLinks.js";
+import { registerExternalRefTools } from "./tools/externalRefs.js";
 import { registerQueryTools } from "./tools/query.js";
 
 export function buildServer(): McpServer {
@@ -28,6 +29,7 @@ export function buildServer(): McpServer {
   registerProjectTools(server);
   registerTicketTools(server);
   registerTicketLinkTools(server);
+  registerExternalRefTools(server);
   registerQueryTools(server);
 
   return server;
