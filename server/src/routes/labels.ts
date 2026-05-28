@@ -1,5 +1,5 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import { Label, CreateLabel, UpdateLabel, Uuid } from "@switchyard/shared";
 import { db } from "../db.js";
 import * as schema from "../../drizzle/schema.js";
@@ -7,7 +7,7 @@ import { requireAuth } from "../auth.js";
 import { idempotency } from "../lib/idempotency.js";
 import { errorResponses, okJson, createdJson, noContent, checkScope, z } from "./_helpers.js";
 import { mapLabel } from "../lib/mappers.js";
-import { catchUnique, notFound } from "../errors.js";
+import { catchUnique, notFound, unprocessable } from "../errors.js";
 
 // Labels live in a single global catalog (no project scoping). Any ticket
 // in any project can carry any subset of these labels. CRUD requires
@@ -37,7 +37,19 @@ const update = createRoute({
 
 const remove = createRoute({
   method: "delete", path: "/v1/labels/{id}", tags: [tag], summary: "Delete a label",
-  request: { params: z.object({ id: Uuid }) },
+  request: {
+    params: z.object({ id: Uuid }),
+    query: z.object({
+      force: z
+        .enum(["true", "false"])
+        .optional()
+        .describe(
+          "When omitted or `false`, deleting a label that is still attached to one or " +
+          "more tickets returns 422. Pass `force=true` to delete anyway and let the " +
+          "FK cascade strip the label off every referencing ticket.",
+        ),
+    }),
+  },
   responses: { ...noContent, ...errorResponses },
 });
 
@@ -86,10 +98,27 @@ export function mount(app: OpenAPIHono) {
   app.openapi(remove, (async (c: any) => {
     checkScope(c, "projects:manage");
     const { id } = c.req.valid("param");
-    const result = await db.delete(schema.labels)
+    const { force } = c.req.valid("query");
+
+    const [existing] = await db.select({ id: schema.labels.id })
+      .from(schema.labels)
       .where(eq(schema.labels.id, id))
-      .returning({ id: schema.labels.id });
-    if (result.length === 0) throw notFound("label");
+      .limit(1);
+    if (!existing) throw notFound("label");
+
+    if (force !== "true") {
+      const countRows = await db.select({ count: sql<number>`count(*)::int` })
+        .from(schema.ticketLabels)
+        .where(eq(schema.ticketLabels.label_id, id));
+      const count = countRows[0]?.count ?? 0;
+      if (count > 0) {
+        throw unprocessable(
+          `label is in use by ${count} ticket${count === 1 ? "" : "s"} — re-issue with ?force=true to delete anyway`,
+        );
+      }
+    }
+
+    await db.delete(schema.labels).where(eq(schema.labels.id, id));
     return c.body(null, 204);
   }) as any);
 }

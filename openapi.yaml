@@ -6769,6 +6769,21 @@ paths:
           required: true
           name: id
           in: path
+        - schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+            description: When omitted or `false`, deleting a label that is still attached to
+              one or more tickets returns 422. Pass `force=true` to delete
+              anyway and let the FK cascade strip the label off every
+              referencing ticket.
+          required: false
+          description: When omitted or `false`, deleting a label that is still attached to
+            one or more tickets returns 422. Pass `force=true` to delete anyway
+            and let the FK cascade strip the label off every referencing ticket.
+          name: force
+          in: query
       responses:
         "204":
           description: no content
