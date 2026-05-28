@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.28.0](https://github.com/Einlanzerous/switchyard/compare/v2.27.0...v2.28.0) (2026-05-28)
+
+
+### Features
+
+* SWY-68 — MCP status admin + label CRUD tools ([#64](https://github.com/Einlanzerous/switchyard/issues/64)) ([0ea2c3c](https://github.com/Einlanzerous/switchyard/commit/0ea2c3c7b1da034dd96e5490087a8eabfc2ea1e4))
+
 ## [2.27.0](https://github.com/Einlanzerous/switchyard/compare/v2.26.0...v2.27.0) (2026-05-27)
 
 
