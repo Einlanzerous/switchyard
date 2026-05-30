@@ -7,6 +7,7 @@ import {
 } from "lucide-vue-next";
 import { Skeleton } from "@/components/ui/skeleton";
 import StatusBadge from "./StatusBadge.vue";
+import { collapseTransitionEvents } from "@/lib/activity";
 import type { Event as ApiEvent, EventType } from "@switchyard/shared";
 
 const props = defineProps<{
@@ -41,9 +42,14 @@ const META: Record<EventType, { icon: any; verb: string }> = {
 };
 
 // Newest-first. Server already returns DESC; sort defensively here so
-// we don't rely on transport order.
+// we don't rely on transport order. Collapse the `status_changed` ("changed
+// status") twin a close/release writes alongside its terminal event first, so
+// the retained `closed`/`released` row (which still carries `changes.status`)
+// renders the from→after pills without a duplicate line above it.
 const ordered = computed(() =>
-  [...props.events].sort((a, b) => b.occurred_at.localeCompare(a.occurred_at)),
+  collapseTransitionEvents([...props.events]).sort((a, b) =>
+    b.occurred_at.localeCompare(a.occurred_at),
+  ),
 );
 
 function relative(iso: string): string {
