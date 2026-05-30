@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.28.1](https://github.com/Einlanzerous/switchyard/compare/v2.28.0...v2.28.1) (2026-05-30)
+
+
+### Bug Fixes
+
+* SWY-84 — de-dupe activity feed (collapse "moved" under close) ([#66](https://github.com/Einlanzerous/switchyard/issues/66)) ([cccad52](https://github.com/Einlanzerous/switchyard/commit/cccad524a6168f40c594dea0de103b7117be6b50))
+
 ## [2.28.0](https://github.com/Einlanzerous/switchyard/compare/v2.27.0...v2.28.0) (2026-05-28)
 
 
