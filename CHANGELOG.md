@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.28.2](https://github.com/Einlanzerous/switchyard/compare/v2.28.1...v2.28.2) (2026-05-30)
+
+
+### Bug Fixes
+
+* SWY-84 — collapse rules-engine close/release twins in activity feed ([#68](https://github.com/Einlanzerous/switchyard/issues/68)) ([cb8ed4f](https://github.com/Einlanzerous/switchyard/commit/cb8ed4f1fcf8da6b85e0c9edebe1c7db11c54f98))
+
 ## [2.28.1](https://github.com/Einlanzerous/switchyard/compare/v2.28.0...v2.28.1) (2026-05-30)
 
 
