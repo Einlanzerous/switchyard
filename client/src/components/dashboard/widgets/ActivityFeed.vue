@@ -10,6 +10,7 @@ import UserAvatar from "@/components/UserAvatar.vue";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
 import { formatRelativeTime } from "@/lib/formatTime";
+import { collapseTransitionEvents } from "@/lib/activity";
 
 const props = defineProps<{
   project?: string;     // CSV of project keys
@@ -36,7 +37,9 @@ const q = useQuery({
   },
 });
 
-const items = computed(() => q.data.value?.items ?? []);
+// Collapse the `status_changed` ("moved") twin a close/release writes alongside
+// its terminal event, so one action renders as one line.
+const items = computed(() => collapseTransitionEvents(q.data.value?.items ?? []));
 
 function actionVerb(event: string): string {
   switch (event) {
