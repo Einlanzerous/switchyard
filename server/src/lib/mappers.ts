@@ -130,12 +130,19 @@ export function mapAttachment(a: AttachmentRow, uploader: UserRow): Attachment {
 // ─── comments ──────────────────────────────────────────────────────────────
 
 export function mapComment(c: CommentRow, author: UserRow, attachments: Attachment[]): Comment {
+  const deleted = c.deleted_at != null;
+  // Tombstoned comments stay in-thread as a placeholder: redact the body and
+  // drop attachments so deleted content never leaks. The "[deleted]" string
+  // also satisfies the Comment.body min(1) floor.
+  const edited = !deleted && c.updated_at > c.created_at;
   return {
     id: c.id,
     ticket_id: c.ticket_id,
     author: mapUserRef(author),
-    body: c.body,
-    attachments,
+    body: deleted ? "[deleted]" : c.body,
+    attachments: deleted ? [] : attachments,
+    edited,
+    deleted,
     created_at: c.created_at,
     updated_at: c.updated_at,
     deleted_at: c.deleted_at,

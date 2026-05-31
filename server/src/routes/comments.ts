@@ -12,7 +12,7 @@ import { buildPage, cursorOrderBy, cursorWhere, decodeCursor } from "../lib/pagi
 import { writeEvent } from "../lib/events.js";
 import { loadTicketSummary } from "../lib/tickets.js";
 import { detectAndNotify, detectAndNotifyOnEdit } from "../lib/mentions.js";
-import { badRequest, notFound } from "../errors.js";
+import { badRequest, forbidden, notFound } from "../errors.js";
 
 const tag = "Comments";
 const idOrKey = z.string().min(1);
@@ -60,9 +60,10 @@ export function mount(app: OpenAPIHono) {
     const limit = q.limit;
     const ticket = await resolveTicket(param);
 
+    // Deleted comments are kept in-thread as "[deleted]" tombstones (mapComment
+    // redacts the body), so we intentionally do NOT filter on deleted_at here.
     const conds: SQL[] = [
       eq(schema.comments.ticket_id, ticket.id),
-      isNull(schema.comments.deleted_at),
     ];
     if (q.cursor) {
       const cur = decodeCursor(q.cursor);
@@ -163,6 +164,8 @@ export function mount(app: OpenAPIHono) {
       .where(and(eq(schema.comments.id, id), isNull(schema.comments.deleted_at)))
       .limit(1);
     if (!existing) throw notFound("comment");
+    // Author-only: a comment can only be edited by the user who wrote it.
+    if (existing.author_id !== auth.user.id) throw forbidden("only the author can edit this comment");
 
     if (body.body === undefined) {
       const author = (await db.select().from(schema.users).where(eq(schema.users.id, existing.author_id)).limit(1))[0]!;
@@ -177,7 +180,8 @@ export function mount(app: OpenAPIHono) {
 
     const updated = await db.transaction(async (tx) => {
       const [u] = await tx.update(schema.comments)
-        .set({ body: body.body })
+        // Bump updated_at so mapComment can surface the "edited" marker.
+        .set({ body: body.body, updated_at: new Date().toISOString() })
         .where(eq(schema.comments.id, id))
         .returning();
       if (!u) throw notFound("comment");
@@ -226,6 +230,8 @@ export function mount(app: OpenAPIHono) {
       .where(and(eq(schema.comments.id, id), isNull(schema.comments.deleted_at)))
       .limit(1);
     if (!existing) throw notFound("comment");
+    // Author-only: a comment can only be deleted by the user who wrote it.
+    if (existing.author_id !== auth.user.id) throw forbidden("only the author can delete this comment");
 
     const ticket = (await db.select().from(schema.tickets).where(eq(schema.tickets.id, existing.ticket_id)).limit(1))[0]!;
     const summary = await loadTicketSummary(ticket);

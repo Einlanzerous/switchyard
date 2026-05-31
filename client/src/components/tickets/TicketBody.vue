@@ -170,6 +170,57 @@ const removeLinkMutation = useMutation({
   },
   onSettled: () => { removingLinkId.value = null; },
 });
+
+// ─── Comment edit / delete ──────────────────────────────────────────────────
+
+// Id of the comment currently being edited/deleted, so its row can show a
+// spinner and suppress its actions while the request is in flight.
+const pendingCommentId = ref<string | null>(null);
+
+const editCommentMutation = useMutation({
+  mutationFn: async ({ id, body }: { id: string; body: string }) => {
+    const { error } = await api.PATCH("/v1/comments/{id}", {
+      params: { path: { id } },
+      body: { body },
+    });
+    if (error) throw error;
+  },
+  onSuccess: () => {
+    qc.invalidateQueries({ queryKey: queryKeys.ticket(idOrKey.value) });
+    toast.success("Comment updated");
+  },
+  onError: (err: unknown) => {
+    const msg = (err as { error?: { message?: string } })?.error?.message ?? "Failed to update comment";
+    toast.error(msg);
+  },
+  onSettled: () => { pendingCommentId.value = null; },
+});
+
+const deleteCommentMutation = useMutation({
+  mutationFn: async (id: string) => {
+    const { error } = await api.DELETE("/v1/comments/{id}", { params: { path: { id } } });
+    if (error) throw error;
+  },
+  onSuccess: () => {
+    qc.invalidateQueries({ queryKey: queryKeys.ticket(idOrKey.value) });
+    toast.success("Comment deleted");
+  },
+  onError: (err: unknown) => {
+    const msg = (err as { error?: { message?: string } })?.error?.message ?? "Failed to delete comment";
+    toast.error(msg);
+  },
+  onSettled: () => { pendingCommentId.value = null; },
+});
+
+function onEditComment(id: string, body: string) {
+  pendingCommentId.value = id;
+  editCommentMutation.mutate({ id, body });
+}
+
+function onDeleteComment(id: string) {
+  pendingCommentId.value = id;
+  deleteCommentMutation.mutate(id);
+}
 </script>
 
 <template>
@@ -336,7 +387,14 @@ const removeLinkMutation = useMutation({
         </div>
 
         <ul v-if="sortedComments.length > 0" class="space-y-4">
-          <CommentItem v-for="c in sortedComments" :key="c.id" :comment="c" />
+          <CommentItem
+            v-for="c in sortedComments"
+            :key="c.id"
+            :comment="c"
+            :saving="pendingCommentId === c.id"
+            @edit="onEditComment"
+            @delete="onDeleteComment"
+          />
         </ul>
         <p v-else class="text-sm text-muted-foreground italic">No comments yet.</p>
       </section>

@@ -4789,7 +4789,10 @@ export interface paths {
         /** Delete a label */
         delete: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description When omitted or `false`, deleting a label that is still attached to one or more tickets returns 422. Pass `force=true` to delete anyway and let the FK cascade strip the label off every referencing ticket. */
+                    force?: "true" | "false";
+                };
                 header?: never;
                 path: {
                     id: string;
