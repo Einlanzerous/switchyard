@@ -606,4 +606,54 @@ export function registerTicketTools(server: McpServer): void {
       };
     },
   );
+
+  server.registerTool(
+    "update_comment",
+    {
+      title: "Update comment",
+      description:
+        "Edit an existing comment's body (markdown). Author-only: only the user who " +
+        "wrote the comment may edit it (others get a 403). Comments are addressed by " +
+        "their bare UUID (they aren't keyed like tickets). Returns the updated comment.",
+      inputSchema: {
+        comment_id: z.string().describe("Comment UUID (from a ticket's comments list)."),
+        body: z.string().min(1).describe("New comment body (markdown)."),
+      },
+    },
+    async ({ comment_id, body }) => {
+      const client = getClient();
+      const { data, error } = await client.PATCH("/v1/comments/{id}", {
+        params: { path: { id: comment_id } },
+        body: { body },
+      });
+      if (error) {
+        return { isError: true, content: [{ type: "text", text: formatApiError(error) }] };
+      }
+      return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
+    },
+  );
+
+  server.registerTool(
+    "delete_comment",
+    {
+      title: "Delete comment",
+      description:
+        "Soft-delete a comment by its UUID. Author-only (others get a 403). The comment " +
+        "remains in the thread as a `[deleted]` tombstone so surrounding context is " +
+        "preserved. Returns 204 on success.",
+      inputSchema: {
+        comment_id: z.string().describe("Comment UUID."),
+      },
+    },
+    async ({ comment_id }) => {
+      const client = getClient();
+      const { error } = await client.DELETE("/v1/comments/{id}", {
+        params: { path: { id: comment_id } },
+      });
+      if (error) {
+        return { isError: true, content: [{ type: "text", text: formatApiError(error) }] };
+      }
+      return { content: [{ type: "text", text: `deleted comment ${comment_id}` }] };
+    },
+  );
 }

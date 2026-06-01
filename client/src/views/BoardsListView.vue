@@ -1,21 +1,15 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { Plus, KanbanSquare, AlertCircle, Trash2 } from "lucide-vue-next";
-import { useMutation, useQueryClient } from "@tanstack/vue-query";
-import { toast } from "vue-sonner";
+import { Plus, KanbanSquare, AlertCircle } from "lucide-vue-next";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
 import CreateBoardDialog from "@/components/boards/CreateBoardDialog.vue";
 import { useBoardsList } from "@/composables/useBoards";
-import { api } from "@/lib/api";
-import { queryKeys } from "@/lib/queryKeys";
 import { formatDistanceToNow } from "date-fns";
 
 const boards = useBoardsList();
 const items = computed(() => boards.data.value?.items ?? []);
 const showCreate = ref(false);
-const qc = useQueryClient();
 
 const errMessage = computed(() => {
   const e = boards.error.value;
@@ -26,38 +20,6 @@ const errMessage = computed(() => {
 function relative(iso: string): string {
   try { return formatDistanceToNow(new Date(iso), { addSuffix: true }); }
   catch { return ""; }
-}
-
-// A board with zero projects has nothing to render — surface a one-click
-// cleanup so empty boards don't accumulate as dead navigation entries.
-// Inline two-step confirm matches the EditBoardDialog / SettingsProject
-// pattern (no shadcn AlertDialog component in the project).
-const confirmingId = ref<string | null>(null);
-const deletingId = ref<string | null>(null);
-const deleteMutation = useMutation({
-  mutationFn: async (id: string) => {
-    const { error } = await api.DELETE("/v1/boards/{id}", { params: { path: { id } } });
-    if (error) throw error;
-  },
-  onSuccess: () => {
-    qc.invalidateQueries({ queryKey: queryKeys.boards() });
-    toast.success("Board deleted");
-  },
-  onError: (err) => {
-    const msg = (err as { error?: { message?: string } }).error?.message ?? "Delete failed";
-    toast.error(msg);
-  },
-  onSettled: () => {
-    deletingId.value = null;
-    confirmingId.value = null;
-  },
-});
-
-function startConfirm(id: string) { confirmingId.value = id; }
-function cancelConfirm() { confirmingId.value = null; }
-function doDelete(id: string) {
-  deletingId.value = id;
-  deleteMutation.mutate(id);
 }
 </script>
 
@@ -102,42 +64,10 @@ function doDelete(id: string) {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div v-if="b.projects.length === 0" class="flex items-center justify-between gap-2">
+            <div v-if="b.projects.length === 0">
               <span class="text-[11px] text-muted-foreground">
                 No projects — nothing to show.
               </span>
-              <div v-if="confirmingId !== b.id" class="flex items-center">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  class="h-7 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                  :disabled="deletingId === b.id"
-                  @click.stop.prevent="startConfirm(b.id)"
-                >
-                  <Trash2 class="h-3.5 w-3.5 mr-1" />
-                  Delete
-                </Button>
-              </div>
-              <div v-else class="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  class="h-7 px-2"
-                  :disabled="deletingId === b.id"
-                  @click.stop.prevent="cancelConfirm"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  class="h-7 px-2"
-                  :disabled="deletingId === b.id"
-                  @click.stop.prevent="doDelete(b.id)"
-                >
-                  {{ deletingId === b.id ? "Deleting…" : "Confirm delete" }}
-                </Button>
-              </div>
             </div>
             <div v-else class="flex flex-wrap gap-1">
               <span

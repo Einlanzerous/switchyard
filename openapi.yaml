@@ -884,6 +884,21 @@ paths:
                               type: string
                               nullable: true
                               format: uuid
+                            parent:
+                              type: object
+                              nullable: true
+                              properties:
+                                id:
+                                  type: string
+                                  format: uuid
+                                key:
+                                  type: string
+                                title:
+                                  type: string
+                              required:
+                                - id
+                                - key
+                                - title
                             assignee:
                               type: object
                               nullable: true
@@ -7148,6 +7163,21 @@ paths:
                           type: string
                           nullable: true
                           format: uuid
+                        parent:
+                          type: object
+                          nullable: true
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            key:
+                              type: string
+                            title:
+                              type: string
+                          required:
+                            - id
+                            - key
+                            - title
                         assignee:
                           type: object
                           nullable: true
@@ -7645,6 +7675,21 @@ paths:
                     type: string
                     nullable: true
                     format: uuid
+                  parent:
+                    type: object
+                    nullable: true
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      key:
+                        type: string
+                      title:
+                        type: string
+                    required:
+                      - id
+                      - key
+                      - title
                   assignee:
                     type: object
                     nullable: true
@@ -8434,6 +8479,21 @@ paths:
                     type: string
                     nullable: true
                     format: uuid
+                  parent:
+                    type: object
+                    nullable: true
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      key:
+                        type: string
+                      title:
+                        type: string
+                    required:
+                      - id
+                      - key
+                      - title
                   assignee:
                     type: object
                     nullable: true
@@ -9260,6 +9320,21 @@ paths:
                     type: string
                     nullable: true
                     format: uuid
+                  parent:
+                    type: object
+                    nullable: true
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      key:
+                        type: string
+                      title:
+                        type: string
+                    required:
+                      - id
+                      - key
+                      - title
                   assignee:
                     type: object
                     nullable: true
@@ -10249,6 +10324,21 @@ paths:
                     type: string
                     nullable: true
                     format: uuid
+                  parent:
+                    type: object
+                    nullable: true
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      key:
+                        type: string
+                      title:
+                        type: string
+                    required:
+                      - id
+                      - key
+                      - title
                   assignee:
                     type: object
                     nullable: true
@@ -11056,6 +11146,21 @@ paths:
                     type: string
                     nullable: true
                     format: uuid
+                  parent:
+                    type: object
+                    nullable: true
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      key:
+                        type: string
+                      title:
+                        type: string
+                    required:
+                      - id
+                      - key
+                      - title
                   assignee:
                     type: object
                     nullable: true
@@ -11913,6 +12018,21 @@ paths:
                               type: string
                               nullable: true
                               format: uuid
+                            parent:
+                              type: object
+                              nullable: true
+                              properties:
+                                id:
+                                  type: string
+                                  format: uuid
+                                key:
+                                  type: string
+                                title:
+                                  type: string
+                              required:
+                                - id
+                                - key
+                                - title
                             assignee:
                               type: object
                               nullable: true
@@ -12453,6 +12573,21 @@ paths:
                           type: string
                           nullable: true
                           format: uuid
+                        parent:
+                          type: object
+                          nullable: true
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            key:
+                              type: string
+                            title:
+                              type: string
+                          required:
+                            - id
+                            - key
+                            - title
                         assignee:
                           type: object
                           nullable: true
@@ -16463,6 +16598,21 @@ paths:
                                 type: string
                                 nullable: true
                                 format: uuid
+                              parent:
+                                type: object
+                                nullable: true
+                                properties:
+                                  id:
+                                    type: string
+                                    format: uuid
+                                  key:
+                                    type: string
+                                  title:
+                                    type: string
+                                required:
+                                  - id
+                                  - key
+                                  - title
                               assignee:
                                 type: object
                                 nullable: true
@@ -18724,6 +18874,21 @@ paths:
                               type: string
                               nullable: true
                               format: uuid
+                            parent:
+                              type: object
+                              nullable: true
+                              properties:
+                                id:
+                                  type: string
+                                  format: uuid
+                                key:
+                                  type: string
+                                title:
+                                  type: string
+                              required:
+                                - id
+                                - key
+                                - title
                             assignee:
                               type: object
                               nullable: true
@@ -21108,6 +21273,21 @@ paths:
                               type: string
                               nullable: true
                               format: uuid
+                            parent:
+                              type: object
+                              nullable: true
+                              properties:
+                                id:
+                                  type: string
+                                  format: uuid
+                                key:
+                                  type: string
+                                title:
+                                  type: string
+                              required:
+                                - id
+                                - key
+                                - title
                             assignee:
                               type: object
                               nullable: true
@@ -31648,6 +31828,21 @@ paths:
                     type: string
                     nullable: true
                     format: uuid
+                  parent:
+                    type: object
+                    nullable: true
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      key:
+                        type: string
+                      title:
+                        type: string
+                    required:
+                      - id
+                      - key
+                      - title
                   assignee:
                     type: object
                     nullable: true
@@ -32103,6 +32298,21 @@ paths:
                           type: string
                           nullable: true
                           format: uuid
+                        parent:
+                          type: object
+                          nullable: true
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            key:
+                              type: string
+                            title:
+                              type: string
+                          required:
+                            - id
+                            - key
+                            - title
                         assignee:
                           type: object
                           nullable: true
