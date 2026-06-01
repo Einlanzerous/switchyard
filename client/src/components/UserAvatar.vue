@@ -44,10 +44,12 @@ const ariaTitle = computed(() => props.title ?? props.user?.name ?? undefined);
 </script>
 
 <template>
+  <!-- @vue-expect-error reka-ui Avatar forwards the global title attribute at runtime but doesn't type it -->
   <Avatar :class="sizeClasses" :title="ariaTitle">
     <!-- AvatarImage falls through to AvatarFallback automatically when the
          src 404s or is empty, so this block is safe even if user.icon is
          a junk URL. -->
+    <!-- @vue-expect-error reka-ui AvatarImage forwards the native img alt attribute at runtime but doesn't type it -->
     <AvatarImage v-if="user?.icon" :src="user.icon" :alt="user?.name ?? ''" />
     <!--
       reka-ui's AvatarFallback is content-sized by default — without

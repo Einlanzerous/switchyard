@@ -60,6 +60,7 @@ onUnmounted(() => {
 </script>
 
 <template>
+  <!-- @vue-expect-error reka-ui ListboxItem forwards the global id attribute at runtime but doesn't type it -->
   <ListboxItem
     v-if="isRender"
     v-bind="forwarded"

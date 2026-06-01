@@ -13,6 +13,9 @@ defineOptions({
 
 const props = defineProps<ListboxFilterProps & {
   class?: HTMLAttributes["class"]
+  // The search placeholder is spread onto ListboxFilter via $attrs at runtime;
+  // declared here so call sites typecheck under strictTemplates.
+  placeholder?: string
 }>()
 
 const delegatedProps = reactiveOmit(props, "class")
@@ -23,6 +26,7 @@ const { filterState } = useCommand()
 </script>
 
 <template>
+  <!-- @vue-expect-error cmdk-input-wrapper is a styling-hook marker attribute, not a typed DOM attribute -->
   <div class="flex items-center border-b px-3" cmdk-input-wrapper>
     <Search class="mr-2 h-4 w-4 shrink-0 opacity-50" />
     <ListboxFilter
