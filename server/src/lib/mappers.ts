@@ -202,6 +202,7 @@ export type TicketSummaryDeps = {
   reporter: UserRow;
   labels: LabelRow[];
   number: number;
+  parent?: { id: string; key: string; title: string } | null;
   // External refs touching this ticket. List endpoints batch-fetch
   // these and feed them in per-ticket; single-ticket loads call
   // `loadTicketLinks`-style helpers. Empty when no refs are attached.
@@ -220,6 +221,7 @@ export function mapTicketSummary(t: TicketRow, deps: TicketSummaryDeps): TicketS
     resolution: (t.resolution ?? null) as Resolution | null,
     priority: (t.priority ?? null) as Priority | null,
     parent_id: t.parent_id,
+    parent: deps.parent ?? null,
     assignee: deps.assignee ? mapUserRef(deps.assignee) : null,
     reporter: mapUserRef(deps.reporter),
     due_date: t.due_date,

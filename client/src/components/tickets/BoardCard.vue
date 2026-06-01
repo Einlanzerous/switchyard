@@ -10,6 +10,7 @@ import TypeIcon from "./TypeIcon.vue";
 import PriorityBadge from "./PriorityBadge.vue";
 import DueDateBadge from "./DueDateBadge.vue";
 import LabelChip from "./LabelChip.vue";
+import EpicChip from "./EpicChip.vue";
 import DropIndicator from "./DropIndicator.vue";
 import ExternalRefBadge from "./ExternalRefBadge.vue";
 import type { TicketSummary } from "@switchyard/shared";
@@ -134,6 +135,7 @@ const isOverdue = computed(() => {
     <div class="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
       <TypeIcon :type="ticket.type" class="h-3.5 w-3.5" />
       <span class="font-mono">{{ ticket.key }}</span>
+      <EpicChip v-if="ticket.parent" :parent="ticket.parent" />
       <span
         v-if="visibleRefs.length > 0"
         class="ml-auto flex items-center gap-1"
