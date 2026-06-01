@@ -320,6 +320,32 @@ export function mount(app: OpenAPIHono) {
       fetchExternalRefsByTicket(ticketIds),
     ]);
 
+    // Batch-resolve parent epics so the epic chip renders on the per-project
+    // board too, not just the multi-project Boards view (SWY-83).
+    const parentIds = [
+      ...new Set(
+        rows.map((r) => r.t.parent_id).filter((x): x is string => x !== null),
+      ),
+    ];
+    const parentRows = parentIds.length
+      ? await db
+          .select({
+            id: schema.tickets.id,
+            number: schema.tickets.number,
+            title: schema.tickets.title,
+            project_key: schema.projects.key,
+          })
+          .from(schema.tickets)
+          .innerJoin(schema.projects, eq(schema.tickets.project_id, schema.projects.id))
+          .where(inArray(schema.tickets.id, parentIds))
+      : [];
+    const parentsById = new Map(
+      parentRows.map(
+        (p) =>
+          [p.id, { id: p.id, key: `${p.project_key}-${p.number}`, title: p.title }] as const,
+      ),
+    );
+
     const summaries: ApiTicketSummary[] = rows.map((r) =>
       mapTicketSummary(r.t, {
         project: r.project,
@@ -329,6 +355,7 @@ export function mount(app: OpenAPIHono) {
         labels: labelsByTicket.get(r.t.id) ?? [],
         number: r.t.number,
         externalRefs: refsByTicket.get(r.t.id) ?? [],
+        parent: r.t.parent_id ? parentsById.get(r.t.parent_id) ?? null : null,
       })
     );
 

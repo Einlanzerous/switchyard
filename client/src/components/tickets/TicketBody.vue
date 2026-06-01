@@ -18,7 +18,9 @@ import ExternalRefsSection from "./ExternalRefsSection.vue";
 import PriorityEditor from "./PriorityEditor.vue";
 import DueDateEditor from "./DueDateEditor.vue";
 import AssigneeEditor from "./AssigneeEditor.vue";
+import ParentEpicEditor from "./ParentEpicEditor.vue";
 import LabelEditor from "./LabelEditor.vue";
+import CreateTicketDialog from "./CreateTicketDialog.vue";
 import { cn } from "@/lib/utils";
 import { useTicketDetail } from "@/composables/useTicketDetail";
 import { api } from "@/lib/api";
@@ -221,6 +223,13 @@ function onDeleteComment(id: string) {
   pendingCommentId.value = id;
   deleteCommentMutation.mutate(id);
 }
+
+// "Add sub-ticket" from the sub-tickets header opens CreateTicketDialog preset
+// with this ticket as the parent epic (see template binding below).
+const createSubTicketOpen = ref(false);
+function openAddSubTicket() {
+  createSubTicketOpen.value = true;
+}
 </script>
 
 <template>
@@ -301,6 +310,11 @@ function onDeleteComment(id: string) {
           <PriorityEditor :ticket="ticket" />
           <span class="text-muted-foreground/40">·</span>
           <DueDateEditor :ticket="ticket" :is-open="ticket.status.category !== 'closed'" />
+          <!-- Parent epic — epics themselves can't have a parent, so hide it there. -->
+          <template v-if="ticket.type !== 'epic'">
+            <span class="text-muted-foreground/40">·</span>
+            <ParentEpicEditor :ticket="ticket" />
+          </template>
         </div>
         <TransitionButton :ticket="ticket" :allowed-statuses="allowedStatuses" />
       </div>
@@ -328,6 +342,16 @@ function onDeleteComment(id: string) {
       @navigate="navigateToLinked"
       @add-link="(p) => addLinkMutation.mutate(p)"
       @remove-link="(id) => removeLinkMutation.mutate(id)"
+      @add-sub-ticket="openAddSubTicket"
+    />
+
+    <!-- Create-sub-ticket dialog: preset with this epic as parent (in its
+         project). Mounted here so both the drawer and full-page renders of
+         TicketBody share one wiring. -->
+    <CreateTicketDialog
+      v-model:open="createSubTicketOpen"
+      :default-project-key="ticket.project.key"
+      :default-parent-id="ticket.id"
     />
 
     <!-- External references (GitHub PR / issue / commit / Actions / generic) -->

@@ -603,6 +603,12 @@ export interface paths {
                                     priority: "low" | "medium" | "high" | "critical" | null;
                                     /** Format: uuid */
                                     parent_id: string | null;
+                                    parent?: {
+                                        /** Format: uuid */
+                                        id: string;
+                                        key: string;
+                                        title: string;
+                                    } | null;
                                     assignee: {
                                         /** Format: uuid */
                                         id: string;
@@ -5176,6 +5182,12 @@ export interface paths {
                                 priority: "low" | "medium" | "high" | "critical" | null;
                                 /** Format: uuid */
                                 parent_id: string | null;
+                                parent?: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    key: string;
+                                    title: string;
+                                } | null;
                                 assignee: {
                                     /** Format: uuid */
                                     id: string;
@@ -5445,6 +5457,12 @@ export interface paths {
                             priority: "low" | "medium" | "high" | "critical" | null;
                             /** Format: uuid */
                             parent_id: string | null;
+                            parent?: {
+                                /** Format: uuid */
+                                id: string;
+                                key: string;
+                                title: string;
+                            } | null;
                             assignee: {
                                 /** Format: uuid */
                                 id: string;
@@ -5824,6 +5842,12 @@ export interface paths {
                             priority: "low" | "medium" | "high" | "critical" | null;
                             /** Format: uuid */
                             parent_id: string | null;
+                            parent?: {
+                                /** Format: uuid */
+                                id: string;
+                                key: string;
+                                title: string;
+                            } | null;
                             assignee: {
                                 /** Format: uuid */
                                 id: string;
@@ -6363,6 +6387,12 @@ export interface paths {
                             priority: "low" | "medium" | "high" | "critical" | null;
                             /** Format: uuid */
                             parent_id: string | null;
+                            parent?: {
+                                /** Format: uuid */
+                                id: string;
+                                key: string;
+                                title: string;
+                            } | null;
                             assignee: {
                                 /** Format: uuid */
                                 id: string;
@@ -6753,6 +6783,12 @@ export interface paths {
                             priority: "low" | "medium" | "high" | "critical" | null;
                             /** Format: uuid */
                             parent_id: string | null;
+                            parent?: {
+                                /** Format: uuid */
+                                id: string;
+                                key: string;
+                                title: string;
+                            } | null;
                             assignee: {
                                 /** Format: uuid */
                                 id: string;
@@ -7146,6 +7182,12 @@ export interface paths {
                             priority: "low" | "medium" | "high" | "critical" | null;
                             /** Format: uuid */
                             parent_id: string | null;
+                            parent?: {
+                                /** Format: uuid */
+                                id: string;
+                                key: string;
+                                title: string;
+                            } | null;
                             assignee: {
                                 /** Format: uuid */
                                 id: string;
@@ -7544,6 +7586,12 @@ export interface paths {
                                     priority: "low" | "medium" | "high" | "critical" | null;
                                     /** Format: uuid */
                                     parent_id: string | null;
+                                    parent?: {
+                                        /** Format: uuid */
+                                        id: string;
+                                        key: string;
+                                        title: string;
+                                    } | null;
                                     assignee: {
                                         /** Format: uuid */
                                         id: string;
@@ -7836,6 +7884,12 @@ export interface paths {
                                 priority: "low" | "medium" | "high" | "critical" | null;
                                 /** Format: uuid */
                                 parent_id: string | null;
+                                parent?: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    key: string;
+                                    title: string;
+                                } | null;
                                 assignee: {
                                     /** Format: uuid */
                                     id: string;
@@ -10537,6 +10591,12 @@ export interface paths {
                                     priority: "low" | "medium" | "high" | "critical" | null;
                                     /** Format: uuid */
                                     parent_id: string | null;
+                                    parent?: {
+                                        /** Format: uuid */
+                                        id: string;
+                                        key: string;
+                                        title: string;
+                                    } | null;
                                     assignee: {
                                         /** Format: uuid */
                                         id: string;
@@ -12085,6 +12145,12 @@ export interface paths {
                                     priority: "low" | "medium" | "high" | "critical" | null;
                                     /** Format: uuid */
                                     parent_id: string | null;
+                                    parent?: {
+                                        /** Format: uuid */
+                                        id: string;
+                                        key: string;
+                                        title: string;
+                                    } | null;
                                     assignee: {
                                         /** Format: uuid */
                                         id: string;
@@ -13667,6 +13733,12 @@ export interface paths {
                                     priority: "low" | "medium" | "high" | "critical" | null;
                                     /** Format: uuid */
                                     parent_id: string | null;
+                                    parent?: {
+                                        /** Format: uuid */
+                                        id: string;
+                                        key: string;
+                                        title: string;
+                                    } | null;
                                     assignee: {
                                         /** Format: uuid */
                                         id: string;
@@ -20522,6 +20594,12 @@ export interface paths {
                             priority: "low" | "medium" | "high" | "critical" | null;
                             /** Format: uuid */
                             parent_id: string | null;
+                            parent?: {
+                                /** Format: uuid */
+                                id: string;
+                                key: string;
+                                title: string;
+                            } | null;
                             assignee: {
                                 /** Format: uuid */
                                 id: string;
@@ -20778,6 +20856,12 @@ export interface paths {
                                 priority: "low" | "medium" | "high" | "critical" | null;
                                 /** Format: uuid */
                                 parent_id: string | null;
+                                parent?: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    key: string;
+                                    title: string;
+                                } | null;
                                 assignee: {
                                     /** Format: uuid */
                                     id: string;

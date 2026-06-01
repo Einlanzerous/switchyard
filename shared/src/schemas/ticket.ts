@@ -28,6 +28,7 @@ export const TicketSummary = z
     resolution: Resolution.nullable(),
     priority: Priority.nullable(),
     parent_id: Uuid.nullable(),
+    parent: z.object({ id: Uuid, key: z.string(), title: z.string() }).nullable().optional(),
     assignee: UserRef.nullable(),
     reporter: UserRef,
     due_date: Iso8601.nullable(),
