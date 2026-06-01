@@ -81,6 +81,7 @@ function onSelectClick(e: MouseEvent) {
          CheckboxRoot to this div, so tests target the wrapping cell
          directly. `pointer-events-none` on the Checkbox forces the
          click to land on the wrapping div. -->
+    <!-- @vue-expect-error this Vue version's DOM types don't include a data-* index signature for dynamic binds -->
     <div
       class="flex items-center justify-center pl-4 pr-1 shrink-0 cursor-pointer"
       :data-testid="`select-cell-${ticket.key}`"

@@ -30,6 +30,7 @@ onUnmounted(() => {
 </script>
 
 <template>
+  <!-- @vue-expect-error reka-ui ListboxGroup forwards the global hidden attribute at runtime but doesn't type it -->
   <ListboxGroup
     v-bind="delegatedProps"
     :id="id"

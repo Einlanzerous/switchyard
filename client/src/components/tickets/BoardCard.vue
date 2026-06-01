@@ -19,6 +19,8 @@ const props = defineProps<{
   ticket: TicketSummary;
   // True while a drag-from-this-card is in flight; we dim it for visual feedback.
   dragging?: boolean;
+  // True when this card is the column's keyboard-focused card; we ring it.
+  focused?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -124,6 +126,7 @@ const isOverdue = computed(() => {
       'rounded-md border bg-card p-2.5 text-sm shadow-sm',
       'hover:border-primary/50 hover:shadow-md transition-shadow',
       dragging && 'opacity-40',
+      focused && 'ring-2 ring-ring ring-offset-1',
       isOverdue && 'border-l-2 border-l-red-400/70',
     )"
     @click="emit('open', ticket.key)"
