@@ -6,19 +6,22 @@ import { Primitive } from "reka-ui"
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "."
 
-// Native button/anchor attributes (disabled, type, title, aria-*, on*, …) reach
-// the rendered element via attribute fallthrough. `@vue-ignore` keeps them out
-// of the runtime props declaration — so they stay in $attrs and fall through —
-// while still making strictTemplates accept them at call sites.
-interface Props extends PrimitiveProps, /* @vue-ignore */ ButtonHTMLAttributes {
+interface Props extends PrimitiveProps {
   variant?: ButtonVariants["variant"]
   size?: ButtonVariants["size"]
   class?: HTMLAttributes["class"]
 }
 
-const props = withDefaults(defineProps<Props>(), {
-  as: "button",
-})
+// Native button/anchor attributes (disabled, type, title, aria-*, on*, …) reach
+// the rendered element via attribute fallthrough. ButtonHTMLAttributes is added
+// as a separate `@vue-ignore` intersection member (NOT in the interface's extends
+// list — that would poison resolution of PrimitiveProps and drop `as`): it keeps
+// these out of the runtime props declaration so they stay in $attrs and fall
+// through, while still making strictTemplates accept them at call sites.
+const props = withDefaults(
+  defineProps<Props & /* @vue-ignore */ ButtonHTMLAttributes>(),
+  { as: "button" },
+)
 </script>
 
 <template>

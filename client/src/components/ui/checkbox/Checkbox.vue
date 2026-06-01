@@ -6,14 +6,16 @@ import { Check } from "lucide-vue-next"
 import { CheckboxIndicator, CheckboxRoot, useForwardPropsEmits } from "reka-ui"
 import { cn } from "@/lib/utils"
 
-// Global DOM attributes (id, on* handlers, title, tabindex, …) fall through to
-// the rendered control. `@vue-ignore` keeps them out of the runtime props while
-// letting strictTemplates accept them at call sites.
-interface Props extends CheckboxRootProps, /* @vue-ignore */ HTMLAttributes {
+interface Props extends CheckboxRootProps {
   class?: HTMLAttributes["class"]
 }
 
-const props = defineProps<Props>()
+// Global DOM attributes (id, on* handlers, title, tabindex, …) fall through to
+// the rendered control. HTMLAttributes is added as a separate `@vue-ignore`
+// intersection member (NOT in the interface's extends list — that would poison
+// resolution of CheckboxRootProps and drop its props): it keeps these out of the
+// runtime props while letting strictTemplates accept them at call sites.
+const props = defineProps<Props & /* @vue-ignore */ HTMLAttributes>()
 const emits = defineEmits<CheckboxRootEmits>()
 
 const delegatedProps = reactiveOmit(props, "class")
