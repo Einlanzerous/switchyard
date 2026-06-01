@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.29.0](https://github.com/Einlanzerous/switchyard/compare/v2.28.2...v2.29.0) (2026-06-01)
+
+
+### Features
+
+* neutral grey palette + de-emphasize board delete ([#73](https://github.com/Einlanzerous/switchyard/issues/73)) ([f1f07be](https://github.com/Einlanzerous/switchyard/commit/f1f07bef86cc5e60f5c2e5aae2fe5c4b0c129009))
+* SWY-82 — comment edit + delete (REST + UI) ([#70](https://github.com/Einlanzerous/switchyard/issues/70)) ([6a6d279](https://github.com/Einlanzerous/switchyard/commit/6a6d279d75e04c11901439906885983932b9fb8d))
+* SWY-83 — show parent epic chip on board cards ([#72](https://github.com/Einlanzerous/switchyard/issues/72)) ([a7aa875](https://github.com/Einlanzerous/switchyard/commit/a7aa8755acb93ff57e39853616aefddc9cfe13aa))
+* SWY-86 — set/change parent epic + add sub-tickets from ticket detail ([#71](https://github.com/Einlanzerous/switchyard/issues/71)) ([f6f9262](https://github.com/Einlanzerous/switchyard/commit/f6f92620ca3fb094ea106e05c5b45e0bbf902591))
+* SWY-87 — enable vue-tsc strictTemplates and fix wrapper-attribute type gaps ([#74](https://github.com/Einlanzerous/switchyard/issues/74)) ([8208b91](https://github.com/Einlanzerous/switchyard/commit/8208b91377ca442979cb916f3a260e77a1fdbe36))
+
 ## [2.28.2](https://github.com/Einlanzerous/switchyard/compare/v2.28.1...v2.28.2) (2026-05-30)
 
 
