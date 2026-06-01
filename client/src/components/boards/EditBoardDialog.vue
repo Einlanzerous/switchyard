@@ -148,9 +148,9 @@ const deleteMutation = useMutation({
       <DialogFooter class="gap-2 sm:gap-2 sm:justify-between">
         <Button
           v-if="!confirmingDelete"
-          variant="ghost"
+          variant="outline"
           size="sm"
-          class="text-destructive hover:text-destructive hover:bg-destructive/10"
+          class="border-destructive/40 bg-destructive/5 text-destructive hover:bg-destructive/10 hover:text-destructive"
           @click="confirmingDelete = true"
         >
           <Trash2 class="h-3.5 w-3.5 mr-1" /> Delete
@@ -170,7 +170,7 @@ const deleteMutation = useMutation({
         </Button>
 
         <div class="flex gap-2">
-          <Button variant="ghost" @click="emit('update:open', false)">Cancel</Button>
+          <Button variant="outline" @click="emit('update:open', false)">Cancel</Button>
           <Button :disabled="!canSave || saveMutation.isPending.value" @click="saveMutation.mutate()">
             <Loader2
               v-if="saveMutation.isPending.value"
