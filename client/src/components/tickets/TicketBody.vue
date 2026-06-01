@@ -172,6 +172,13 @@ const removeLinkMutation = useMutation({
   },
   onSettled: () => { removingLinkId.value = null; },
 });
+
+// "Add sub-ticket" from the sub-tickets header opens CreateTicketDialog preset
+// with this ticket as the parent epic (see template binding below).
+const createSubTicketOpen = ref(false);
+function openAddSubTicket() {
+  createSubTicketOpen.value = true;
+}
 </script>
 
 <template>
