@@ -28,6 +28,7 @@ const emit = defineEmits<{
   navigate: [key: string];
   "add-link": [payload: { type: TicketLinkType; target: string }];
   "remove-link": [linkId: string];
+  "add-sub-ticket": [];
 }>();
 
 // Verb table: (type, direction) → human label. The link row stores one
@@ -97,6 +98,13 @@ function reset() {
       <div class="flex items-center gap-2 text-xs text-muted-foreground pt-1">
         <Layers class="h-3.5 w-3.5" />
         <span>Sub-tickets ({{ children.length }})</span>
+        <button
+          type="button"
+          class="inline-flex items-center gap-1 rounded-md border border-dashed px-1.5 h-5 text-[10px] text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors"
+          @click="$emit('add-sub-ticket')"
+        >
+          <Plus class="h-2.5 w-2.5" /> Add sub-ticket
+        </button>
       </div>
 
       <div v-if="childrenLoading" class="space-y-1.5">
@@ -119,7 +127,7 @@ function reset() {
       </ul>
 
       <p v-else class="text-xs text-muted-foreground italic">
-        No sub-tickets yet. Create a ticket and set this epic as its parent.
+        No sub-tickets yet. Use "Add sub-ticket" to create one under this epic.
       </p>
     </template>
 

@@ -25,6 +25,9 @@ const props = defineProps<{
   // project filter or the project board's key) so users land on the right
   // project without having to pick it every time.
   defaultProjectKey?: string | null;
+  // Optional parent epic. Set when launched from an epic's "Add sub-ticket"
+  // button so the new ticket lands under that epic automatically.
+  defaultParentId?: string | null;
 }>();
 
 const emit = defineEmits<{ "update:open": [value: boolean] }>();
@@ -37,6 +40,7 @@ const projectKey = ref<string>("");
 const title = ref("");
 const type = ref<TicketType>("task");
 const priority = ref<Priority | "__none__">("__none__");
+const parentId = ref<string | "__none__">("__none__");
 const description = ref("");
 const titleInput = useTemplateRef<HTMLInputElement>("titleInput");
 const descTextarea = useTemplateRef<HTMLTextAreaElement>("descTextarea");
@@ -66,6 +70,7 @@ watch(() => props.open, (v) => {
   title.value = "";
   type.value = "task";
   priority.value = "__none__";
+  parentId.value = props.defaultParentId ?? "__none__";
   description.value = "";
   projectKey.value = props.defaultProjectKey ?? "";
   // Focus the title field once Vue renders it.
@@ -82,6 +87,34 @@ const projectsQuery = useQuery({
   },
 });
 const projects = computed(() => projectsQuery.data.value?.items ?? []);
+
+// Epics in the selected project — candidate parents. Parents must be epics in
+// the SAME project (server-enforced), so the picker is scoped accordingly and
+// resets when the project changes.
+const epicsQuery = useQuery({
+  queryKey: computed(() => ["sw", "tickets", "epics", projectKey.value]),
+  enabled: computed(() => props.open && projectKey.value.length > 0),
+  staleTime: 5 * 60 * 1000,
+  queryFn: async () => {
+    const { data, error } = await api.GET("/v1/tickets", {
+      params: { query: { project: projectKey.value, type: "epic", limit: 200 } },
+    });
+    if (error) throw error;
+    return data;
+  },
+});
+const epics = computed(() => epicsQuery.data.value?.items ?? []);
+
+// Changing the project invalidates a previously-picked parent (it belonged to
+// the old project). Only clear once the new project's epics have actually
+// loaded — otherwise an in-flight fetch would wrongly drop a valid preset.
+watch([projectKey, epics], () => {
+  if (parentId.value === "__none__") return;
+  if (epicsQuery.isFetching.value) return;
+  if (!epics.value.some((e) => e.id === parentId.value)) {
+    parentId.value = "__none__";
+  }
+});
 
 // If the parent didn't pass a default and the user's URL has a single project
 // filter, pull from there. Falls back to the first project alphabetically.
@@ -115,6 +148,7 @@ const createMutation = useMutation({
     };
     if (description.value.trim()) body.description = description.value.trim();
     if (priority.value !== "__none__") body.priority = priority.value;
+    if (parentId.value !== "__none__") body.parent_id = parentId.value;
 
     const { data, error } = await api.POST("/v1/tickets", {
       body: body as never,
@@ -126,6 +160,11 @@ const createMutation = useMutation({
     qc.invalidateQueries({ queryKey: ["sw", "tickets"] });
     qc.invalidateQueries({ queryKey: ["sw", "projects", projectKey.value, "board"] });
     qc.invalidateQueries({ queryKey: ["sw", "boards"] });
+    // Refresh the parent epic's sub-ticket list + detail when this was a child.
+    if (parentId.value !== "__none__") {
+      qc.invalidateQueries({ queryKey: queryKeys.ticketChildren(parentId.value) });
+      qc.invalidateQueries({ queryKey: queryKeys.ticket(parentId.value) });
+    }
     toast.success(`${ticket?.key ?? "Ticket"} created`);
     emit("update:open", false);
     if (ticket?.key) {
@@ -222,6 +261,24 @@ function onKeydown(e: KeyboardEvent) {
               <SelectItem value="medium">Medium</SelectItem>
               <SelectItem value="high">High</SelectItem>
               <SelectItem value="critical">Critical</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <!-- Parent epic — only offered for non-epic types (epics can't nest)
+             and only when the project actually has epics to choose from. -->
+        <div v-if="type !== 'epic' && epics.length > 0" class="space-y-1.5">
+          <Label>Parent epic</Label>
+          <Select v-model="parentId">
+            <SelectTrigger class="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">No parent</SelectItem>
+              <SelectItem v-for="e in epics" :key="e.id" :value="e.id">
+                <span class="font-mono text-xs">{{ e.key }}</span>
+                <span class="ml-2">{{ e.title }}</span>
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>
