@@ -8,7 +8,7 @@ import { describe, expect, test } from "bun:test";
 import {
   parseKeyMentions,
   parseClosingKeyMentions,
-} from "../../src/lib/externalRefs/githubWebhook.js";
+} from "../../src/lib/externalRefs/parseKeys.js";
 
 describe("parseKeyMentions (title / branch — bare keys)", () => {
   test("matches PR-title and branch-name patterns with the configured prefix", () => {
