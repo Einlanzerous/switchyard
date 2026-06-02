@@ -33,6 +33,11 @@ async function seedCtx(opts: { projectKey?: string } = {}) {
   const [rulesEngine] = await testDb.insert(schema.users)
     .values({ name: "rules-engine", type: "agent" })
     .returning();
+  // SWY-69 switched the webhook actor off rules-engine (whose events the
+  // dispatcher's loop-prevention drops) onto a dedicated external-ref-poller.
+  const [poller] = await testDb.insert(schema.users)
+    .values({ name: "external-ref-poller", type: "agent" })
+    .returning();
   const [project] = await testDb.insert(schema.projects)
     .values({ key: opts.projectKey ?? "SWY", name: "Test" })
     .returning();
@@ -41,7 +46,7 @@ async function seedCtx(opts: { projectKey?: string } = {}) {
     project_id: project!.id, category: "backlog", display_name: "Backlog",
     position: 0, is_default: true,
   }).returning();
-  return { magos: magos!, rulesEngine: rulesEngine!, project: project!, backlog: backlog! };
+  return { magos: magos!, rulesEngine: rulesEngine!, poller: poller!, project: project!, backlog: backlog! };
 }
 
 async function makeTicket(
@@ -96,7 +101,7 @@ describe("4.5.3 handlePullRequestEvent", () => {
           head: { ref: "magos/SWY-1-fix-the-thing" },
         },
       },
-      { keyPrefix: "SWY", rulesEngineUserId: ctx.rulesEngine.id },
+      { keyPrefix: "SWY", pollerUserId: ctx.poller.id },
     );
     expect(updated).toBe(1);
 
@@ -121,7 +126,7 @@ describe("4.5.3 handlePullRequestEvent", () => {
           head: { ref: "fix-1" },
         },
       },
-      { keyPrefix: "SWY", rulesEngineUserId: ctx.rulesEngine.id },
+      { keyPrefix: "SWY", pollerUserId: ctx.poller.id },
     );
 
     await handlePullRequestEvent(
@@ -135,7 +140,7 @@ describe("4.5.3 handlePullRequestEvent", () => {
           head: { ref: "fix-1" },
         },
       },
-      { keyPrefix: "SWY", rulesEngineUserId: ctx.rulesEngine.id },
+      { keyPrefix: "SWY", pollerUserId: ctx.poller.id },
     );
 
     const [ref] = await testDb.select().from(schema.ticketExternalRefs)
@@ -161,7 +166,7 @@ describe("4.5.3 handlePullRequestEvent", () => {
           head: { ref: "random-branch" },
         },
       },
-      { keyPrefix: "SWY", rulesEngineUserId: ctx.rulesEngine.id },
+      { keyPrefix: "SWY", pollerUserId: ctx.poller.id },
     );
     expect(updated).toBe(0);
 
@@ -184,7 +189,7 @@ describe("4.5.3 handlePullRequestEvent", () => {
           head: { ref: "fix" },
         },
       },
-      { keyPrefix: "SWY", rulesEngineUserId: ctx.rulesEngine.id },
+      { keyPrefix: "SWY", pollerUserId: ctx.poller.id },
     );
     expect(updated).toBe(2);
 
@@ -213,7 +218,7 @@ describe("4.5.3 handlePullRequestEvent", () => {
             head: { ref: "fix" },
           },
         },
-        { keyPrefix: "SWY", rulesEngineUserId: ctx.rulesEngine.id },
+        { keyPrefix: "SWY", pollerUserId: ctx.poller.id },
       );
     }
 
@@ -240,11 +245,105 @@ describe("4.5.3 handlePullRequestEvent", () => {
           head: { ref: "x" },
         },
       },
-      { keyPrefix: "SWY", rulesEngineUserId: ctx.rulesEngine.id },
+      { keyPrefix: "SWY", pollerUserId: ctx.poller.id },
     );
     expect(updated).toBe(0);
 
     const refs = await testDb.select().from(schema.ticketExternalRefs);
     expect(refs).toHaveLength(0);
+  });
+
+  test("SWY-81 super PR: body `Closes A, B, C` attaches every listed ticket", async () => {
+    const ctx = await seedCtx();
+    const t1 = await makeTicket(ctx, 1);
+    const t2 = await makeTicket(ctx, 2);
+    const t3 = await makeTicket(ctx, 3);
+
+    // Title/branch name only one ticket; the rest live in the body — the
+    // exact shape that slipped past title+branch-only parsing before.
+    const updated = await handlePullRequestEvent(
+      {
+        action: "opened",
+        pull_request: {
+          html_url: "https://github.com/owner/repo/pull/77",
+          title: "[SWY-1] Big sweep",
+          body: "## Summary\nOne PR, several tickets.\n\nCloses SWY-1, SWY-2 and SWY-3\n",
+          state: "open",
+          head: { ref: "magos/SWY-1-big-sweep" },
+        },
+      },
+      { keyPrefix: "SWY", pollerUserId: ctx.poller.id },
+    );
+    expect(updated).toBe(3);
+
+    const refs = await testDb.select().from(schema.ticketExternalRefs);
+    const ticketIds = new Set(refs.map((r) => r.ticket_id));
+    expect(ticketIds.has(t1.id)).toBe(true);
+    expect(ticketIds.has(t2.id)).toBe(true);
+    expect(ticketIds.has(t3.id)).toBe(true);
+  });
+
+  test("SWY-81 bare body mention (no closing keyword) does NOT attach", async () => {
+    const ctx = await seedCtx();
+    await makeTicket(ctx, 1);
+
+    const updated = await handlePullRequestEvent(
+      {
+        action: "opened",
+        pull_request: {
+          html_url: "https://github.com/owner/repo/pull/78",
+          title: "Refactor the widget",
+          body: "This is similar to what we did in SWY-1, but for widgets.",
+          state: "open",
+          head: { ref: "refactor-widget" },
+        },
+      },
+      { keyPrefix: "SWY", pollerUserId: ctx.poller.id },
+    );
+    expect(updated).toBe(0);
+
+    const refs = await testDb.select().from(schema.ticketExternalRefs);
+    expect(refs).toHaveLength(0);
+  });
+
+  test("SWY-81 body edit (pull_request.edited) picks up a newly-added Closes key", async () => {
+    const ctx = await seedCtx();
+    const t = await makeTicket(ctx, 9);
+
+    // Opened with no key anywhere → no-op.
+    const opened = await handlePullRequestEvent(
+      {
+        action: "opened",
+        pull_request: {
+          html_url: "https://github.com/owner/repo/pull/79",
+          title: "WIP",
+          body: "Draft.",
+          state: "open",
+          head: { ref: "wip" },
+        },
+      },
+      { keyPrefix: "SWY", pollerUserId: ctx.poller.id },
+    );
+    expect(opened).toBe(0);
+
+    // Body later edited to add the closing keyword → now attaches.
+    const edited = await handlePullRequestEvent(
+      {
+        action: "edited",
+        pull_request: {
+          html_url: "https://github.com/owner/repo/pull/79",
+          title: "WIP",
+          body: "Draft.\n\nCloses SWY-9",
+          state: "open",
+          head: { ref: "wip" },
+        },
+      },
+      { keyPrefix: "SWY", pollerUserId: ctx.poller.id },
+    );
+    expect(edited).toBe(1);
+
+    const [ref] = await testDb.select().from(schema.ticketExternalRefs)
+      .where(eq(schema.ticketExternalRefs.ticket_id, t.id));
+    expect(ref!.kind).toBe("github_pr");
   });
 });

@@ -43,6 +43,37 @@ export function parseKeyMentions(text: string, prefix: string): string[] {
   return [...out];
 }
 
+// Closing-keyword scan for PR *bodies* (SWY-81). Unlike titles and branch
+// names — which are terse and rarely name a ticket the PR doesn't touch —
+// PR bodies are free-form prose that frequently *mention* a key in passing
+// ("similar to what we did in SWY-42", a "Related:" footer). Attaching on a
+// bare body mention would let the SWY-69 auto-close-on-merge rule close a
+// ticket the PR never fixed. So in bodies we only honor keys introduced by
+// an explicit closing keyword, mirroring GitHub's own `Closes <ref>`
+// semantics; title/branch parsing keeps matching bare keys.
+//
+// This is what catches the "super PR" pattern: one PR that closes several
+// tickets lists them in the body (`Closes A, B, C`), not the title/branch.
+const CLOSING_KEYWORDS = "close[sd]?|fix(?:e[sd])?|resolve[sd]?|references?|refs?";
+const KEY_TOKEN = "[A-Z][A-Z0-9]{1,9}-\\d+";
+// A keyword, an optional colon, then a comma / "and" / "&"-separated list of
+// keys. The list is captured loosely and handed back to parseKeyMentions so
+// prefix filtering, the `*` wildcard, and the ABBSWY-1 boundary guard stay
+// identical to title/branch handling.
+const CLOSING_LIST_RE = new RegExp(
+  `\\b(?:${CLOSING_KEYWORDS})\\b\\s*:?\\s+(${KEY_TOKEN}(?:\\s*(?:,|&|and)\\s*${KEY_TOKEN})*)`,
+  "gi",
+);
+
+export function parseClosingKeyMentions(body: string, prefix: string): string[] {
+  if (!body) return [];
+  const out = new Set<string>();
+  for (const m of body.matchAll(CLOSING_LIST_RE)) {
+    for (const key of parseKeyMentions(m[1] ?? "", prefix)) out.add(key);
+  }
+  return [...out];
+}
+
 // PR action → state we want the ref to land at. We do NOT re-open a ref
 // when GitHub does (re-opening a closed PR is rare, and operators can
 // remove the ref manually if needed); state transitions only ratchet
@@ -101,6 +132,7 @@ export async function handlePullRequestEvent(payload: {
   pull_request: {
     html_url: string;
     title: string;
+    body?: string | null;
     state: string;
     merged?: boolean;
     merged_at?: string | null;
@@ -110,9 +142,13 @@ export async function handlePullRequestEvent(payload: {
   const pr = payload.pull_request;
   const title = pr.title ?? "";
   const branch = pr.head?.ref ?? "";
+  const body = pr.body ?? "";
   const keys = [...new Set([
+    // Title + branch: bare key mentions (terse, low false-positive).
     ...parseKeyMentions(title, opts.keyPrefix),
     ...parseKeyMentions(branch, opts.keyPrefix),
+    // Body: only keys behind a closing keyword (see parseClosingKeyMentions).
+    ...parseClosingKeyMentions(body, opts.keyPrefix),
   ])];
   if (keys.length === 0) return 0;
 
