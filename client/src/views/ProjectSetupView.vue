@@ -83,6 +83,7 @@ function back() { router.push("/projects"); }
 
     <!-- Body -->
     <div class="flex-1 overflow-auto">
+      <!-- @vue-expect-error router-view passes extra attrs through as props to the matched route component, which RouterViewProps doesn't model -->
       <router-view :project-key="projectKey" />
     </div>
   </div>

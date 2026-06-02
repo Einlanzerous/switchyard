@@ -118,8 +118,11 @@ export async function loadTicketDetail(ticket: TicketRow, tx?: Tx): Promise<ApiT
   const summaryDeps = await loadTicketSummaryDeps(ticket);
 
   // Comments + author lookups.
+  // Keep deleted comments in the thread as "[deleted]" tombstones (mapComment
+  // redacts the body), consistent with the list endpoint — so we do NOT filter
+  // on deleted_at here.
   const commentRows = await db.select().from(schema.comments)
-    .where(and(eq(schema.comments.ticket_id, ticket.id), isNull(schema.comments.deleted_at)))
+    .where(eq(schema.comments.ticket_id, ticket.id))
     .orderBy(asc(schema.comments.created_at));
   const commentIds = commentRows.map((c) => c.id);
 
