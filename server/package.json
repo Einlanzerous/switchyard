@@ -18,7 +18,7 @@
     "seed:model-pricing": "bun scripts/seed-model-pricing.ts",
     "openapi:gen": "DATABASE_URL=postgres://codegen@localhost:5432/codegen bun src/lib/openapi-gen.ts",
     "test": "bun test --parallel=1",
-    "test:unit": "bun test test/lib/pagination.test.ts test/lib/hmac.test.ts test/lib/hex-color.test.ts",
+    "test:unit": "bun test test/lib/pagination.test.ts test/lib/hmac.test.ts test/lib/hex-color.test.ts test/lib/github-webhook-parse.test.ts",
     "test:integration": "bun test --parallel=1 test/lib/seed.test.ts test/integration/webhooks.test.ts"
   },
   "dependencies": {

@@ -1,12 +1,10 @@
-// GitHub webhook receiver helpers. Two responsibilities:
-//   1. parseKeyMentions — pull `KEY-N` ticket keys out of free-form text
-//      (PR titles, branch names) with the same project-key shape rules
-//      the rest of the codebase uses.
-//   2. handlePullRequestEvent — wire a parsed pull_request payload to
-//      the existing ticket_external_refs upsert path.
+// GitHub webhook receiver helpers: handlePullRequestEvent wires a parsed
+// pull_request payload to the existing ticket_external_refs upsert path. The
+// receiver itself lives in routes/external.ts.
 //
-// The receiver itself lives in routes/external.ts; this module exists
-// so the parsing logic is unit-testable in isolation.
+// The pure key parsers (parseKeyMentions / parseClosingKeyMentions) live in
+// ./parseKeys.ts so they stay db/env-free and unit-testable without a
+// database; they're re-exported here for the existing import surface.
 
 import { and, eq, isNull } from "drizzle-orm";
 import * as schema from "../../../drizzle/schema.js";
@@ -15,33 +13,10 @@ import { writeEvent } from "../events.js";
 import { loadTicketSummary } from "../tickets.js";
 import { mapUserRef } from "../mappers.js";
 import { detectKind } from "./detectKind.js";
+import { parseKeyMentions, parseClosingKeyMentions } from "./parseKeys.js";
 import type { ExternalRefState } from "@switchyard/shared";
 
-// PROJECT_KEY (per shared/schemas/common.ts) is `^[A-Z][A-Z0-9]{1,9}$`.
-// Inside text, a mention is delimited so we don't catch substrings of
-// longer alphanumeric runs. Tail is letters/digits only (no trailing
-// hyphen consumed); leading boundary forbids alphanumeric immediately
-// before the prefix so e.g. "ABBSWY-1" doesn't match.
-const KEY_TAIL_RE = /[A-Z][A-Z0-9]{1,9}-\d+/g;
-
-export function parseKeyMentions(text: string, prefix: string): string[] {
-  if (!text) return [];
-  // Compile per call — the prefix is cheap to scan and rarely changes.
-  // When prefix === "*" we accept any project-key shape; otherwise
-  // require the literal prefix at the start of the key.
-  const wildcard = prefix === "*";
-  const out = new Set<string>();
-  for (const match of text.matchAll(KEY_TAIL_RE)) {
-    const key = match[0]!;
-    if (!wildcard && !key.startsWith(prefix + "-")) continue;
-    // Reject when the char immediately before the match is alphanumeric
-    // (avoids matching ABBSWY-1 → SWY-1 when prefix=SWY).
-    const idx = match.index ?? 0;
-    if (idx > 0 && /[A-Za-z0-9]/.test(text[idx - 1] ?? "")) continue;
-    out.add(key);
-  }
-  return [...out];
-}
+export { parseKeyMentions, parseClosingKeyMentions } from "./parseKeys.js";
 
 // PR action → state we want the ref to land at. We do NOT re-open a ref
 // when GitHub does (re-opening a closed PR is rare, and operators can
@@ -101,6 +76,7 @@ export async function handlePullRequestEvent(payload: {
   pull_request: {
     html_url: string;
     title: string;
+    body?: string | null;
     state: string;
     merged?: boolean;
     merged_at?: string | null;
@@ -110,9 +86,13 @@ export async function handlePullRequestEvent(payload: {
   const pr = payload.pull_request;
   const title = pr.title ?? "";
   const branch = pr.head?.ref ?? "";
+  const body = pr.body ?? "";
   const keys = [...new Set([
+    // Title + branch: bare key mentions (terse, low false-positive).
     ...parseKeyMentions(title, opts.keyPrefix),
     ...parseKeyMentions(branch, opts.keyPrefix),
+    // Body: only keys behind a closing keyword (see parseClosingKeyMentions).
+    ...parseClosingKeyMentions(body, opts.keyPrefix),
   ])];
   if (keys.length === 0) return 0;
 
