@@ -5,7 +5,7 @@ import { hashToken } from "./lib/id.js";
 import { unauthorized, forbidden } from "./errors.js";
 import type { ApiTokenScope } from "@switchyard/shared";
 
-export type AuthContext = {
+type AuthContext = {
   user: typeof schema.users.$inferSelect;
   token: typeof schema.apiTokens.$inferSelect;
 };
@@ -53,15 +53,3 @@ export const requireAuth: MiddlewareHandler = async (c, next) => {
   c.set("auth", { user: row.user, token: row.token });
   await next();
 };
-
-export function requireScope(...scopes: ApiTokenScope[]): MiddlewareHandler {
-  return async (c, next) => {
-    const auth = c.get("auth");
-    if (!auth) throw unauthorized();
-    const granted = auth.token.scopes as ApiTokenScope[];
-    if (granted.includes("admin")) return next();
-    const ok = scopes.every((s) => granted.includes(s));
-    if (!ok) throw forbidden(`requires scope(s): ${scopes.join(", ")}`);
-    await next();
-  };
-}

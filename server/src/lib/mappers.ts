@@ -105,7 +105,7 @@ export function mapLabel(l: LabelRow): Label {
   };
 }
 
-export function mapLabelRef(l: LabelRow): LabelRef {
+function mapLabelRef(l: LabelRow): LabelRef {
   return { id: l.id, name: l.name, color: l.color };
 }
 

@@ -7,7 +7,7 @@ import {
 } from "@switchyard/shared";
 import { db } from "../db.js";
 import * as schema from "../../drizzle/schema.js";
-import { errorResponses, okJson, createdJson, noContent, scope, z, checkScope } from "./_helpers.js";
+import { errorResponses, okJson, createdJson, noContent, z, checkScope } from "./_helpers.js";
 import { mapStatus } from "../lib/mappers.js";
 import { getProjectByKey } from "../lib/lookups.js";
 import { badRequest, catchUnique, notFound, unprocessable } from "../errors.js";

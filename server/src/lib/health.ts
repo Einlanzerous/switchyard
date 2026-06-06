@@ -22,14 +22,14 @@ export type HealthReport = {
 const QUEUE_WARN_THRESHOLD = 1000;
 const RULES_QUEUE_WARN_THRESHOLD = 500;
 
-export async function probeDb(): Promise<{ ok: boolean; latency_ms: number | null }> {
+async function probeDb(): Promise<{ ok: boolean; latency_ms: number | null }> {
   const start = performance.now();
   const ok = await pingDatabase();
   const latency_ms = ok ? Math.round(performance.now() - start) : null;
   return { ok, latency_ms };
 }
 
-export async function probeUploads(): Promise<{ ok: boolean; dir: string }> {
+async function probeUploads(): Promise<{ ok: boolean; dir: string }> {
   const dir = resolve(env.UPLOAD_DIR);
   const probePath = resolve(dir, ".healthz-probe");
   try {
@@ -41,7 +41,7 @@ export async function probeUploads(): Promise<{ ok: boolean; dir: string }> {
   }
 }
 
-export async function probeWebhookQueue(): Promise<{ queue_depth: number; warn: boolean }> {
+async function probeWebhookQueue(): Promise<{ queue_depth: number; warn: boolean }> {
   try {
     const rows = await db.select({ count: sql<number>`count(*)::int` })
       .from(schema.webhookDeliveries)
@@ -53,7 +53,7 @@ export async function probeWebhookQueue(): Promise<{ queue_depth: number; warn: 
   }
 }
 
-export async function probeRulesQueue(): Promise<{ queue_depth: number; warn: boolean }> {
+async function probeRulesQueue(): Promise<{ queue_depth: number; warn: boolean }> {
   try {
     const rows = await db.select({ count: sql<number>`count(*)::int` })
       .from(schema.ruleFirings)

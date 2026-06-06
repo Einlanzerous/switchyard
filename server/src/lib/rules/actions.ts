@@ -575,7 +575,7 @@ function requireTicket(ctx: RuleContext): TicketRef {
 // `{{path}}` and `{{rule.name}}` template substitution. Missing paths render
 // as empty string rather than literal `<undefined>` so a misspelled token
 // doesn't pollute the comment body.
-export function renderTemplate(template: string, ctx: RuleContext): string {
+function renderTemplate(template: string, ctx: RuleContext): string {
   return template.replace(/\{\{\s*([a-zA-Z0-9_.\[\]]+)\s*\}\}/g, (_, path: string) => {
     if (path === "rule.name") return ctx.rule.name;
     if (path === "rule.id") return ctx.rule.id;

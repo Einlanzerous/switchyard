@@ -16,13 +16,13 @@ import { detectKind } from "./detectKind.js";
 import { parseKeyMentions, parseClosingKeyMentions } from "./parseKeys.js";
 import type { ExternalRefState } from "@switchyard/shared";
 
-export { parseKeyMentions, parseClosingKeyMentions } from "./parseKeys.js";
+export { parseKeyMentions } from "./parseKeys.js";
 
 // PR action → state we want the ref to land at. We do NOT re-open a ref
 // when GitHub does (re-opening a closed PR is rare, and operators can
 // remove the ref manually if needed); state transitions only ratchet
 // toward closed/merged.
-export function pullRequestStateFromPayload(
+function pullRequestStateFromPayload(
   action: string,
   payload: { state?: string; merged?: boolean; merged_at?: string | null },
 ): ExternalRefState {
@@ -37,7 +37,7 @@ export function pullRequestStateFromPayload(
 // upserts. Soft-deleted tickets are excluded; mentioning a stale key
 // is a no-op rather than an error so a PR that references a since-
 // deleted ticket doesn't 5xx the receiver.
-export async function resolveTicketsByKeys(
+async function resolveTicketsByKeys(
   keys: string[],
 ): Promise<typeof schema.tickets.$inferSelect[]> {
   if (keys.length === 0) return [];

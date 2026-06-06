@@ -24,7 +24,7 @@ type MentionSource = "comment" | "description";
 // preserve insertion order so snippet computation stays stable.
 const MENTION_RE = /(?:^|[^\w])@(\w+)/gi;
 
-export function extractMentionedNames(text: string | null | undefined): string[] {
+function extractMentionedNames(text: string | null | undefined): string[] {
   if (!text) return [];
   const seen = new Set<string>();
   const out: string[] = [];
@@ -39,7 +39,7 @@ export function extractMentionedNames(text: string | null | undefined): string[]
 
 // Look up the lowercase names against `users`. Soft-deleted users are
 // skipped so a tombstoned account doesn't keep generating notifications.
-export async function resolveMentionedUsers(
+async function resolveMentionedUsers(
   tx: Tx,
   names: string[]
 ): Promise<UserRow[]> {
@@ -58,7 +58,7 @@ export async function resolveMentionedUsers(
 // Build a ~120-char snippet centered on the first occurrence of @<name> in
 // the source text. Used as a preview in the notifications dropdown so the
 // recipient can decide whether to dive in.
-export function snippetAround(text: string, name: string): string {
+function snippetAround(text: string, name: string): string {
   const re = new RegExp(`(?:^|[^\\w])@${escapeRegex(name)}(?:$|[^\\w])`, "i");
   const m = re.exec(text);
   if (!m) return text.slice(0, 120);
@@ -81,7 +81,7 @@ function escapeRegex(s: string): string {
 // `ticket_id` and `comment_id` together identify the source row; both can
 // be null in extreme cases (description-mention with no ticket — never
 // happens today, but defensive).
-export async function writeMentionNotifications(
+async function writeMentionNotifications(
   tx: Tx,
   opts: {
     recipients: UserRow[];

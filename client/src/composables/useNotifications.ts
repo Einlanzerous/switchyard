@@ -86,10 +86,3 @@ export function useMarkOneRead() {
     },
   });
 }
-
-// Convenience: small derived flag the bell uses to decide whether to
-// render the red dot.
-export function useHasUnread() {
-  const q = useUnreadCount();
-  return computed(() => (q.data.value?.count ?? 0) > 0);
-}

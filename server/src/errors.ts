@@ -1,7 +1,7 @@
 import type { Context } from "hono";
 import type { ErrorCode } from "@switchyard/shared";
 
-export class HttpError extends Error {
+class HttpError extends Error {
   constructor(
     public readonly status: number,
     public readonly code: ErrorCode,
@@ -24,8 +24,6 @@ export const conflict = (message: string, details?: Record<string, unknown>) =>
   new HttpError(409, "conflict", message, details);
 export const unprocessable = (message: string, details?: Record<string, unknown>) =>
   new HttpError(422, "unprocessable", message, details);
-export const notImplemented = () =>
-  new HttpError(501, "internal", "handler not yet implemented");
 
 // Wrap an INSERT/UPDATE that may fail with a Postgres unique-constraint
 // violation. Translates the 23505 SQLSTATE into a friendly 409 with the
@@ -39,7 +37,7 @@ export async function catchUnique<T>(message: string, fn: () => Promise<T>): Pro
   }
 }
 
-export function toEnvelope(err: unknown) {
+function toEnvelope(err: unknown) {
   if (err instanceof HttpError) {
     return {
       status: err.status,

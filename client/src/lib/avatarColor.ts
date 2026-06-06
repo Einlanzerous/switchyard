@@ -7,7 +7,7 @@
 // shades so white text reads cleanly on every entry. "A touch muted" per
 // the ask.
 
-export const AVATAR_PALETTE = [
+const AVATAR_PALETTE = [
   "#2563eb", // blue-600
   "#0891b2", // cyan-600
   "#059669", // emerald-600

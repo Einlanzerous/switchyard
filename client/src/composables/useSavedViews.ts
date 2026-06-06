@@ -4,7 +4,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
-import type { CreateSavedView, UpdateSavedView } from "@switchyard/shared";
+import type { CreateSavedView } from "@switchyard/shared";
 
 export function useSavedViewsList() {
   return useQuery({
@@ -23,23 +23,6 @@ export function useCreateSavedView() {
   return useMutation({
     mutationFn: async (body: CreateSavedView) => {
       const { data, error } = await api.POST("/v1/views", { body });
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.savedViews() });
-    },
-  });
-}
-
-export function useUpdateSavedView() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ id, body }: { id: string; body: UpdateSavedView }) => {
-      const { data, error } = await api.PATCH("/v1/views/{id}", {
-        params: { path: { id } },
-        body,
-      });
       if (error) throw error;
       return data;
     },

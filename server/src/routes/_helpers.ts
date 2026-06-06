@@ -1,8 +1,7 @@
 import { z } from "@hono/zod-openapi";
 import { ErrorEnvelope } from "@switchyard/shared";
 import type { ApiTokenScope } from "@switchyard/shared";
-import { notImplemented, unauthorized, forbidden } from "../errors.js";
-import { requireScope as _requireScope } from "../auth.js";
+import { unauthorized, forbidden } from "../errors.js";
 
 // All non-2xx responses use the same envelope. Centralized so route definitions
 // don't have to repeat the response shape.
@@ -27,18 +26,6 @@ export const createdJson = <T extends z.ZodTypeAny>(schema: T) => ({
 export const noContent = {
   204: { description: "no content" },
 } as const;
-
-// Stub handler — every route in Phase 0 returns 501. Phase 1 replaces these
-// one-by-one with real implementations.
-export const stub: any = () => {
-  throw notImplemented();
-};
-
-// Loosely-typed wrapper around requireScope. @hono/zod-openapi's `app.openapi`
-// types every subsequent argument as a Handler with a TypedResponse return,
-// which a generic MiddlewareHandler doesn't satisfy. Casting to `any` here
-// keeps route definitions readable without poisoning the whole auth module.
-export const scope = (...scopes: ApiTokenScope[]): any => _requireScope(...scopes);
 
 // Common header schemas.
 export const idempotencyHeader = z.object({

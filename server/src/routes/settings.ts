@@ -33,7 +33,7 @@ const patch = createRoute({
 // All settings keys + their defaults live here. The seeder writes these on
 // first migrate; reads merge stored values over the defaults so a new key
 // shipped after deploy is immediately readable without a manual migration.
-export const SETTING_DEFAULTS = {
+const SETTING_DEFAULTS = {
   stale_in_progress_days: DEFAULT_STALE_IN_PROGRESS_DAYS,
   board_closed_window_days: DEFAULT_BOARD_CLOSED_WINDOW_DAYS,
 } as const;

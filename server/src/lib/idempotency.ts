@@ -14,7 +14,6 @@
 import type { MiddlewareHandler } from "hono";
 import { and, eq, gt } from "drizzle-orm";
 import { db, schema } from "../db.js";
-import { conflict } from "../errors.js";
 
 const TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -92,11 +91,4 @@ export async function cleanupExpiredIdempotencyKeys(): Promise<number> {
     /* sql */ `DELETE FROM idempotency_keys WHERE expires_at <= now()` as unknown as any
   );
   return Number((result as any)?.count ?? 0);
-}
-
-// Helper for callers that want to detect collision proactively (e.g., to
-// surface a 409 when a key is reused with a different request body — Phase 1.3
-// won't enable this; documenting the hook for later).
-export function rejectCollision(message: string): never {
-  throw conflict(message);
 }
