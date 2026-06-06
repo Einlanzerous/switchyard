@@ -38,11 +38,14 @@ jobs:
         id: release
         with:
           token: ${{ steps.app-token.outputs.token }}
-          # `simple` is the right pick for switchyard: the project is a bun
-          # workspace with three package.json files, none of which are
-          # individually published. release-please tracks the version via
-          # the latest GitHub release tag.
-          release-type: simple
+          # Manifest/config-file mode. `simple` is still the right release-type
+          # (a bun workspace with three unpublished package.json files; version
+          # is tracked as one root component, not per-package) — it now lives in
+          # release-please-config.json so we can also set `changelog-sections`
+          # to surface chore/refactor/polish work in the release notes. The
+          # action defaults to these filenames, but we name them explicitly.
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
 
   build-and-push:
     needs: release-please
