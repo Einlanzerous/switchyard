@@ -1,0 +1,42 @@
+{
+  // Fallow config — keep `npx fallow` output signal-rich.
+  // See https://docs.fallow.tools. Run `npx fallow` from the repo root.
+
+  // Entry points fallow can't infer on its own:
+  //  - client/serve.ts is the production static server (Dockerfile CMD,
+  //    not an import target), so it looks "unused" without this.
+  //  - mcp/scripts/smoke.ts is a manual/CI live smoke-test script (shebang).
+  // These ADD to the ~72 auto-detected entries (package.json + plugins).
+  "entry": [
+    "client/serve.ts",
+    "mcp/scripts/smoke.ts"
+  ],
+
+  "duplicates": {
+    // client/src/lib/api.types.ts and mcp/src/api.types.ts are emitted by
+    // `openapi-typescript ../openapi.yaml` (the `api:gen` script) and are
+    // correctly duplicated per package. They account for ~21k of the
+    // "duplicated" lines and drown the real duplication signal.
+    "ignore": [
+      "**/api.types.ts"
+    ]
+  },
+
+  // shadcn-vue component kit lives under components/ui/**. Its barrel
+  // index.ts files intentionally re-export the whole component surface
+  // (kept for kit completeness) and form benign index<->component cycles.
+  // Suppress only those rules for that path — we keep the files in the
+  // graph (so deps like reka-ui / class-variance-authority stay tracked)
+  // and only silence the barrel noise, not real findings.
+  "overrides": [
+    {
+      "files": ["client/src/components/ui/**"],
+      "rules": {
+        "unused-exports": "off",
+        "unused-types": "off",
+        "circular-dependencies": "off",
+        "re-export-cycle": "off"
+      }
+    }
+  ]
+}
