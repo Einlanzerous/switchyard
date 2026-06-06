@@ -58,7 +58,7 @@ const ticketsQuery = useQuery({
   },
 });
 
-// Use the same canonical keys as ProjectMultiSelect / useBoardsList so the
+// Use the same canonical keys as useBoardsList so the
 // palette piggybacks on the cache instead of triggering a new fetch on first
 // open. Limits match the existing callers (200 / 200) for cache compatibility.
 const projectsQuery = useQuery({
