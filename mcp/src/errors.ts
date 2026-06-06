@@ -2,7 +2,7 @@
 // `{ error: { code, message, details? } }` on failure — surface the
 // code + message so the calling agent can act on it.
 
-export interface ApiErrorEnvelope {
+interface ApiErrorEnvelope {
   error?: {
     code?: string;
     message?: string;

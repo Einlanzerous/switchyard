@@ -54,10 +54,14 @@ export async function stopExternalRefPoller(deadlineMs = 5_000): Promise<void> {
 
 // Test seam — drives one tick synchronously without waiting for the
 // interval. Also used to drop in-memory state between tests.
+// Deliberate test seam (poller has no test suite yet).
+// fallow-ignore-next-line unused-export
 export async function _tickOnce(): Promise<number> {
   return tick();
 }
 
+// Deliberate test seam (poller has no test suite yet).
+// fallow-ignore-next-line unused-export
 export function _resetForTesting(): void {
   if (timer) clearInterval(timer);
   timer = null;

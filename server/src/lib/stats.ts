@@ -29,7 +29,7 @@ export type ClosedTicketInfo = {
 // in_progress. Open ranges (entered in_progress and never recorded leaving)
 // are dropped — that means the ticket is still in_progress and shouldn't
 // have ended up in the "closed in window" set anyway.
-export function computeInProgressMs(events: StatusChangeRow[]): number {
+function computeInProgressMs(events: StatusChangeRow[]): number {
   // Defensive sort — caller probably already sorted but be safe.
   const evs = events.slice().sort((a, b) => (a.created_at < b.created_at ? -1 : 1));
   let totalMs = 0;
@@ -70,7 +70,7 @@ export function buildCycleTimeSamples(
 }
 
 // Nearest-rank percentile. p in [0, 1]. Empty input → 0.
-export function percentile(sortedMs: number[], p: number): number {
+function percentile(sortedMs: number[], p: number): number {
   if (sortedMs.length === 0) return 0;
   const idx = Math.min(sortedMs.length - 1, Math.max(0, Math.ceil(sortedMs.length * p) - 1));
   return sortedMs[idx]!;
@@ -142,7 +142,7 @@ const VALID_CATEGORIES = new Set(["backlog", "planning", "in_progress", "blocked
 // Walk a per-ticket timeline (sorted ascending by `at`) and return the
 // category at time T, or null if the ticket isn't alive at T (created
 // later, or deleted earlier).
-export function categoryAt(timeline: TimelinePoint[], t: number): string | null {
+function categoryAt(timeline: TimelinePoint[], t: number): string | null {
   let category: string | null = null;
   let alive = false;
   for (const e of timeline) {

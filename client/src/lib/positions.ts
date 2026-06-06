@@ -15,9 +15,9 @@
 
 import type { TicketSummary } from "@switchyard/shared";
 
-export const STEP = 1024;
+const STEP = 1024;
 
-export function effectivePosition(t: TicketSummary): number {
+function effectivePosition(t: TicketSummary): number {
   if (typeof t.position === "number") return t.position;
   // Backfilled at server boot, but a defensive fallback if the migrate step
   // hasn't run yet against an older container.

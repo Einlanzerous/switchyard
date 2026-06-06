@@ -7,7 +7,7 @@
 // kind, which the API still accepts — agents are trusted-ish on the
 // homelab. Untrusted-input case would tighten this.
 import { mkdir, unlink } from "node:fs/promises";
-import { dirname, resolve, extname, join } from "node:path";
+import { dirname, resolve, extname } from "node:path";
 import { randomUUID } from "node:crypto";
 import { env, ATTACHMENT_LIMITS } from "../env.js";
 import { unprocessable, badRequest } from "../errors.js";
@@ -167,6 +167,3 @@ export function safeResolve(storagePath: string): string {
   }
   return abs;
 }
-
-// Helper alias re-exported so callers don't need a separate import.
-export { join };

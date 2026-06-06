@@ -3,7 +3,7 @@
 // passes in from the release-please tag; defaults to "dev" so local
 // `bun run dev` shows a recognizable placeholder rather than "undefined".
 
-export const APP_VERSION = import.meta.env.VITE_APP_VERSION ?? "dev";
+const APP_VERSION = import.meta.env.VITE_APP_VERSION ?? "dev";
 
 // Display form: prefix a "v" only when the value parses as semver
 // (`2.5.0`, `2.5.0-rc.1`). Keeps "dev" un-prefixed.

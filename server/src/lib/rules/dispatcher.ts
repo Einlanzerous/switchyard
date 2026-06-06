@@ -65,7 +65,7 @@ export async function stopDispatcher(deadlineMs = 5_000): Promise<void> {
   if (loopPromise) await loopPromise.catch(() => {});
 }
 
-export function dispatcherInflight(): number {
+function dispatcherInflight(): number {
   return inflight;
 }
 

@@ -8,7 +8,7 @@ import { db } from "../db.js";
 import * as schema from "../../drizzle/schema.js";
 import { requireAuth } from "../auth.js";
 import { idempotency } from "../lib/idempotency.js";
-import { errorResponses, okJson, createdJson, noContent, scope, z, checkScope } from "./_helpers.js";
+import { errorResponses, okJson, createdJson, noContent, z, checkScope } from "./_helpers.js";
 import { mapProject, mapUserRef } from "../lib/mappers.js";
 import { getProjectByKey } from "../lib/lookups.js";
 import { addProjectToDefaultBoard, removeProjectFromDefaultBoard } from "../lib/defaultBoard.js";

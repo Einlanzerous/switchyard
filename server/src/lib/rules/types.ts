@@ -3,7 +3,7 @@
 // are the runtime shapes the dispatcher/evaluator/actions hand each other.
 
 import type {
-  RuleAction, RuleConditions, RuleFiringResultSummary, RuleFiringActionResult,
+  RuleFiringResultSummary, RuleFiringActionResult,
   UserRef,
 } from "@switchyard/shared";
 
@@ -41,6 +41,3 @@ export type FiringOutcome = {
   result_summary: RuleFiringResultSummary;
   last_error: string | null;
 };
-
-// Re-exports so callers can import everything from one place.
-export type { RuleAction, RuleConditions };

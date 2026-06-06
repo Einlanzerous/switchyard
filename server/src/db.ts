@@ -13,7 +13,6 @@ const client = postgres(env.DATABASE_URL, {
 });
 
 export const db = drizzle(client, { schema });
-export type DB = typeof db;
 export { schema };
 
 // Validate connectivity at boot. If this fails, exit non-zero so docker reports

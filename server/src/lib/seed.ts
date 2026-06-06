@@ -29,7 +29,7 @@ type CanonicalLabel = {
   color: string;
 };
 
-export const RULES_ENGINE_USER_NAME = "rules-engine";
+const RULES_ENGINE_USER_NAME = "rules-engine";
 // System actor for external-ref state updates (GitHub poller + webhook
 // receiver). Kept distinct from `rules-engine` because the events.ts
 // loop-prevention skips rule-authored events — folding the poller under

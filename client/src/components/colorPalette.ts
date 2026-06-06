@@ -5,7 +5,7 @@
 // Tailwind 500-shade names — handy for human-readable color readouts.
 // Order is preserved through `Object.keys(SWATCH_NAMES)`, which the picker
 // renders as the grid.
-export const SWATCH_NAMES = {
+const SWATCH_NAMES = {
   "#ef4444": "red",
   "#f97316": "orange",
   "#f59e0b": "amber",
@@ -27,7 +27,6 @@ export const SWATCH_NAMES = {
 } as const;
 
 export const SWATCHES = Object.keys(SWATCH_NAMES) as Array<keyof typeof SWATCH_NAMES>;
-export type Swatch = (typeof SWATCHES)[number];
 
 // Lookup the human-readable name for a hex value (case-insensitive). Returns
 // undefined when the hex doesn't match a curated palette entry.

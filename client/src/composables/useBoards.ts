@@ -26,9 +26,9 @@ export function useBoardsList() {
   });
 }
 
-export type ProjectStatusMap = Map<StatusCategory, Status>;
+type ProjectStatusMap = Map<StatusCategory, Status>;
 // Outer map: projectId → its category-to-status map.
-export type BoardStatusLookup = Map<string, ProjectStatusMap>;
+type BoardStatusLookup = Map<string, ProjectStatusMap>;
 
 export function useBoardDetail(boardId: ComputedRef<string | null>) {
   const enabled = computed(() => boardId.value !== null);
