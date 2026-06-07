@@ -96,6 +96,22 @@ await assertProjectReadable(auth.user, ticket.project_id, "ticket"); // 404 for 
 
 6.1.0 ships the primitives + this playbook + the matrix harness with **no
 endpoint behavior change**. Enforcement is then wired per endpoint family:
-6.1.1 ticket reads + inherited resources, 6.1.2 project config, 6.1.3 boards
-(drop non-member columns rather than 404 the whole board), 6.1.4 aggregates &
-feeds, 6.1.5 admin-surface audit. Write-path enforcement + role mapping is 6.2.
+
+- **6.1.0 — ✅ primitives + playbook + matrix harness.**
+- **6.1.1 — ✅ ticket reads + inherited resources.** Scoped: `GET /v1/tickets`
+  (list, via `visibleProjectFilter`), ticket detail / `events` / `children`,
+  `GET /v1/tickets/{id}/comments`, ticket `links` + `external-refs`, and
+  attachment `GET /v1/attachments/{id}` + `/meta` (resolved up to the parent
+  ticket's project, including the `comment_id` → comment → ticket chain). Each
+  non-member read returns `404`. The negative-access matrix now boots the real
+  Hono app and drives these endpoints over HTTP as a viewer.
+- 6.1.2 project config, 6.1.3 boards (drop non-member columns rather than 404
+  the whole board), 6.1.4 aggregates & feeds, 6.1.5 admin-surface audit.
+
+Write-path enforcement + role mapping is 6.2.
+
+**Intentional non-goal (read visibility is soft):** a ticket you *can* see may
+link to a ticket in a project you can't — the link list still surfaces that
+ticket's key + title. Cross-project relationship metadata is visible by design;
+only a *direct* fetch of the linked ticket 404s. The strictness budget is spent
+on write isolation (6.2), not on hiding the existence of related work.

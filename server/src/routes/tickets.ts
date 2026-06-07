@@ -27,6 +27,7 @@ import {
   loadTicketDetail, loadTicketSummary, allocateTicketNumber, fetchExternalRefsByTicket,
 } from "../lib/tickets.js";
 import { detectAndNotify, detectAndNotifyOnEdit } from "../lib/mentions.js";
+import { assertProjectReadable, visibleProjectFilter } from "../lib/authz.js";
 import { badRequest, unprocessable } from "../errors.js";
 
 const tag = "Tickets";
@@ -181,10 +182,19 @@ export function mount(app: OpenAPIHono) {
   // ─── list ────────────────────────────────────────────────────────────────
   app.openapi(list, (async (c: any) => {
     const q = c.req.valid("query");
+    const auth = c.get("auth");
     const limit = q.limit;
 
     const conds: SQL[] = [];
     if (!q.include_deleted) conds.push(isNull(schema.tickets.deleted_at));
+
+    // Phase 6.1.1 read scoping: restrict to the caller's visible projects at
+    // the SQL layer so counts + cursor pagination stay correct. null for
+    // owner/agent (instance-wide) → no filter added. Composes (AND) with the
+    // explicit `?project=` filter below, so a member asking for a project they
+    // can't see just gets an empty page.
+    const scope = await visibleProjectFilter(auth.user, schema.tickets.project_id);
+    if (scope) conds.push(scope);
 
     if (q.project) {
       const keys = q.project.split(",").map((k: string) => k.trim()).filter(Boolean);
@@ -375,6 +385,8 @@ export function mount(app: OpenAPIHono) {
   app.openapi(get, (async (c: any) => {
     const { idOrKey: param } = c.req.valid("param");
     const ticket = await resolveTicket(param);
+    // 404 (not 403) for non-members, so existence stays hidden.
+    await assertProjectReadable(c.get("auth").user, ticket.project_id, "ticket");
     return c.json(await loadTicketDetail(ticket), 200);
   }) as any);
 
@@ -865,6 +877,7 @@ export function mount(app: OpenAPIHono) {
     const q = c.req.valid("query");
     const limit = q.limit;
     const ticket = await resolveTicket(param, { includeDeleted: true });
+    await assertProjectReadable(c.get("auth").user, ticket.project_id, "ticket");
 
     const conds: SQL[] = [eq(schema.events.ticket_id, ticket.id)];
     if (q.cursor) {
@@ -899,6 +912,9 @@ export function mount(app: OpenAPIHono) {
     const q = c.req.valid("query");
     const limit = q.limit;
     const parent = await resolveTicket(param);
+    // Children share the parent epic's project (enforced at create/move), so
+    // gating on the parent's project covers the whole set.
+    await assertProjectReadable(c.get("auth").user, parent.project_id, "ticket");
 
     const conds: SQL[] = [
       eq(schema.tickets.parent_id, parent.id),

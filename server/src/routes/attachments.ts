@@ -13,6 +13,7 @@ import { loadTicketSummary } from "../lib/tickets.js";
 import {
   resolveSniff, checkSizeCap, buildStoragePath, writeBytes, unlinkSafe, safeResolve,
 } from "../lib/attachments.js";
+import { assertProjectReadable } from "../lib/authz.js";
 import { badRequest, notFound, unprocessable } from "../errors.js";
 
 const tag = "Attachments";
@@ -58,6 +59,28 @@ const meta = createRoute({
   responses: { ...okJson(Attachment), ...errorResponses },
 });
 
+// Resolve an attachment's owning project by walking up to its parent ticket —
+// directly via `ticket_id`, or through its `comment_id` to the comment's ticket.
+// Inherited-resource reads (6.1.1) gate on THIS project, never the attachment
+// row in isolation. Returns null when the chain can't resolve (orphan row).
+async function attachmentProjectId(
+  row: typeof schema.attachments.$inferSelect,
+): Promise<string | null> {
+  if (row.ticket_id) {
+    const [t] = await db.select({ pid: schema.tickets.project_id })
+      .from(schema.tickets).where(eq(schema.tickets.id, row.ticket_id)).limit(1);
+    return t?.pid ?? null;
+  }
+  if (row.comment_id) {
+    const [t] = await db.select({ pid: schema.tickets.project_id })
+      .from(schema.comments)
+      .innerJoin(schema.tickets, eq(schema.comments.ticket_id, schema.tickets.id))
+      .where(eq(schema.comments.id, row.comment_id)).limit(1);
+    return t?.pid ?? null;
+  }
+  return null;
+}
+
 export function mount(app: OpenAPIHono) {
   app.use("/v1/attachments/*", requireAuth);
   app.use("/v1/attachments/*", idempotency);
@@ -66,6 +89,9 @@ export function mount(app: OpenAPIHono) {
     const { id } = c.req.valid("param");
     const [row] = await db.select().from(schema.attachments).where(eq(schema.attachments.id, id)).limit(1);
     if (!row) throw notFound("attachment");
+    const pid = await attachmentProjectId(row);
+    if (!pid) throw notFound("attachment");
+    await assertProjectReadable(c.get("auth").user, pid, "attachment");
     const uploader = await getUserById(row.uploaded_by);
     return c.json(mapAttachment(row, uploader), 200);
   }) as any);
@@ -158,6 +184,11 @@ export function mount(app: OpenAPIHono) {
     const { id } = c.req.valid("param");
     const [row] = await db.select().from(schema.attachments).where(eq(schema.attachments.id, id)).limit(1);
     if (!row) throw notFound("attachment");
+    // A direct file-id fetch must 404 for non-members — resolve up to the
+    // parent ticket's project first (6.1.1).
+    const pid = await attachmentProjectId(row);
+    if (!pid) throw notFound("attachment");
+    await assertProjectReadable(c.get("auth").user, pid, "attachment");
 
     const abs = safeResolve(row.storage_path);
     const file = Bun.file(abs);

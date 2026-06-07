@@ -12,6 +12,7 @@ import { buildPage, cursorOrderBy, cursorWhere, decodeCursor } from "../lib/pagi
 import { writeEvent } from "../lib/events.js";
 import { loadTicketSummary } from "../lib/tickets.js";
 import { detectAndNotify, detectAndNotifyOnEdit } from "../lib/mentions.js";
+import { assertProjectReadable } from "../lib/authz.js";
 import { badRequest, forbidden, notFound } from "../errors.js";
 
 const tag = "Comments";
@@ -59,6 +60,8 @@ export function mount(app: OpenAPIHono) {
     const q = c.req.valid("query");
     const limit = q.limit;
     const ticket = await resolveTicket(param);
+    // Comments inherit the parent ticket's project membership (6.1.1).
+    await assertProjectReadable(c.get("auth").user, ticket.project_id, "ticket");
 
     // Deleted comments are kept in-thread as "[deleted]" tombstones (mapComment
     // redacts the body), so we intentionally do NOT filter on deleted_at here.
