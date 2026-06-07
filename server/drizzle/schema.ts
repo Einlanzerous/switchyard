@@ -20,6 +20,14 @@ import {
 // ─── Enums ──────────────────────────────────────────────────────────────────
 
 export const userType = pgEnum("user_type", ["agent", "human"]);
+// Instance-wide role (Phase 6). `owner` = full instance admin (magos);
+// `member` = a regular human scoped to the projects they belong to via
+// `user_projects`. Agents bypass membership regardless of this value
+// (see `hasInstanceWideAccess` in lib/authz.ts).
+export const instanceRole = pgEnum("instance_role", ["owner", "member"]);
+// Per-project role (Phase 6), carried on `user_projects.role`. `viewer` =
+// read-only; `editor` = ticket/comment writes; `admin` = project config.
+export const projectMemberRole = pgEnum("project_member_role", ["admin", "editor", "viewer"]);
 export const statusCategory = pgEnum("status_category", [
   "backlog",
   "planning",
@@ -74,6 +82,7 @@ export const users = pgTable(
     name: varchar("name", { length: 100 }).notNull(),
     icon: varchar("icon", { length: 500 }),
     type: userType("type").notNull(),
+    instance_role: instanceRole("instance_role").notNull().default("member"),
     created_at: createdAt(),
     updated_at: updatedAt(),
     deleted_at: deletedAt(),
@@ -121,6 +130,11 @@ export const projects = pgTable(
   })
 );
 
+// Project membership (Phase 6). A `member`-role human sees only the projects
+// they have a row here for; `role` caps what they can do within each. Owners
+// and agents bypass this table entirely (see lib/authz.ts). The composite PK
+// (user_id, project_id) both enforces one-row-per-pair and indexes the
+// user_id-prefix lookups `visibleProjectIds` does.
 export const userProjects = pgTable(
   "user_projects",
   {
@@ -130,6 +144,7 @@ export const userProjects = pgTable(
     project_id: uuid("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
+    role: projectMemberRole("role").notNull(),
     created_at: createdAt(),
   },
   (t) => ({
