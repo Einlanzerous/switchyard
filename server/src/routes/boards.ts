@@ -15,6 +15,7 @@ import { errorResponses, okJson, createdJson, noContent, checkScope, z } from ".
 import { mapTicketSummary, mapProjectRef } from "../lib/mappers.js";
 import { fetchExternalRefsByTicket } from "../lib/tickets.js";
 import { buildPage, cursorOrderBy, cursorWhere, decodeCursor } from "../lib/pagination.js";
+import { hasInstanceWideAccess, visibleProjectIds } from "../lib/authz.js";
 import { badRequest, notFound } from "../errors.js";
 
 const tag = "Boards";
@@ -85,12 +86,17 @@ export function mount(app: OpenAPIHono) {
     const q = c.req.valid("query");
     const limit = q.limit;
 
+    const user = c.get("auth").user;
     const conds: SQL[] = [];
     if (q.cursor) {
       const cur = decodeCursor(q.cursor);
       if (!cur) throw badRequest("invalid cursor");
       conds.push(cursorWhere(schema.boards.updated_at, schema.boards.id, cur));
     }
+    // 6.1.3: a member only sees boards carrying ≥1 project they belong to.
+    // Filter at the query layer to keep pagination + has_more correct.
+    const boardScope = await visibleBoardFilter(user);
+    if (boardScope) conds.push(boardScope);
 
     const rows = await db.select().from(schema.boards)
       .where(conds.length > 0 ? and(...conds) : undefined)
@@ -104,7 +110,14 @@ export function mount(app: OpenAPIHono) {
     // Bulk-fetch project memberships for the boards on this page.
     const projectsByBoard = await fetchBoardProjects(rows.map((b) => b.id));
 
-    const boards = rows.map((b) => shapeBoard(b, projectsByBoard.get(b.id) ?? []));
+    // Narrow each surviving board's project refs to the member's own; instance-
+    // wide actors keep the full set. The board itself is already known visible
+    // (the EXISTS filter above guaranteed ≥1 member project).
+    const visibleIds = hasInstanceWideAccess(user) ? null : await visibleProjectIds(user);
+    const narrow = (refs: ApiProjectRef[]) =>
+      visibleIds ? refs.filter((p) => visibleIds.has(p.id)) : refs;
+
+    const boards = rows.map((b) => shapeBoard(b, narrow(projectsByBoard.get(b.id) ?? [])));
 
     return c.json(buildPage(boards, limit), 200);
   }) as any);
@@ -113,7 +126,9 @@ export function mount(app: OpenAPIHono) {
     const { id } = c.req.valid("param");
     const [board] = await db.select().from(schema.boards).where(eq(schema.boards.id, id)).limit(1);
     if (!board) throw notFound("board");
-    const projects = (await fetchBoardProjects([board.id])).get(board.id) ?? [];
+    const allProjects = (await fetchBoardProjects([board.id])).get(board.id) ?? [];
+    // 6.1.3: drop non-member projects; 404 if the member can see none of them.
+    const projects = await visibleBoardProjects(c.get("auth").user, allProjects);
     return c.json(shapeBoard(board, projects), 200);
   }) as any);
 
@@ -122,7 +137,11 @@ export function mount(app: OpenAPIHono) {
     const [board] = await db.select().from(schema.boards).where(eq(schema.boards.id, id)).limit(1);
     if (!board) throw notFound("board");
 
-    const projectRefs = (await fetchBoardProjects([board.id])).get(board.id) ?? [];
+    const allRefs = (await fetchBoardProjects([board.id])).get(board.id) ?? [];
+    // 6.1.3: narrow to the member's projects (404 if none). Driving the ticket
+    // query off this filtered id set drops non-member cards too — which is also
+    // what keeps client-side swimlanes from surfacing a non-member project row.
+    const projectRefs = await visibleBoardProjects(c.get("auth").user, allRefs);
     const projectIds = projectRefs.map((p) => p.id);
 
     if (projectIds.length === 0) {
@@ -378,6 +397,50 @@ async function assertProjectsExist(projectIds: string[]): Promise<void> {
   const foundSet = new Set(found.map((r) => r.id));
   const missing = projectIds.filter((id) => !foundSet.has(id));
   throw badRequest(`unknown or deleted project_id(s): ${missing.join(", ")}`);
+}
+
+// ─── 6.1.3 board read scoping ─────────────────────────────────────────────────
+//
+// Boards are saved views over a many-to-many set of projects, so the
+// single-column `visibleProjectFilter` doesn't apply. A member sees a board iff
+// they hold a membership on ≥1 of its projects; within a visible board they see
+// only their member projects' columns/cards. Instance-wide actors (owner/agent)
+// are unaffected. A board with zero projects the member can see is dropped from
+// the list AND 404s on direct fetch — indistinguishable from one that doesn't
+// exist. Both helpers build on the `lib/authz.ts` primitives.
+
+type ScopeUser = Parameters<typeof hasInstanceWideAccess>[0] & { id: string };
+
+// List reads: an EXISTS predicate keeping only boards that carry at least one
+// live project the member may see. Pushed into the query's `conds[]` so cursor
+// pagination + has_more stay correct (never fetch-then-filter). Returns `null`
+// for instance-wide actors (no filter) and a `FALSE` predicate for a member with
+// zero visible projects (empty page, pagination intact).
+async function visibleBoardFilter(user: ScopeUser): Promise<SQL | null> {
+  if (hasInstanceWideAccess(user)) return null;
+  const ids = await visibleProjectIds(user);
+  if (ids.size === 0) return sql`false`;
+  return sql`EXISTS (
+    SELECT 1 FROM ${schema.boardProjects} bp
+    JOIN ${schema.projects} p ON p.id = bp.project_id AND p.deleted_at IS NULL
+    WHERE bp.board_id = ${schema.boards.id}
+      AND ${inArray(sql`bp.project_id`, [...ids])}
+  )`;
+}
+
+// Detail reads (get / columns): narrow a board's project refs to those the
+// member may see, or 404 if none — a board you can see no project of is
+// indistinguishable from one that doesn't exist. Instance-wide actors keep the
+// full set (including a genuinely empty board, which returns 200 with no cards).
+async function visibleBoardProjects(
+  user: ScopeUser,
+  refs: ApiProjectRef[],
+): Promise<ApiProjectRef[]> {
+  if (hasInstanceWideAccess(user)) return refs;
+  const ids = await visibleProjectIds(user);
+  const visible = refs.filter((p) => ids.has(p.id));
+  if (visible.length === 0) throw notFound("board");
+  return visible;
 }
 
 // ─── helpers ────────────────────────────────────────────────────────────────

@@ -114,8 +114,25 @@ endpoint behavior change**. Enforcement is then wired per endpoint family:
   `name` + `color`, no `project_id`, no project-identifying info) and **global
   custom fields** (`project_id NULL` — instance-wide config the ticket-create
   form needs; only *project-scoped* fields gate on membership).
-- 6.1.3 boards (drop non-member columns rather than 404 the whole board),
-  6.1.4 aggregates & feeds, 6.1.5 admin-surface audit.
+- **6.1.3 — ✅ boards (cross-project column drop).** Boards are saved views over
+  a many-to-many set of projects, so the single-column `visibleProjectFilter`
+  doesn't apply — `boards.ts` builds on `visibleProjectIds` / `hasInstanceWideAccess`
+  directly. A member sees a board iff they hold a membership on ≥1 of its
+  projects; within a visible board they see only their own projects' refs +
+  cards. `GET /v1/boards` (list) pushes an `EXISTS (board_projects ⋈ projects …)`
+  predicate so pagination + `has_more` stay correct, then narrows each board's
+  `projects[]`; `GET /v1/boards/{id}` and `/columns` intersect the board's
+  projects with the member's and drive the card query off that filtered set.
+  **Decision (the ticket left it open):** a board with **zero** projects the
+  member can see — a single-project board for a non-member project, a
+  cross-project board they're a member of none of, or a genuinely empty board —
+  is **dropped from the list AND 404s on direct fetch** (never a
+  visible-but-unloadable board). Instance-wide actors (owner/agent) are
+  unaffected and still get empty boards as `200`. Swimlanes
+  (project/assignee/epic/type) are computed client-side from the columns' cards,
+  so the card filter is what guarantees a non-member project row never surfaces —
+  there's no separate server-side swimlane to gate.
+- 6.1.4 aggregates & feeds, 6.1.5 admin-surface audit.
 
 Write-path enforcement + role mapping is 6.2.
 
