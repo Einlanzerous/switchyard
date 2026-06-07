@@ -6,12 +6,17 @@
 // entirely; a `member` human sees and acts only within the projects they hold
 // a `user_projects` row for.
 //
-// 6.0 ships these helpers + tests only — no endpoint calls them yet. The read
-// path wires them in 6.1.x (gate on `hasInstanceWideAccess` first, fall back to
-// `visibleProjectIds` for scoped members), and 6.2 refines the precise
-// per-endpoint write mapping on top of `effectivePermissions`.
-import { and, eq, isNull } from "drizzle-orm";
+// 6.0 shipped the model helpers (`hasInstanceWideAccess`, `visibleProjectIds`,
+// `effectivePermissions`); 6.1.0 adds the read-path enforcement primitives
+// (`visibleProjectFilter`, `canSeeProject`, `assertProjectReadable`) the 6.1.x
+// sub-milestones wire into handlers. No endpoint calls them yet — wiring lands
+// per endpoint family in 6.1.x (gate on `hasInstanceWideAccess` first, scope
+// members via `visibleProjectFilter` for lists / `assertProjectReadable` for
+// detail reads), and 6.2 refines the per-endpoint write mapping on top of
+// `effectivePermissions`. The written playbook lives in docs/permissions.md.
+import { and, eq, inArray, isNull, sql, type Column, type SQL } from "drizzle-orm";
 import { db, schema } from "../db.js";
+import { notFound } from "../errors.js";
 
 type AuthUser = typeof schema.users.$inferSelect;
 type AuthToken = typeof schema.apiTokens.$inferSelect;
@@ -69,6 +74,57 @@ export async function effectivePermissions(
   const role = await projectRole(user.id, projectId);
   if (!role) return new Set(); // not a member → no access
   return intersect(new Set<Capability>(ROLE_CAPABILITIES[role]), tokenCaps);
+}
+
+// ─── 6.1.0 enforcement primitives ────────────────────────────────────────────
+//
+// The linchpin the 6.1.x read-path enforcement is built on. See
+// docs/permissions.md for the written playbook these implement.
+
+// The canonical scoped-query primitive. Returns a WHERE predicate restricting
+// `projectIdCol` to the projects the user may see — to be pushed into a
+// handler's existing `conds: SQL[]` array. Three cases:
+//   - instance-wide actor → `null` (caller adds no filter; sees everything),
+//   - scoped member       → `project_id IN (…their projects…)`,
+//   - member with zero visible projects → a `FALSE` predicate.
+// The FALSE branch matters: filtering at the SQL layer (rather than
+// fetch-then-filter) is what keeps cursor pagination + counts correct when the
+// result set is empty. NEVER fetch-then-filter — it silently breaks both.
+export async function visibleProjectFilter(
+  user: Pick<AuthUser, "id" | "type" | "instance_role">,
+  projectIdCol: Column,
+): Promise<SQL | null> {
+  if (hasInstanceWideAccess(user)) return null;
+  const ids = await visibleProjectIds(user);
+  if (ids.size === 0) return sql`false`;
+  return inArray(projectIdCol, [...ids]);
+}
+
+// True when the user may read the given project. Instance-wide actors always
+// can; a `member` needs a `user_projects` row. Cheaper than `visibleProjectIds`
+// for single-resource reads — one targeted membership lookup, not a full scan.
+export async function canSeeProject(
+  user: Pick<AuthUser, "id" | "type" | "instance_role">,
+  projectId: string,
+): Promise<boolean> {
+  if (hasInstanceWideAccess(user)) return true;
+  return (await projectRole(user.id, projectId)) !== null;
+}
+
+// Assert the user may READ a resource living in `projectId`, else throw 404 —
+// deliberately NOT 403. Reads return not-found for non-member projects so a
+// viewer can't probe for the existence of projects/tickets they can't see.
+// (Writes use 403 + role checks; that's 6.2.) `resource` shapes the message,
+// e.g. `assertProjectReadable(user, pid, "ticket")` → "ticket not found".
+// Inherited resources (comments, attachments) must resolve to their parent
+// ticket's project first, then pass that project id here — never their own row.
+export async function assertProjectReadable(
+  user: Pick<AuthUser, "id" | "type" | "instance_role">,
+  projectId: string,
+  resource = "resource",
+): Promise<void> {
+  if (await canSeeProject(user, projectId)) return;
+  throw notFound(resource);
 }
 
 // ─── internals ──────────────────────────────────────────────────────────────

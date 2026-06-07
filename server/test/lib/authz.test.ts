@@ -131,3 +131,74 @@ describe("effectivePermissions (token scopes ∩ project role)", () => {
     expect(caps.size).toBe(0);
   });
 });
+
+describe("visibleProjectFilter (scoped-query primitive)", () => {
+  test("instance-wide actors get a null filter — no scoping applied", async () => {
+    const owner = await makeUser("magos", "human", "owner");
+    const agent = await makeUser("claude", "agent", "member");
+    await makeProject("AAA", "Alpha");
+    expect(await authz.visibleProjectFilter(owner, schema.projects.id)).toBeNull();
+    expect(await authz.visibleProjectFilter(agent, schema.projects.id)).toBeNull();
+  });
+
+  test("member filter restricts a project query to their memberships", async () => {
+    const friend = await makeUser("friend", "human", "member");
+    const plex = await makeProject("PLEX", "Plex");
+    const swy = await makeProject("SWY", "Switchyard");
+    await addMember(friend.id, plex, "viewer");
+    const filter = await authz.visibleProjectFilter(friend, schema.projects.id);
+    expect(filter).not.toBeNull();
+    const rows = await testDb.select({ id: schema.projects.id }).from(schema.projects).where(filter!);
+    expect(rows.map((r) => r.id)).toEqual([plex]);
+    expect(rows.find((r) => r.id === swy)).toBeUndefined();
+  });
+
+  test("member with no memberships gets a FALSE filter — zero rows, query still valid", async () => {
+    const friend = await makeUser("friend", "human", "member");
+    await makeProject("SWY", "Switchyard");
+    const filter = await authz.visibleProjectFilter(friend, schema.projects.id);
+    expect(filter).not.toBeNull();
+    const rows = await testDb.select().from(schema.projects).where(filter!);
+    expect(rows).toHaveLength(0);
+  });
+});
+
+describe("canSeeProject", () => {
+  test("instance-wide actors see any project; members only their own", async () => {
+    const owner = await makeUser("magos", "human", "owner");
+    const agent = await makeUser("claude", "agent", "member");
+    const friend = await makeUser("friend", "human", "member");
+    const plex = await makeProject("PLEX", "Plex");
+    const swy = await makeProject("SWY", "Switchyard");
+    await addMember(friend.id, plex, "viewer");
+    expect(await authz.canSeeProject(owner, swy)).toBe(true);
+    expect(await authz.canSeeProject(agent, swy)).toBe(true);
+    expect(await authz.canSeeProject(friend, plex)).toBe(true);
+    expect(await authz.canSeeProject(friend, swy)).toBe(false);
+  });
+});
+
+describe("assertProjectReadable (404, not 403)", () => {
+  test("throws a 404 not_found for a non-member project", async () => {
+    const friend = await makeUser("friend", "human", "member");
+    const swy = await makeProject("SWY", "Switchyard");
+    let err: any;
+    try {
+      await authz.assertProjectReadable(friend, swy, "ticket");
+    } catch (e) {
+      err = e;
+    }
+    expect(err).toBeDefined();
+    expect(err.status).toBe(404);
+    expect(err.code).toBe("not_found");
+  });
+
+  test("resolves for a member and for instance-wide actors", async () => {
+    const owner = await makeUser("magos", "human", "owner");
+    const friend = await makeUser("friend", "human", "member");
+    const plex = await makeProject("PLEX", "Plex");
+    await addMember(friend.id, plex, "viewer");
+    await expect(authz.assertProjectReadable(friend, plex, "ticket")).resolves.toBeUndefined();
+    await expect(authz.assertProjectReadable(owner, plex, "ticket")).resolves.toBeUndefined();
+  });
+});
