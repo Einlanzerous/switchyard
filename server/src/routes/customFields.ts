@@ -6,7 +6,7 @@
 // management). Reads are auth-only.
 
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { and, asc, eq, isNull, or, type SQL } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, or, type SQL } from "drizzle-orm";
 import {
   CustomField, CreateCustomField, UpdateCustomField, Uuid,
 } from "@switchyard/shared";
@@ -16,6 +16,7 @@ import { requireAuth } from "../auth.js";
 import { idempotency } from "../lib/idempotency.js";
 import { errorResponses, okJson, createdJson, noContent, checkScope, z } from "./_helpers.js";
 import { mapCustomField } from "../lib/mappers.js";
+import { assertProjectReadable, hasInstanceWideAccess, visibleProjectIds } from "../lib/authz.js";
 import { catchUnique, notFound } from "../errors.js";
 
 const tag = "Custom Fields";
@@ -63,15 +64,28 @@ export function mount(app: OpenAPIHono) {
   // ─── list ────────────────────────────────────────────────────────────────
   app.openapi(list, (async (c: any) => {
     const q = c.req.valid("query");
+    const user = c.get("auth").user;
     const conds: SQL[] = [];
     if (q.project) {
       const [proj] = await db.select({ id: schema.projects.id })
         .from(schema.projects).where(eq(schema.projects.key, q.project)).limit(1);
       if (!proj) return c.json({ items: [] }, 200);
+      // 6.1.2: a non-member naming a real project they can't see gets 404.
+      await assertProjectReadable(user, proj.id, "project");
       // A scoped query returns both project-specific AND global fields,
       // so callers like the ticket-create form get the full set in one
       // request.
       conds.push(or(eq(schema.customFields.project_id, proj.id), isNull(schema.customFields.project_id))!);
+    } else if (!hasInstanceWideAccess(user)) {
+      // Unscoped list: globals (project_id NULL — instance-wide config, like
+      // labels) plus only the member's visible projects' fields. Never leak
+      // other projects' field definitions.
+      const ids = await visibleProjectIds(user);
+      conds.push(
+        ids.size > 0
+          ? or(isNull(schema.customFields.project_id), inArray(schema.customFields.project_id, [...ids]))!
+          : isNull(schema.customFields.project_id),
+      );
     }
     const rows = await db.select().from(schema.customFields)
       .where(conds.length > 0 ? and(...conds) : undefined)
@@ -115,6 +129,10 @@ export function mount(app: OpenAPIHono) {
     const [row] = await db.select().from(schema.customFields)
       .where(eq(schema.customFields.id, id)).limit(1);
     if (!row) throw notFound("custom field");
+    // Globals are instance-wide; project-scoped fields gate on membership.
+    if (row.project_id) {
+      await assertProjectReadable(c.get("auth").user, row.project_id, "custom field");
+    }
     return c.json(mapCustomField(row), 200);
   }) as any);
 

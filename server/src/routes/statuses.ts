@@ -10,6 +10,7 @@ import * as schema from "../../drizzle/schema.js";
 import { errorResponses, okJson, createdJson, noContent, z, checkScope } from "./_helpers.js";
 import { mapStatus } from "../lib/mappers.js";
 import { getProjectByKey } from "../lib/lookups.js";
+import { assertProjectReadable } from "../lib/authz.js";
 import { badRequest, catchUnique, notFound, unprocessable } from "../errors.js";
 
 const tag = "Statuses";
@@ -78,6 +79,7 @@ export function mount(app: OpenAPIHono) {
   app.openapi(list, (async (c: any) => {
     const { key } = c.req.valid("param");
     const p = await getProjectByKey(key, { includeArchived: true });
+    await assertProjectReadable(c.get("auth").user, p.id, "project");
     const rows = await db.select().from(schema.statuses)
       .where(eq(schema.statuses.project_id, p.id))
       .orderBy(asc(schema.statuses.position));
@@ -87,6 +89,7 @@ export function mount(app: OpenAPIHono) {
   app.openapi(listTransitions, (async (c: any) => {
     const { key } = c.req.valid("param");
     const p = await getProjectByKey(key, { includeArchived: true });
+    await assertProjectReadable(c.get("auth").user, p.id, "project");
     const rows = await db.select().from(schema.statusTransitions)
       .where(eq(schema.statusTransitions.project_id, p.id))
       .orderBy(asc(schema.statusTransitions.created_at));

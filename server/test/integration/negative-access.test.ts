@@ -323,3 +323,97 @@ describe("6.1.1 — ticket reads + inherited resources (HTTP, friend=viewer on P
     expect((await GET(`/v1/attachments/${swyA.id}/meta`, ownerToken)).status).toBe(200);
   });
 });
+
+// ─── 6.1.2 — project config reads (real HTTP) ────────────────────────────────
+// The friend (viewer on PLEX) sees only PLEX in the project list and gets 404
+// on every SWY config read — project, statuses, transitions, templates, and the
+// project-scoped custom field. Global custom fields (project_id NULL) stay
+// visible, like the labels catalog.
+describe("6.1.2 — project config reads (HTTP, friend=viewer on PLEX)", () => {
+  async function seed() {
+    const ctx = await fixture();
+
+    // status transition per project (from=null wildcard → backlog).
+    await testDb.insert(schema.statusTransitions).values([
+      { project_id: ctx.plex.id, from_status_id: null, to_status_id: ctx.plexBacklog.id },
+      { project_id: ctx.swy.id, from_status_id: null, to_status_id: ctx.swyBacklog.id },
+    ]);
+
+    // one ticket template per project (one-shot via trigger_at).
+    const mkTemplate = (project: { id: string }, title: string) =>
+      testDb.insert(schema.ticketTemplates).values({
+        project_id: project.id, title, type: "task",
+        trigger_at: "2026-07-01T00:00:00.000Z", created_by_user_id: ctx.magos.id,
+      }).returning().then((r) => r[0]!);
+    const plexTpl = await mkTemplate(ctx.plex, "Plex template");
+    const swyTpl = await mkTemplate(ctx.swy, "Swy template");
+
+    // custom fields: a global one (project_id NULL) + one per project.
+    const mkField = (project_id: string | null, key: string) =>
+      testDb.insert(schema.customFields).values({
+        project_id, key, label: key, type: "text",
+      }).returning().then((r) => r[0]!);
+    const globalField = await mkField(null, "global_field");
+    const plexField = await mkField(ctx.plex.id, "plex_field");
+    const swyField = await mkField(ctx.swy.id, "swy_field");
+
+    const friendToken = await mintToken(ctx.friend.id, ["tickets:read"]);
+    const ownerToken = await mintToken(ctx.magos.id, ["admin"]);
+    return { ctx, plexTpl, swyTpl, globalField, plexField, swyField, friendToken, ownerToken };
+  }
+
+  test("project list: friend sees only PLEX; owner sees both", async () => {
+    const { friendToken, ownerToken } = await seed();
+    const fBody: any = await (await GET("/v1/projects", friendToken)).json();
+    expect(fBody.items.map((p: any) => p.key)).toEqual(["PLEX"]);
+    const oKeys = new Set((await (await GET("/v1/projects", ownerToken)).json()).items.map((p: any) => p.key));
+    expect(oKeys.has("PLEX") && oKeys.has("SWY")).toBe(true);
+  });
+
+  test("project / statuses / transitions / templates: SWY → 404, PLEX → 200", async () => {
+    const { friendToken } = await seed();
+    const notFound = async (path: string) => {
+      const res = await GET(path, friendToken);
+      expect(res.status).toBe(404);
+      expect((await res.json()).error.code).toBe("not_found");
+    };
+    const ok = async (path: string) => expect((await GET(path, friendToken)).status).toBe(200);
+
+    await notFound("/v1/projects/SWY");
+    await notFound("/v1/projects/SWY/statuses");
+    await notFound("/v1/projects/SWY/transitions");
+    await notFound("/v1/projects/SWY/templates");
+
+    await ok("/v1/projects/PLEX");
+    await ok("/v1/projects/PLEX/statuses");
+    await ok("/v1/projects/PLEX/transitions");
+    await ok("/v1/projects/PLEX/templates");
+  });
+
+  test("templates by id + instances: SWY → 404, PLEX → 200", async () => {
+    const { friendToken, plexTpl, swyTpl } = await seed();
+    expect((await GET(`/v1/templates/${swyTpl.id}`, friendToken)).status).toBe(404);
+    expect((await GET(`/v1/templates/${swyTpl.id}/instances`, friendToken)).status).toBe(404);
+    expect((await GET(`/v1/templates/${plexTpl.id}`, friendToken)).status).toBe(200);
+    expect((await GET(`/v1/templates/${plexTpl.id}/instances`, friendToken)).status).toBe(200);
+  });
+
+  test("custom fields: globals visible, project-scoped gated by membership", async () => {
+    const { friendToken, globalField, plexField, swyField } = await seed();
+
+    // GET by id: global + PLEX field → 200; SWY field → 404.
+    expect((await GET(`/v1/custom-fields/${globalField.id}`, friendToken)).status).toBe(200);
+    expect((await GET(`/v1/custom-fields/${plexField.id}`, friendToken)).status).toBe(200);
+    expect((await GET(`/v1/custom-fields/${swyField.id}`, friendToken)).status).toBe(404);
+
+    // ?project= a non-member project → 404; member project → 200.
+    expect((await GET("/v1/custom-fields?project=SWY", friendToken)).status).toBe(404);
+    expect((await GET("/v1/custom-fields?project=PLEX", friendToken)).status).toBe(200);
+
+    // Unscoped list: globals + PLEX field, never the SWY field.
+    const keys = (await (await GET("/v1/custom-fields", friendToken)).json()).items.map((f: any) => f.key);
+    expect(keys).toContain("global_field");
+    expect(keys).toContain("plex_field");
+    expect(keys).not.toContain("swy_field");
+  });
+});
