@@ -449,10 +449,52 @@ Phase 5 hardens switchyard as the **agent-facing source of truth** — the place
 - **Smart initial-position at ticket-create time.** Original 4.8 wish was "I added a new ticket due before ticket 5, so it's placed above 5 automatically." Shipped 4.8 stopped short — view-time `smart` sort with due_date as the primary key made drag-reorder snap back, so smart was aliased to manual position order. The right fix is at create time: on `POST /v1/tickets` with a due_date, compute the initial position via fractional indexing against the destination column's neighbors with the closest due_dates. Then default board sort stays position-based (drag wins), but new tickets land where the user expected. ~30 LOC server-side, no schema change. Edge cases: empty column (use `Date.now()`), no neighbors with due_date (use newest-first stack).
 - **QR-code device login (SWY-63 ⏳).** Friction point: signing into prod from a phone / tablet or into dev from a second machine currently means copy-pasting a bearer token across devices. Fix: extend `/settings/tokens` so the "show secret once" banner also renders a QR that wraps the freshly-minted bearer in a `${origin}/login?token=…` URL — a phone's native scanner opens the browser directly at `/login` with the token pre-filled. `/login` also exposes an in-app "Scan QR" affordance that decodes via the browser's `BarcodeDetector` for desktop-to-desktop scans. Per-device token names (e.g. "tablet 2026-05") so a lost device can be revoked individually. Tailnet-only deploy makes the QR-on-camera-shot risk negligible.
 - **Blue/green deploys** via Caddy or Traefik. Only if Phase 4.12a (frontend retry buffer) doesn't cover the observed pain.
-- **Multi-user** (project_members + RBAC). Currently single-user + agents; will be needed if anyone else logs in.
 - **S3-compatible attachment storage** — only if filesystem becomes painful (size, sharing across multiple containers, off-host backup).
 - **Sprints / cycles** — only if the workflow benefits from time-boxed planning. Probably not.
 - **Time tracking** — only if asked.
+
+## Phase 6 — Multi-user & permissions ⏳
+
+Phase 6 turns switchyard from "one human + N trusted agents who all see everything" into a multi-user instance where each human is scoped to the projects they're a member of, with role-based read/write. Motivating case: invite a friend as a **read-only viewer** on a single project (e.g. a shared Plex setup) without exposing the rest of the instance. Tracked as **SWY-94 epic**.
+
+This is **multi-user, still single-tenant** — not the multi-tenant / multi-org split, which stays a non-goal (see below).
+
+### Locked decisions for Phase 6
+
+- **Auth mechanism unchanged.** Bearer tokens stay. New humans get in by an admin minting them a user + token (shared via the SWY-63 QR flow). No OAuth/SSO.
+- **Two-dimensional authz.** Effective permission = the token's global scopes ∩ the user's role on the project. Global scopes keep meaning what they do today; the project dimension is new.
+- **Instance role on users** (`owner | member`). `owner` = magos (full instance admin). Migration backfills magos→owner.
+- **Per-project role** on `user_projects.role` (`admin | editor | viewer`). `viewer` = read-only; `editor` = ticket/comment writes; `admin` = project config. The friend is `viewer` on one project. (Membership reuses the pre-existing, previously-unused `user_projects` join table from Phase 0 — same naming family as `board_projects` / `ticket_labels` — rather than a new `project_members` table.)
+- **Agents are instance-wide service accounts** — they bypass per-project membership and keep seeing everything. Keeps imperium-loop working unchanged; no per-project migration of agent tokens.
+- **Default-deny for `member` humans** — a member sees only projects they belong to. Owners + agents keep blanket access. This is the behavior change that makes scoping real.
+- **`admin` token scope = instance-admin.** Existing `admin` tokens (magos, agents) keep full access. Humans get project-level admin via their project role, not the global `admin` scope.
+- **Reads 404, writes 403 for non-member resources.** Reads return 404 (not 403) so a viewer can't probe for the existence of projects/tickets they can't see.
+
+### Milestones
+
+- **6.0 — Authz foundation ✅.** Added `role` (`project_member_role` enum) to the existing `user_projects` join table; added `users.instance_role` (`owner | member`, default `member`). `lib/authz.ts` ships `hasInstanceWideAccess`, `visibleProjectIds`, and `effectivePermissions(user, token, projectId)` (token scopes ∩ project role → read/write/manage capability set). Seed backfill: magos→owner + `admin` membership in every project; agents bypass. Migration `0019_swy_95_project_membership`. No endpoint wired yet. Unit-tested in `test/lib/authz.test.ts` + `seed.test.ts`.
+- **6.1 — Read-path enforcement** ⚠️ *the data-leak surface; the bulk and the risk of the phase. Split into six independently-mergeable sub-milestones.*
+  - **6.1.0 — Enforcement primitives + playbook.** The linchpin everything else depends on. Ships the `visibleProjectIds` / `assertProjectAccess` / `hasInstanceWideAccess` helpers, a **scoped query helper** (filter at the SQL layer — `WHERE project_id IN (…)` — never fetch-then-filter, which breaks cursor pagination + counts), a **negative-access test matrix** (a fixture user who is `viewer` on one project; every later sub-milestone adds its endpoints, asserting 404/empty for non-member projects), and `docs/permissions.md` — the written enforcement playbook (below). No endpoint behavior change beyond wiring.
+  - **6.1.1 — Ticket reads + inherited resources.** `tickets.ts` (list/detail/children/events/comments), `comments.ts` reads, `attachments.ts` download, `ticketLinks.ts`, `ticketExternalRefs.ts`. Inherited resources resolve to their parent ticket's project first. Highest traffic + highest leak risk.
+  - **6.1.2 — Project config reads.** `projects.ts` (list/get), `statuses.ts`, `customFields.ts`, `ticketTemplates.ts`. Decision during build: `labels.ts` is a global shared catalog — likely stays instance-wide.
+  - **6.1.3 — Boards.** `boards.ts`. Cross-project boards + the auto "All projects" board must **drop non-member columns**, not 404 the whole board.
+  - **6.1.4 — Aggregates & feeds.** `events.ts` global feed, all `stats.ts` endpoints, the search DSL, notifications — each restricted to visible projects (they silently aggregate across everything today).
+  - **6.1.5 — Admin-surface audit.** `rules.ts`, `targets.ts`, `webhooks.ts`, `settings.ts`, `users.ts`, `llmObservations.ts` — verify instance-admin gating and that none leak project data to members; close gaps.
+- **6.2 — Write-path enforcement + roles.** Map roles to writes (viewer=none, editor=tickets/comments, admin=config). Reconcile with global scopes (effective = scope ∩ role). Split instance-admin from project-admin in `checkScope`. Friend can't transition/comment/edit.
+- **6.3 — Read-only tokens & viewer-role enforcement (absorbs SWY-74).** Generalizes "read-only by construction": dashboard token-kind (original SWY-74) **and** viewer role both yield read-only. Carries SWY-74's original acceptance (token `kind` enum, dashboard-token creation flow + badge, scope refinement in `shared/`).
+- **6.4 — Membership & invite UI.** Settings → per-project **Members** (add/remove, set role); admin user management gains instance-role + token mint for a new human; "show secret once" banner surfaces the QR (SWY-63 synergy).
+- **6.5 — Agents & service-account hardening.** Formalize + document the agent bypass; verify every imperium-loop per-actor token still resolves cross-project.
+- **6.6 — Docs + E2E.** `docs/permissions.md` finalized + `docs/agents.md` updated; E2E: invited viewer sees only their project, write affordances absent, direct-URL access to another project 404s.
+
+### Enforcement playbook (6.1.0 deliverable, lives in `docs/permissions.md`)
+
+1. **Default-deny, centralized.** Every project-scoped read goes through the shared helper; no ad-hoc membership checks inline in handlers.
+2. **Filter at the query layer, not after** — fetch-then-filter breaks cursor pagination and counts.
+3. **Inherited resources resolve up** to their parent ticket/project membership, never their own row in isolation.
+4. **Reads 404, writes 403** for non-member resources — don't leak existence on reads.
+5. **Owner/agent bypass is one predicate** (`hasInstanceWideAccess`), explicit and tested — never scattered `type === 'agent'` checks.
+6. **Every read-endpoint PR extends the negative-access matrix** — a new read without a matrix row fails review.
+7. **Optional CI guard:** a grep-test flagging handlers that query `tickets`/`projects`/`boards` without routing through the scoped helper.
 
 ---
 
@@ -484,11 +526,13 @@ These were settled during planning. Don't relitigate without naming the *why* li
 | Rule condition DSL (Phase 4) | Flat JSONB, `eq/ne/in/not_in/contains/is_null/is_not_null`, one level of `all`/`any` | Strong enough for daily rules without inventing a parser; flat enough that the form-based UI stays honest. |
 | Rule action retry (Phase 4) | Auto-retry on infra errors only; action-internal failures stop without retry | Infra-flake should self-heal; a rule whose `move_status` is rejected by the transitions table shouldn't keep hammering. Admin redelivers explicitly. |
 | Transition guards (Phase 4) | Out of scope; hardcoded epic-close stays | Guards are sync-and-reject — a different shape from async after-the-fact rules. Revisit when daily use surfaces the needed primitives. |
+| Authz model (Phase 6) | Two-dimensional: token scopes ∩ per-project role; reads 404 (not 403) for non-member resources | Adds the project dimension the global-scope model lacks without discarding scopes. 404-on-read avoids leaking the existence of projects/tickets a viewer can't see. |
+| User roles (Phase 6) | Instance `owner\|member` + per-project `admin\|editor\|viewer`; agents are instance-wide service accounts | Lets a human be scoped read-only to one project while agents keep cross-project access, so imperium-loop is untouched. |
 
 ## Non-goals (deliberately out of scope)
 
-- **Multi-tenant**. Single-instance, single-org. If this changes, it's a Phase 6 conversation.
-- **OAuth / SSO**. Bearer tokens are sufficient for one human + N agents.
+- **Multi-tenant**. Single-instance, single-org. Phase 6 adds multi-*user* (project-scoped humans within the one org); true multi-*tenant* (isolated orgs) stays out.
+- **OAuth / SSO**. Bearer tokens remain the auth mechanism even with multiple humans (Phase 6) — admins mint per-user tokens, shared via the SWY-63 QR flow. No external identity provider.
 - **Real-time collaborative editing**. Markdown, save-on-blur. Not Notion.
 - **Sprints / agile ceremonies**. The user runs an agentic pipeline, not a scrum team.
 - **Email notifications**. Discord (via Autosavant) and direct webhooks cover this.

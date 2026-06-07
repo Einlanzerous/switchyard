@@ -9,7 +9,7 @@
 //     (one-shot file the user reads then deletes).
 //   - Once any tokens exist and BOOTSTRAP_TOKEN is unset, the bootstrap path
 //     is silent. No re-prompts.
-import { eq, and } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve, dirname } from "node:path";
 import { db, schema } from "../db.js";
@@ -67,10 +67,47 @@ const CANONICAL_USERS: CanonicalUser[] = [
 
 export async function seed(opts: { bootstrapToken?: string } = {}): Promise<void> {
   const userIdsByName = await ensureUsers();
-  await ensureBootstrapToken(userIdsByName.get("magos")!, opts.bootstrapToken);
+  const magosId = userIdsByName.get("magos")!;
+  await ensureOwner(magosId);
+  await ensureBootstrapToken(magosId, opts.bootstrapToken);
   await ensureDefaultSettings();
   await ensureLabels();
   await ensureDefaultBoard();
+  await ensureOwnerMemberships(magosId);
+}
+
+// magos is the instance owner (Phase 6). Installs created before instance_role
+// existed have magos as a plain `member`; fresh installs create magos with the
+// `member` default in ensureUsers. Promote idempotently either way. Owners
+// bypass per-project membership for access checks (see lib/authz.ts).
+async function ensureOwner(magosId: string): Promise<void> {
+  const [magos] = await db
+    .select({ instance_role: schema.users.instance_role })
+    .from(schema.users)
+    .where(eq(schema.users.id, magosId))
+    .limit(1);
+  if (magos?.instance_role === "owner") return;
+  await db
+    .update(schema.users)
+    .set({ instance_role: "owner" })
+    .where(eq(schema.users.id, magosId));
+  console.log("[seed] set magos instance_role=owner");
+}
+
+// Give the owner an explicit `admin` membership row in every live project so
+// the members UI lists them consistently — even though owners bypass
+// membership for access. Idempotent via the (user_id, project_id) PK. New
+// projects created between deploys get backfilled on the next migrate.
+async function ensureOwnerMemberships(magosId: string): Promise<void> {
+  const projects = await db
+    .select({ id: schema.projects.id })
+    .from(schema.projects)
+    .where(isNull(schema.projects.deleted_at));
+  if (projects.length === 0) return;
+  await db
+    .insert(schema.userProjects)
+    .values(projects.map((p) => ({ user_id: magosId, project_id: p.id, role: "admin" as const })))
+    .onConflictDoNothing();
 }
 
 // Auto-create an "All projects" board on first boot. Populates it with

@@ -19,7 +19,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  await testDb.execute(sql`TRUNCATE api_tokens, labels, users RESTART IDENTITY CASCADE`);
+  await testDb.execute(sql`TRUNCATE api_tokens, labels, users, projects RESTART IDENTITY CASCADE`);
 });
 
 describe("seed", () => {
@@ -61,6 +61,49 @@ describe("seed", () => {
     // Second run should not add another token.
     await seed();
     const after = await testDb.select().from(schema.apiTokens);
+    expect(after).toHaveLength(1);
+  });
+
+  test("backfills magos as instance owner; other canonical users stay members", async () => {
+    const { seed } = await import("../../src/lib/seed.js");
+    await seed();
+    const users = await testDb.select().from(schema.users);
+    const magos = users.find((u) => u.name === "magos")!;
+    expect(magos.instance_role).toBe("owner");
+    for (const u of users.filter((x) => x.name !== "magos")) {
+      expect(u.instance_role).toBe("member");
+    }
+
+    // Idempotent: re-running keeps magos owner.
+    await seed();
+    const [magosAgain] = await testDb
+      .select({ instance_role: schema.users.instance_role })
+      .from(schema.users)
+      .where(eq(schema.users.name, "magos"));
+    expect(magosAgain!.instance_role).toBe("owner");
+  });
+
+  test("gives the owner an admin membership in every existing project (idempotent)", async () => {
+    const { seed } = await import("../../src/lib/seed.js");
+    await testDb.insert(schema.projects).values({ key: "PLEX", name: "Plex" });
+    await seed();
+
+    const magos = (
+      await testDb.select().from(schema.users).where(eq(schema.users.name, "magos"))
+    )[0]!;
+    const memberships = await testDb
+      .select()
+      .from(schema.userProjects)
+      .where(eq(schema.userProjects.user_id, magos.id));
+    expect(memberships).toHaveLength(1);
+    expect(memberships[0]!.role).toBe("admin");
+
+    // Re-running doesn't duplicate (PK conflict is swallowed).
+    await seed();
+    const after = await testDb
+      .select()
+      .from(schema.userProjects)
+      .where(eq(schema.userProjects.user_id, magos.id));
     expect(after).toHaveLength(1);
   });
 
