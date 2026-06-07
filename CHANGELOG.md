@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.29.1](https://github.com/Einlanzerous/switchyard/compare/v2.29.0...v2.29.1) (2026-06-06)
+
+
+### Bug Fixes
+
+* SWY-81 — auto-attach scans PR body for Closes-style keys (super PRs) ([#77](https://github.com/Einlanzerous/switchyard/issues/77)) ([b46a86e](https://github.com/Einlanzerous/switchyard/commit/b46a86e8b89da30b30640d56540d45e4e3d612d0))
+
+
+### Maintenance
+
+* surface maintenance work in release notes via changelog-sections ([#83](https://github.com/Einlanzerous/switchyard/issues/83)) ([69fa7cc](https://github.com/Einlanzerous/switchyard/commit/69fa7ccbdbed5c8016c40434ee77f5ccc6c67e39))
+* SWY-89 — remove unused frontend deps (radix-vue, vee-validate, @vee-validate/zod) ([#79](https://github.com/Einlanzerous/switchyard/issues/79)) ([c4750cb](https://github.com/Einlanzerous/switchyard/commit/c4750cb86d5d8a66667e41b90cb63f123a14f92a))
+* SWY-90 — delete dead UI files orphaned by refactors ([#80](https://github.com/Einlanzerous/switchyard/issues/80)) ([8142030](https://github.com/Einlanzerous/switchyard/commit/8142030000df95aca9ca7ce81a846d50e74cc184))
+* SWY-91 — triage dead lib exports (drop visibility / delete / suppress) ([#82](https://github.com/Einlanzerous/switchyard/issues/82)) ([73568f7](https://github.com/Einlanzerous/switchyard/commit/73568f79353f2932197caf1dbdcded7b795d0b80))
+* SWY-92 — add fallow config to de-noise analysis ([#81](https://github.com/Einlanzerous/switchyard/issues/81)) ([6a9e0cb](https://github.com/Einlanzerous/switchyard/commit/6a9e0cb3ffe7aa18382df617115c052da95c8a65))
+
+
+### Polish
+
+* SWY-83 — clean up epic chip label, drop redundant dot ([#76](https://github.com/Einlanzerous/switchyard/issues/76)) ([bcca585](https://github.com/Einlanzerous/switchyard/commit/bcca585721f0934aa5e35ee7d22ce2a35e235edb))
+
 ## [2.29.0](https://github.com/Einlanzerous/switchyard/compare/v2.28.2...v2.29.0) (2026-06-01)
 
 
