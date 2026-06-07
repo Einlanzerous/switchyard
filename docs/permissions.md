@@ -105,8 +105,17 @@ endpoint behavior change**. Enforcement is then wired per endpoint family:
   ticket's project, including the `comment_id` → comment → ticket chain). Each
   non-member read returns `404`. The negative-access matrix now boots the real
   Hono app and drives these endpoints over HTTP as a viewer.
-- 6.1.2 project config, 6.1.3 boards (drop non-member columns rather than 404
-  the whole board), 6.1.4 aggregates & feeds, 6.1.5 admin-surface audit.
+- **6.1.2 — ✅ project config reads.** Scoped: `GET /v1/projects` (list, via
+  `visibleProjectFilter`) + `GET /v1/projects/{key}`; `statuses` + `transitions`
+  lists; ticket `templates` list, `GET /v1/templates/{id}`, and its `instances`;
+  `custom-fields` (`?project=` gated, unscoped list returns globals + visible
+  projects' fields, `GET /v1/custom-fields/{id}` gated when project-scoped).
+  Two deliberate carve-outs stay instance-wide: **labels** (a global catalog —
+  `name` + `color`, no `project_id`, no project-identifying info) and **global
+  custom fields** (`project_id NULL` — instance-wide config the ticket-create
+  form needs; only *project-scoped* fields gate on membership).
+- 6.1.3 boards (drop non-member columns rather than 404 the whole board),
+  6.1.4 aggregates & feeds, 6.1.5 admin-surface audit.
 
 Write-path enforcement + role mapping is 6.2.
 

@@ -25,6 +25,7 @@ import { mapTicketTemplate } from "../lib/mappers.js";
 import { getProjectByKey, getUserById } from "../lib/lookups.js";
 import { materializeFromTemplate } from "../lib/templates/materializer.js";
 import { loadTicketSummary } from "../lib/tickets.js";
+import { assertProjectReadable } from "../lib/authz.js";
 import { badRequest, notFound, unprocessable } from "../errors.js";
 
 const tag = "Ticket Templates";
@@ -93,6 +94,7 @@ export function mount(app: OpenAPIHono) {
   app.openapi(list, (async (c: any) => {
     const { key } = c.req.valid("param");
     const project = await getProjectByKey(key);
+    await assertProjectReadable(c.get("auth").user, project.id, "project");
 
     const rows = await db
       .select({ t: schema.ticketTemplates, project: schema.projects, assignee: schema.users })
@@ -159,6 +161,15 @@ export function mount(app: OpenAPIHono) {
   // ─── get ───────────────────────────────────────────────────────────────
   app.openapi(get, (async (c: any) => {
     const { id } = c.req.valid("param");
+    // Templates inherit their project's membership. Resolve the project id
+    // first so a non-member 404s before we map the (existing) template.
+    const [tpl] = await db
+      .select({ project_id: schema.ticketTemplates.project_id })
+      .from(schema.ticketTemplates)
+      .where(eq(schema.ticketTemplates.id, id))
+      .limit(1);
+    if (!tpl) throw notFound("template");
+    await assertProjectReadable(c.get("auth").user, tpl.project_id, "template");
     const row = await loadTemplateById(id);
     return c.json(row, 200);
   }) as any);
@@ -247,6 +258,14 @@ export function mount(app: OpenAPIHono) {
   // ─── instances (tickets materialized from this template) ───────────────
   app.openapi(instances, (async (c: any) => {
     const { id } = c.req.valid("param");
+    // Gate on the template's project before listing its materialized tickets.
+    const [tpl] = await db
+      .select({ project_id: schema.ticketTemplates.project_id })
+      .from(schema.ticketTemplates)
+      .where(eq(schema.ticketTemplates.id, id))
+      .limit(1);
+    if (!tpl) throw notFound("template");
+    await assertProjectReadable(c.get("auth").user, tpl.project_id, "template");
 
     const rows = await db
       .select()

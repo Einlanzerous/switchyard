@@ -14,6 +14,7 @@ import { getProjectByKey } from "../lib/lookups.js";
 import { addProjectToDefaultBoard, removeProjectFromDefaultBoard } from "../lib/defaultBoard.js";
 import { buildPage, cursorOrderBy, cursorWhere, decodeCursor } from "../lib/pagination.js";
 import { writeEvent } from "../lib/events.js";
+import { assertProjectReadable, visibleProjectFilter } from "../lib/authz.js";
 import { badRequest, catchUnique } from "../errors.js";
 
 const tag = "Projects";
@@ -73,6 +74,9 @@ export function mount(app: OpenAPIHono) {
     const limit = q.limit;
     const conds: SQL[] = [isNull(schema.projects.deleted_at)];
     if (!q.include_archived) conds.push(isNull(schema.projects.archived_at));
+    // 6.1.2 read scoping: members see only their projects; owner/agent → null.
+    const scope = await visibleProjectFilter(c.get("auth").user, schema.projects.id);
+    if (scope) conds.push(scope);
     if (q.cursor) {
       const cur = decodeCursor(q.cursor);
       if (!cur) throw badRequest("invalid cursor");
@@ -88,6 +92,7 @@ export function mount(app: OpenAPIHono) {
   app.openapi(get, (async (c: any) => {
     const { key } = c.req.valid("param");
     const p = await getProjectByKey(key, { includeArchived: true });
+    await assertProjectReadable(c.get("auth").user, p.id, "project");
     return c.json(mapProject(p), 200);
   }) as any);
 
