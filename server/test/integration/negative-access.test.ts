@@ -70,7 +70,7 @@ afterAll(async () => {
 beforeEach(async () => {
   await testDb.execute(
     sql`TRUNCATE events, ticket_labels, comments, attachments, tickets,
-        project_counters, statuses, status_transitions, labels, projects,
+        boards, project_counters, statuses, status_transitions, labels, projects,
         api_tokens, idempotency_keys, user_projects, users
         RESTART IDENTITY CASCADE`,
   );
@@ -415,5 +415,100 @@ describe("6.1.2 — project config reads (HTTP, friend=viewer on PLEX)", () => {
     expect(keys).toContain("global_field");
     expect(keys).toContain("plex_field");
     expect(keys).not.toContain("swy_field");
+  });
+});
+
+// ─── 6.1.3 — boards: cross-project column drop (real HTTP) ────────────────────
+// Boards are saved views over a many-to-many set of projects. The friend (viewer
+// on PLEX) sees a board iff they belong to ≥1 of its projects, and within a
+// visible board only their own projects' refs + cards. A board they can see no
+// project of is dropped from the list AND 404s on direct fetch — never a
+// visible-but-broken board. The card filter is also what keeps client-side
+// swimlanes (project/assignee/epic/type) from surfacing a non-member row.
+describe("6.1.3 — boards: cross-project column drop (HTTP, friend=viewer on PLEX)", () => {
+  async function seed() {
+    const ctx = await fixture();
+
+    // A card in each project so columns have content to (not) leak.
+    const mkTicket = (project: { id: string }, status: { id: string }, number: number, title: string) =>
+      testDb.insert(schema.tickets).values({
+        project_id: project.id, number, type: "task", title,
+        status_id: status.id, reporter_id: ctx.magos.id,
+      }).returning().then((r) => r[0]!);
+    const plexT = await mkTicket(ctx.plex, ctx.plexBacklog, 1, "Plex card");
+    const swyT = await mkTicket(ctx.swy, ctx.swyBacklog, 1, "Swy card");
+
+    const mkBoard = async (name: string, projectIds: string[], auto = false) => {
+      const [b] = await testDb.insert(schema.boards)
+        .values({ name, layout: "kanban", auto_include_all_projects: auto }).returning();
+      await testDb.insert(schema.boardProjects)
+        .values(projectIds.map((project_id) => ({ board_id: b!.id, project_id })));
+      return b!;
+    };
+    // Single-project boards + a cross-project board mimicking the auto
+    // "All projects" board from 4.9 (auto_include_all_projects = true).
+    const plexBoard = await mkBoard("Plex board", [ctx.plex.id]);
+    const swyBoard = await mkBoard("Swy board", [ctx.swy.id]);
+    const allBoard = await mkBoard("All projects", [ctx.plex.id, ctx.swy.id], true);
+
+    const friendToken = await mintToken(ctx.friend.id, ["tickets:read"]);
+    const ownerToken = await mintToken(ctx.magos.id, ["admin"]);
+    return { ctx, plexT, swyT, plexBoard, swyBoard, allBoard, friendToken, ownerToken };
+  }
+
+  test("board list: SWY-only board absent; cross-project board present with PLEX-only refs", async () => {
+    const { friendToken, ownerToken } = await seed();
+
+    const fBody: any = await (await GET("/v1/boards", friendToken)).json();
+    const fNames = fBody.items.map((b: any) => b.name);
+    expect(fNames).toContain("Plex board");
+    expect(fNames).toContain("All projects");
+    expect(fNames).not.toContain("Swy board"); // member of none of its projects → dropped
+
+    // Every surviving board exposes only PLEX in its project refs.
+    for (const b of fBody.items) {
+      expect(b.projects.map((p: any) => p.key)).toEqual(["PLEX"]);
+    }
+
+    // Owner sees all three; the cross-project board keeps both refs.
+    const oBody: any = await (await GET("/v1/boards", ownerToken)).json();
+    const oNames = new Set(oBody.items.map((b: any) => b.name));
+    expect(oNames.has("Plex board") && oNames.has("Swy board") && oNames.has("All projects")).toBe(true);
+    const oAll = oBody.items.find((b: any) => b.name === "All projects");
+    expect(new Set(oAll.projects.map((p: any) => p.key))).toEqual(new Set(["PLEX", "SWY"]));
+  });
+
+  test("get: single-project SWY board → 404; PLEX board + cross-project board → 200 w/ PLEX-only refs", async () => {
+    const { friendToken, plexBoard, swyBoard, allBoard } = await seed();
+
+    expect((await GET(`/v1/boards/${swyBoard.id}`, friendToken)).status).toBe(404);
+
+    const plexRes = await GET(`/v1/boards/${plexBoard.id}`, friendToken);
+    expect(plexRes.status).toBe(200);
+    expect((await plexRes.json()).projects.map((p: any) => p.key)).toEqual(["PLEX"]);
+
+    const allRes = await GET(`/v1/boards/${allBoard.id}`, friendToken);
+    expect(allRes.status).toBe(200);
+    expect((await allRes.json()).projects.map((p: any) => p.key)).toEqual(["PLEX"]);
+  });
+
+  test("columns: SWY board → 404; cross-project board drops SWY cards + refs, never leaks a SWY ticket", async () => {
+    const { friendToken, ownerToken, swyBoard, allBoard } = await seed();
+
+    expect((await GET(`/v1/boards/${swyBoard.id}/columns`, friendToken)).status).toBe(404);
+
+    // Cross-project board: friend gets PLEX-only board refs and PLEX-only cards.
+    const fRes = await GET(`/v1/boards/${allBoard.id}/columns`, friendToken);
+    expect(fRes.status).toBe(200);
+    const fBody: any = await fRes.json();
+    expect(fBody.board.projects.map((p: any) => p.key)).toEqual(["PLEX"]);
+    const fCards = fBody.columns.flatMap((col: any) => col.tickets);
+    expect(fCards.length).toBeGreaterThan(0);
+    expect(fCards.every((t: any) => t.project.key === "PLEX")).toBe(true); // no SWY card leak
+
+    // Owner sees both projects' cards on the same board.
+    const oBody: any = await (await GET(`/v1/boards/${allBoard.id}/columns`, ownerToken)).json();
+    const oKeys = new Set(oBody.columns.flatMap((col: any) => col.tickets).map((t: any) => t.project.key));
+    expect(oKeys.has("PLEX") && oKeys.has("SWY")).toBe(true);
   });
 });
