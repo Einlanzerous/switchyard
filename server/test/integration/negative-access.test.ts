@@ -4,10 +4,13 @@
 //   DATABASE_URL_TEST=postgres://...:5432/switchyard_test \
 //     bun --cwd server test test/integration/negative-access.test.ts
 //
-// 6.1.0 BASELINE: no endpoints are scoped yet, so this asserts the enforcement
-// PRIMITIVES (lib/authz.ts) behave — the scoped-query filter, the 404-not-403
-// read convention, the owner/agent bypass — and that the scoped filter
-// preserves cursor pagination + counts (the acceptance criterion).
+// 6.1.0 layer asserts the enforcement PRIMITIVES (lib/authz.ts) behave — the
+// scoped-query filter, the 404-not-403 read convention, the owner/agent bypass
+// — and that the scoped filter preserves cursor pagination + counts.
+//
+// 6.1.1 layer drives the REAL Hono app over HTTP (see the harness below) to
+// prove the primitives are wired into the ticket/comment/attachment/link/
+// external-ref read handlers — a viewer-on-PLEX gets 404 on every SWY read.
 //
 // HOW TO EXTEND (every later 6.1.x sub-milestone — see docs/permissions.md):
 //   When you scope an endpoint, add a `describe("6.1.x — <area>")` block here
@@ -26,6 +29,39 @@ const authz = await import("../../src/lib/authz.js");
 const { buildPage, cursorOrderBy, cursorWhere, decodeCursor } = await import(
   "../../src/lib/pagination.js"
 );
+
+// Real-app harness (6.1.1): build the same Hono app prod boots — error handler
+// + every route — and issue actual HTTP requests as a minted token. This proves
+// the helpers are WIRED into each handler (a lib-level test can't catch a
+// handler that forgets to call assertProjectReadable).
+const { OpenAPIHono } = await import("@hono/zod-openapi");
+const { installErrorHandler } = await import("../../src/errors.js");
+const { mountRoutes } = await import("../../src/routes/index.js");
+const { generateApiToken } = await import("../../src/lib/id.js");
+
+function buildApp() {
+  const app = new OpenAPIHono();
+  installErrorHandler(app);
+  mountRoutes(app);
+  return app;
+}
+const app = buildApp();
+
+async function mintToken(userId: string, scopes: string[]): Promise<string> {
+  const { token, hash, prefix } = generateApiToken();
+  await testDb.insert(schema.apiTokens).values({
+    user_id: userId,
+    name: "matrix-test",
+    hashed_token: hash,
+    token_prefix: prefix,
+    scopes,
+  });
+  return token;
+}
+
+function GET(path: string, token: string) {
+  return app.request(path, { headers: { authorization: `Bearer ${token}` } });
+}
 
 afterAll(async () => {
   await closeTestDb();
@@ -165,5 +201,125 @@ describe("6.1.0 — scoped filter preserves cursor pagination + counts", () => {
     expect(seen).toHaveLength(5);
     expect(new Set(seen).size).toBe(5); // no row repeated across pages
     expect(seen.every((id) => plexIds.has(id))).toBe(true); // no SWY leak
+  });
+});
+
+// ─── 6.1.1 — ticket reads + inherited resources (real HTTP) ──────────────────
+// The friend is a viewer on PLEX only. Every PLEX read resolves; every SWY read
+// — ticket, comment, events, children, link, external-ref, and a direct
+// attachment file-id fetch (resolved up through ticket OR comment) — returns
+// 404, never 403, so existence stays hidden.
+describe("6.1.1 — ticket reads + inherited resources (HTTP, friend=viewer on PLEX)", () => {
+  async function seed() {
+    const ctx = await fixture();
+    const mkTicket = async (
+      project: { id: string },
+      status: { id: string },
+      number: number,
+      title: string,
+      type: "task" | "epic" = "task",
+      parent_id: string | null = null,
+    ) => {
+      const [t] = await testDb
+        .insert(schema.tickets)
+        .values({
+          project_id: project.id, number, type, title,
+          status_id: status.id, reporter_id: ctx.magos.id, parent_id,
+        })
+        .returning();
+      return t!;
+    };
+
+    const plexT = await mkTicket(ctx.plex, ctx.plexBacklog, 1, "Plex task");
+    const swyT = await mkTicket(ctx.swy, ctx.swyBacklog, 1, "Swy task");
+    const swyEpic = await mkTicket(ctx.swy, ctx.swyBacklog, 2, "Swy epic", "epic");
+    await mkTicket(ctx.swy, ctx.swyBacklog, 3, "Swy child", "task", swyEpic.id);
+
+    const [plexC] = await testDb.insert(schema.comments)
+      .values({ ticket_id: plexT.id, author_id: ctx.magos.id, body: "plex note" }).returning();
+    const [swyC] = await testDb.insert(schema.comments)
+      .values({ ticket_id: swyT.id, author_id: ctx.magos.id, body: "swy secret" }).returning();
+
+    const att = (vals: Partial<typeof schema.attachments.$inferInsert>) =>
+      testDb.insert(schema.attachments).values({
+        kind: "text", mime_type: "text/plain", size_bytes: 3,
+        storage_path: `x/${Math.abs(vals.size_bytes ?? 1)}.txt`, uploaded_by: ctx.magos.id,
+        ...vals,
+      } as any).returning().then((r) => r[0]!);
+    const plexA = await att({ ticket_id: plexT.id, storage_path: "x/plex.txt" });
+    const swyA = await att({ ticket_id: swyT.id, storage_path: "x/swy.txt" });
+    const swyCommentA = await att({ comment_id: swyC!.id, storage_path: "x/swyc.txt" });
+
+    await testDb.insert(schema.ticketLinks).values({
+      source_ticket_id: swyT.id, target_ticket_id: plexT.id, type: "relates_to", created_by: ctx.magos.id,
+    });
+    await testDb.insert(schema.ticketExternalRefs).values([
+      { ticket_id: plexT.id, kind: "generic", url: "https://example.com/p", created_by: ctx.magos.id },
+      { ticket_id: swyT.id, kind: "generic", url: "https://example.com/s", created_by: ctx.magos.id },
+    ]);
+
+    const friendToken = await mintToken(ctx.friend.id, ["tickets:read"]);
+    const ownerToken = await mintToken(ctx.magos.id, ["admin"]);
+    return { ctx, plexT, swyT, swyEpic, plexC: plexC!, swyA, plexA, swyCommentA, friendToken, ownerToken };
+  }
+
+  test("list: friend sees only PLEX tickets; owner sees all", async () => {
+    const { friendToken, ownerToken } = await seed();
+
+    const fRes = await GET("/v1/tickets", friendToken);
+    expect(fRes.status).toBe(200);
+    const fBody: any = await fRes.json();
+    expect(fBody.items.length).toBeGreaterThan(0);
+    expect(fBody.items.every((i: any) => i.project.key === "PLEX")).toBe(true);
+
+    const oRes = await GET("/v1/tickets", ownerToken);
+    const oBody: any = await oRes.json();
+    const oKeys = new Set(oBody.items.map((i: any) => i.project.key));
+    expect(oKeys.has("PLEX")).toBe(true);
+    expect(oKeys.has("SWY")).toBe(true);
+  });
+
+  test("detail/events/children/comments/links/external-refs: SWY → 404, PLEX → 200", async () => {
+    const { friendToken } = await seed();
+    const notFound = async (path: string) => {
+      const res = await GET(path, friendToken);
+      expect(res.status).toBe(404);
+      expect((await res.json()).error.code).toBe("not_found");
+    };
+    const ok = async (path: string) => {
+      const res = await GET(path, friendToken);
+      expect(res.status).toBe(200);
+    };
+
+    // non-member SWY reads → 404
+    await notFound("/v1/tickets/SWY-1");
+    await notFound("/v1/tickets/SWY-1/events");
+    await notFound("/v1/tickets/SWY-2/children");
+    await notFound("/v1/tickets/SWY-1/comments");
+    await notFound("/v1/tickets/SWY-1/links");
+    await notFound("/v1/tickets/SWY-1/external-refs");
+
+    // member PLEX reads → 200
+    await ok("/v1/tickets/PLEX-1");
+    await ok("/v1/tickets/PLEX-1/comments");
+    await ok("/v1/tickets/PLEX-1/links");
+    await ok("/v1/tickets/PLEX-1/external-refs");
+  });
+
+  test("inherited attachments: direct file-id fetch resolves up to the ticket's project", async () => {
+    const { friendToken, ownerToken, swyA, swyCommentA, plexA } = await seed();
+
+    // SWY attachment (direct ticket_id) — download + meta both 404 for friend.
+    expect((await GET(`/v1/attachments/${swyA.id}`, friendToken)).status).toBe(404);
+    expect((await GET(`/v1/attachments/${swyA.id}/meta`, friendToken)).status).toBe(404);
+
+    // SWY attachment reached via comment_id (inherited path) — also 404.
+    expect((await GET(`/v1/attachments/${swyCommentA.id}/meta`, friendToken)).status).toBe(404);
+
+    // PLEX attachment meta → 200 for the member (positive inherited read).
+    expect((await GET(`/v1/attachments/${plexA.id}/meta`, friendToken)).status).toBe(200);
+
+    // Owner sees the SWY attachment meta.
+    expect((await GET(`/v1/attachments/${swyA.id}/meta`, ownerToken)).status).toBe(200);
   });
 });

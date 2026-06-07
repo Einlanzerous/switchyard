@@ -6,9 +6,12 @@
 //     bun server/scripts/seed-test-fixtures.ts
 //
 // What it creates (idempotent — re-running tops up missing rows only):
-//   - User: test-user (human). Has its own bootstrap token via
-//     E2E_TEST_USER_TOKEN env, otherwise the Playwright auth.setup
-//     project mints one through the API at first boot.
+//   - User: test-user (human, instance_role=owner). Has its own bootstrap
+//     token via E2E_TEST_USER_TOKEN env, otherwise the Playwright auth.setup
+//     project mints one through the API at first boot. Owner so the suite sees
+//     every project under Phase 6 read scoping (the realistic "primary admin
+//     operating the app" role); the scoped-member read path is covered by
+//     server/test/integration/negative-access.test.ts.
 //   - Project: TEST (key=TEST). Default 5 statuses. Three deterministic
 //     tickets:
 //       TEST-1 — "Backlog ticket"     (backlog,   no assignee)
@@ -77,13 +80,25 @@ async function ensureTestUser(): Promise<typeof schema.users.$inferSelect> {
     .from(schema.users)
     .where(eq(schema.users.name, TEST_USER_NAME))
     .limit(1);
-  if (existing) return existing;
+  if (existing) {
+    // Promote pre-Phase-6 fixtures (created with the `member` default) so the
+    // suite keeps seeing every project under read scoping. Idempotent.
+    if (existing.instance_role !== "owner") {
+      await db
+        .update(schema.users)
+        .set({ instance_role: "owner" })
+        .where(eq(schema.users.id, existing.id));
+      console.log(`[test-seed] promoted ${TEST_USER_NAME} to instance_role=owner`);
+      return { ...existing, instance_role: "owner" };
+    }
+    return existing;
+  }
   const [created] = await db
     .insert(schema.users)
-    .values({ name: TEST_USER_NAME, type: "human" })
+    .values({ name: TEST_USER_NAME, type: "human", instance_role: "owner" })
     .returning();
   if (!created) throw new Error("test-user insert returned nothing");
-  console.log(`[test-seed] created user: ${TEST_USER_NAME}`);
+  console.log(`[test-seed] created user: ${TEST_USER_NAME} (owner)`);
   return created;
 }
 

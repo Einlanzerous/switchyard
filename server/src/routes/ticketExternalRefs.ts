@@ -17,6 +17,7 @@ import { resolveTicket } from "../lib/lookups.js";
 import { loadTicketSummary } from "../lib/tickets.js";
 import { writeEvent } from "../lib/events.js";
 import { detectKind, urlMatchesKind } from "../lib/externalRefs/detectKind.js";
+import { assertProjectReadable } from "../lib/authz.js";
 import { badRequest, catchUnique, notFound } from "../errors.js";
 
 const tag = "External Refs";
@@ -57,6 +58,8 @@ export function mount(app: OpenAPIHono) {
   app.openapi(list, (async (c: any) => {
     const { idOrKey: param } = c.req.valid("param");
     const ticket = await resolveTicket(param);
+    // External refs belong to the path ticket's project (6.1.1).
+    await assertProjectReadable(c.get("auth").user, ticket.project_id, "ticket");
     const rows = await db
       .select()
       .from(schema.ticketExternalRefs)

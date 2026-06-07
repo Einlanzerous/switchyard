@@ -17,6 +17,7 @@ import { mapTicketLink, mapUserRef } from "../lib/mappers.js";
 import { resolveTicket } from "../lib/lookups.js";
 import { loadTicketLinks, loadTicketSummary } from "../lib/tickets.js";
 import { writeEvent } from "../lib/events.js";
+import { assertProjectReadable } from "../lib/authz.js";
 import { badRequest, notFound, catchUnique } from "../errors.js";
 
 const tag = "Ticket Links";
@@ -57,6 +58,11 @@ export function mount(app: OpenAPIHono) {
   app.openapi(list, (async (c: any) => {
     const { idOrKey: param } = c.req.valid("param");
     const ticket = await resolveTicket(param);
+    // Gate on the path ticket's project. The link list intentionally still
+    // surfaces the key + title of linked tickets in OTHER projects the caller
+    // can't access — cross-project relationship metadata is visible by design
+    // (see docs/permissions.md); only direct fetch of those tickets 404s.
+    await assertProjectReadable(c.get("auth").user, ticket.project_id, "ticket");
     const items = await loadTicketLinks(ticket.id);
     return c.json({ items }, 200);
   }) as any);
