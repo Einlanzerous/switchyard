@@ -512,3 +512,139 @@ describe("6.1.3 — boards: cross-project column drop (HTTP, friend=viewer on PL
     expect(oKeys.has("PLEX") && oKeys.has("SWY")).toBe(true);
   });
 });
+
+// ─── 6.1.4 — aggregates & feeds (real HTTP) ──────────────────────────────────
+// Events, stats, and search all silently aggregated across every project. The
+// friend (viewer on PLEX) now sees PLEX-only everywhere; a `stranger` member
+// with ZERO projects gets empty aggregates — never the all-projects fallback
+// (the `projectIds.length === 0` conflation guard). Notifications are the one
+// deliberate carve-out: own @-mentions stay visible cross-project (decision B,
+// 2026-06-07) — read visibility is soft, write isolation is the goal.
+describe("6.1.4 — aggregates & feeds (HTTP, friend=viewer on PLEX, stranger=0 projects)", () => {
+  const WINDOW = "since=2026-06-01T00:00:00.000Z&until=2026-06-30T00:00:00.000Z";
+
+  async function seed() {
+    const ctx = await fixture();
+    const [stranger] = await testDb.insert(schema.users)
+      .values({ name: "stranger", type: "human", instance_role: "member" }).returning();
+    // stranger gets NO user_projects row → zero visible projects.
+
+    // in_progress statuses so we can seed stale tickets.
+    const [plexProg] = await testDb.insert(schema.statuses)
+      .values({ project_id: ctx.plex.id, category: "in_progress", display_name: "In Progress", position: 1 }).returning();
+    const [swyProg] = await testDb.insert(schema.statuses)
+      .values({ project_id: ctx.swy.id, category: "in_progress", display_name: "In Progress", position: 1 }).returning();
+
+    const mkTicket = (
+      project: { id: string }, status: { id: string }, number: number, title: string,
+      updated_at?: string,
+    ) => testDb.insert(schema.tickets).values({
+      project_id: project.id, number, type: "task", title,
+      status_id: status.id, reporter_id: ctx.magos.id,
+      ...(updated_at ? { updated_at } : {}),
+    }).returning().then((r) => r[0]!);
+
+    // Backlog tickets (project stats counts) + long-stale in_progress tickets.
+    await mkTicket(ctx.plex, ctx.plexBacklog, 1, "Plex backlog");
+    await mkTicket(ctx.swy, ctx.swyBacklog, 1, "Swy backlog");
+    await mkTicket(ctx.plex, plexProg!, 2, "Plex stale", "2020-01-01T00:00:00.000Z");
+    const swyStale = await mkTicket(ctx.swy, swyProg!, 2, "Swy stale", "2020-01-01T00:00:00.000Z");
+
+    // Events: a ticket.closed in window per project (throughput) + a generic feed event.
+    await testDb.insert(schema.events).values([
+      { project_id: ctx.plex.id, actor_id: ctx.magos.id, event_type: "ticket.closed", created_at: "2026-06-05T00:00:00.000Z", payload: {} },
+      { project_id: ctx.swy.id, actor_id: ctx.magos.id, event_type: "ticket.closed", created_at: "2026-06-05T00:00:00.000Z", payload: {} },
+      { project_id: ctx.plex.id, actor_id: ctx.magos.id, event_type: "ticket.created", payload: {} },
+      { project_id: ctx.swy.id, actor_id: ctx.magos.id, event_type: "ticket.created", payload: {} },
+    ]);
+
+    // Notification for friend on a SWY ticket — the carve-out under test.
+    await testDb.insert(schema.notifications).values({
+      user_id: ctx.friend.id, kind: "mention", actor_id: ctx.magos.id,
+      ticket_id: swyStale.id, payload: { source: "comment", snippet: "ping @friend" },
+    });
+
+    const friendToken = await mintToken(ctx.friend.id, ["tickets:read"]);
+    const strangerToken = await mintToken(stranger!.id, ["tickets:read"]);
+    const ownerToken = await mintToken(ctx.magos.id, ["admin"]);
+    return { ctx, friendToken, strangerToken, ownerToken };
+  }
+
+  test("events feed: friend sees only PLEX events; ?project=SWY → 404; owner sees both", async () => {
+    const { friendToken, ownerToken } = await seed();
+    // 4 events seeded (2 PLEX, 2 SWY). The Event API shape carries no project_id,
+    // so assert scoping by count: friend (PLEX viewer) sees exactly the 2 PLEX.
+    const fBody: any = await (await GET("/v1/events", friendToken)).json();
+    expect(fBody.items.length).toBe(2);
+
+    // Naming a project they can't see → 404, not its audit trail.
+    expect((await GET("/v1/events?project=SWY", friendToken)).status).toBe(404);
+    const plexScoped: any = await (await GET("/v1/events?project=PLEX", friendToken)).json();
+    expect(plexScoped.items.length).toBe(2);
+
+    // Owner sees all four.
+    expect((await (await GET("/v1/events", ownerToken)).json()).items.length).toBe(4);
+  });
+
+  test("project stats: SWY → 404, PLEX → 200; bulk list scoped; stranger empty", async () => {
+    const { friendToken, strangerToken, ownerToken } = await seed();
+
+    expect((await GET("/v1/projects/SWY/stats", friendToken)).status).toBe(404);
+    expect((await GET("/v1/projects/PLEX/stats", friendToken)).status).toBe(200);
+
+    // /v1/stats/projects bulk directory.
+    const fKeys = (await (await GET("/v1/stats/projects", friendToken)).json()).items.map((i: any) => i.project.key);
+    expect(fKeys).toEqual(["PLEX"]);
+    const oKeys = new Set((await (await GET("/v1/stats/projects", ownerToken)).json()).items.map((i: any) => i.project.key));
+    expect(oKeys.has("PLEX") && oKeys.has("SWY")).toBe(true);
+    // Zero-project member → empty directory, NOT all projects.
+    expect((await (await GET("/v1/stats/projects", strangerToken)).json()).items).toEqual([]);
+  });
+
+  test("throughput / cycle-time / cfd: scoped; stranger never gets all-data", async () => {
+    const { friendToken, strangerToken, ownerToken } = await seed();
+
+    // Friend: 1 PLEX closure in window; owner: 2 (PLEX+SWY).
+    expect((await (await GET(`/v1/stats/throughput?${WINDOW}`, friendToken)).json()).total).toBe(1);
+    expect((await (await GET(`/v1/stats/throughput?${WINDOW}`, ownerToken)).json()).total).toBe(2);
+    // Friend naming SWY → empty series, not SWY's closures.
+    expect((await (await GET(`/v1/stats/throughput?${WINDOW}&project=SWY`, friendToken)).json()).total).toBe(0);
+    // CRITICAL: zero-project member with NO ?project= must get empty, not all 2.
+    expect((await (await GET(`/v1/stats/throughput?${WINDOW}`, strangerToken)).json()).total).toBe(0);
+
+    // cycle-time + cfd share the same scope path — assert the empty branch holds.
+    expect((await (await GET(`/v1/stats/cycle-time?${WINDOW}`, strangerToken)).json()).count).toBe(0);
+    expect((await (await GET(`/v1/stats/cumulative-flow?${WINDOW}`, strangerToken)).json()).points).toEqual([]);
+  });
+
+  test("stale rollup: friend sees only PLEX; stranger empty; owner both", async () => {
+    const { ctx, friendToken, strangerToken, ownerToken } = await seed();
+
+    const fItems = (await (await GET("/v1/stats/stale", friendToken)).json()).items;
+    expect(fItems.length).toBe(1);
+    expect(fItems[0].project.key).toBe("PLEX");
+
+    expect((await (await GET("/v1/stats/stale", strangerToken)).json()).items).toEqual([]);
+
+    const oKeys = new Set((await (await GET("/v1/stats/stale", ownerToken)).json()).items.map((i: any) => i.project.key));
+    expect(oKeys.has("PLEX") && oKeys.has("SWY")).toBe(true);
+    void ctx;
+  });
+
+  test("search DSL (already scoped in 6.1.1): ?project=SWY → empty, ?project=PLEX → rows", async () => {
+    const { friendToken } = await seed();
+    const swy = (await (await GET("/v1/tickets?project=SWY", friendToken)).json()).items;
+    expect(swy).toEqual([]);
+    const plex = (await (await GET("/v1/tickets?project=PLEX", friendToken)).json()).items;
+    expect(plex.length).toBeGreaterThan(0);
+    expect(plex.every((t: any) => t.project.key === "PLEX")).toBe(true);
+  });
+
+  test("notifications carve-out (B): own @-mention on a non-member SWY ticket stays visible", async () => {
+    const { friendToken } = await seed();
+    const body: any = await (await GET("/v1/users/me/notifications", friendToken)).json();
+    // The SWY-ticket notification is present despite friend not being a SWY member.
+    const swyNote = body.items.find((n: any) => n.ticket?.project?.key === "SWY");
+    expect(swyNote).toBeTruthy();
+  });
+});
