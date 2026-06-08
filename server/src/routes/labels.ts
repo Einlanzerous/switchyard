@@ -7,6 +7,7 @@ import { requireAuth } from "../auth.js";
 import { idempotency } from "../lib/idempotency.js";
 import { errorResponses, okJson, createdJson, noContent, checkScope, z } from "./_helpers.js";
 import { mapLabel } from "../lib/mappers.js";
+import { assertInstanceAdmin } from "../lib/authz.js";
 import { catchUnique, notFound, unprocessable } from "../errors.js";
 
 // Labels live in a single global catalog (no project scoping). Any ticket
@@ -67,6 +68,7 @@ export function mount(app: OpenAPIHono) {
   // is undefined when the handler runs. See Phase 1.6 pattern note.
   app.openapi(create, (async (c: any) => {
     checkScope(c, "projects:manage");
+    assertInstanceAdmin(c.get("auth").user, "labels");
     const body = c.req.valid("json");
     const [inserted] = await catchUnique(`label "${body.name}" already exists`, () =>
       db.insert(schema.labels).values({ name: body.name, color: body.color }).returning()
@@ -77,6 +79,7 @@ export function mount(app: OpenAPIHono) {
 
   app.openapi(update, (async (c: any) => {
     checkScope(c, "projects:manage");
+    assertInstanceAdmin(c.get("auth").user, "labels");
     const { id } = c.req.valid("param");
     const body = c.req.valid("json");
 
@@ -97,6 +100,7 @@ export function mount(app: OpenAPIHono) {
 
   app.openapi(remove, (async (c: any) => {
     checkScope(c, "projects:manage");
+    assertInstanceAdmin(c.get("auth").user, "labels");
     const { id } = c.req.valid("param");
     const { force } = c.req.valid("query");
 

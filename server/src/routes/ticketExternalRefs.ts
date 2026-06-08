@@ -17,7 +17,7 @@ import { resolveTicket } from "../lib/lookups.js";
 import { loadTicketSummary } from "../lib/tickets.js";
 import { writeEvent } from "../lib/events.js";
 import { detectKind, urlMatchesKind } from "../lib/externalRefs/detectKind.js";
-import { assertProjectReadable } from "../lib/authz.js";
+import { assertProjectReadable, assertProjectRole } from "../lib/authz.js";
 import { badRequest, catchUnique, notFound } from "../errors.js";
 
 const tag = "External Refs";
@@ -87,6 +87,7 @@ export function mount(app: OpenAPIHono) {
     const auth = c.get("auth");
 
     const ticket = await resolveTicket(param);
+    await assertProjectRole(auth.user, ticket.project_id, "write", "external ref");
 
     const kind = body.kind ?? detectKind(body.url);
     if (!urlMatchesKind(body.url, kind)) {
@@ -140,6 +141,7 @@ export function mount(app: OpenAPIHono) {
     const [ticket] = await db.select().from(schema.tickets)
       .where(eq(schema.tickets.id, existing.ticket_id)).limit(1);
     if (!ticket) throw notFound("external ref");
+    await assertProjectRole(auth.user, ticket.project_id, "write", "external ref");
 
     await db.transaction(async (tx) => {
       await tx.delete(schema.ticketExternalRefs).where(eq(schema.ticketExternalRefs.id, id));

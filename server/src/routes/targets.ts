@@ -112,6 +112,7 @@ export function mount(app: OpenAPIHono) {
   // ─── create ──────────────────────────────────────────────────────────────
   app.openapi(create, (async (c: any) => {
     checkScope(c, "targets:manage");
+    assertInstanceAdmin(c.get("auth").user, "targets");
     const body = c.req.valid("json");
 
     // Normalize name to lowercase so case-only collisions (n8n vs N8N) are
@@ -151,6 +152,7 @@ export function mount(app: OpenAPIHono) {
   // ─── patch ───────────────────────────────────────────────────────────────
   app.openapi(update, (async (c: any) => {
     checkScope(c, "targets:manage");
+    assertInstanceAdmin(c.get("auth").user, "targets");
     const { id } = c.req.valid("param");
     const body = c.req.valid("json");
 
@@ -177,6 +179,7 @@ export function mount(app: OpenAPIHono) {
   // ─── delete ──────────────────────────────────────────────────────────────
   app.openapi(remove, (async (c: any) => {
     checkScope(c, "targets:manage");
+    assertInstanceAdmin(c.get("auth").user, "targets");
     const { id } = c.req.valid("param");
 
     const [existing] = await db.select().from(schema.targets).where(eq(schema.targets.id, id)).limit(1);

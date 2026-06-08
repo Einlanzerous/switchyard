@@ -46,8 +46,8 @@ which is `user.type === 'agent' || user.instance_role === 'owner'`.
 4. **Reads 404, writes 403.** For a non-member resource, *reads* return
    `404 not_found` (via `assertProjectReadable`) so a viewer can't probe for the
    existence of projects/tickets they can't see. *Writes* return `403 forbidden`
-   with a role check — existence isn't a secret once you're already acting on a
-   resource you can see. (Write enforcement is 6.2.)
+   (via `assertProjectRole` / `assertInstanceAdmin`) — existence isn't a secret
+   once you're already acting on a resource by id.
 
 5. **Owner/agent bypass is one predicate.** `hasInstanceWideAccess`, explicit
    and tested. Never re-derive it.
@@ -58,15 +58,20 @@ which is `user.type === 'agent' || user.instance_role === 'owner'`.
    and never sees their rows in list reads. A new scoped read without a matrix
    row fails review.
 
-7. **CI grep-guard.** `server/scripts/authz-guard.ts` flags route handlers that
-   query `tickets` / `projects` / `boards` without routing through an authz
-   helper. It was **advisory through 6.1.0–6.1.4** while the read path was wired
-   family by family; **6.1.5 flipped it to ENFORCING** — it runs in
-   `.github/workflows/ci.yml` and a new unscoped handler fails the build. A
-   handler that legitimately touches these tables outside the project-scoped read
-   model (e.g. self-scoped notification hydration in `users.ts`) satisfies the
-   guard by referencing any helper in its `AUTHZ_HELPERS` list. Run it any time
-   with `bun server/scripts/authz-guard.ts`.
+7. **CI grep-guard (reads + writes).** `server/scripts/authz-guard.ts` flags
+   route files that touch scoped tables without the right gate. The **read**
+   check flags `.from(schema.{tickets,projects,boards})` without a read helper
+   (`visibleProjectFilter` / `assertProjectReadable` / …); the **write** check
+   (added in 6.2) flags `.insert|update|delete(schema.X)` on a project-scoped or
+   admin table (`tickets`, `comments`, `statuses`, `projects`, `rules`, `users`,
+   …) without a write gate (`assertProjectRole` / `assertInstanceAdmin`). It was
+   **advisory through 6.1.0–6.1.4**, **ENFORCING since 6.1.5** — it runs in
+   `.github/workflows/ci.yml` and a new unscoped read OR write handler fails the
+   build. A file that legitimately touches these tables outside the project model
+   (self-scoped notification hydration, owner-scoped saved views, audit-event
+   writes) satisfies the guard by referencing the relevant helper, or by living
+   on a table the guard doesn't track. Run it any time with
+   `bun server/scripts/authz-guard.ts`.
 
 ## Helper API (`server/src/lib/authz.ts`)
 
@@ -79,7 +84,8 @@ which is `user.type === 'agent' || user.instance_role === 'owner'`.
 | `assertProjectReadable(user, projectId, resource)` | **Detail reads.** Throws `404 not_found` for non-members; resolves for members + instance-wide actors. |
 | `assertInstanceAdmin(user, surface)` | **Admin surfaces (6.1.5).** Throws `403 forbidden` unless the user is instance-wide (owner/agent). Gates reads on rules/targets/webhooks — whole subsystems, not project-scoped resources, so they 403 (not 404). |
 | `visibleUserIds(user)` | **People directory (6.1.5).** Set of user ids a member may see — co-members of their visible projects ∪ all agents ∪ self; `null` (no filter) for instance-wide actors. |
-| `effectivePermissions(user, token, projectId)` | Token scopes ∩ project role → `read`/`write`/`manage` capability set. The basis for 6.2 write enforcement. |
+| `assertProjectRole(user, projectId, capability, resource)` | **Writes (6.2).** Throws `403 forbidden` unless the user holds `capability` (`"write"` = editor+, `"manage"` = project admin) on the project. The project-role dimension; pairs with the handler's existing `checkScope` (token dimension) — both must pass. Instance-wide actors bypass. |
+| `effectivePermissions(user, token, projectId)` | Token scopes ∩ project role → `read`/`write`/`manage` capability set. The documented model; load-bearing in 6.3 (read-only-token reconciliation). |
 
 ### List-read pattern
 
@@ -97,6 +103,24 @@ const ticket = await resolveTicket(idOrKey); // existence as today
 if (!ticket) throw notFound("ticket");
 await assertProjectReadable(auth.user, ticket.project_id, "ticket"); // 404 for non-members
 ```
+
+### Write pattern (6.2)
+
+Keep the existing `checkScope` (token dimension) and add the role gate after the
+project is resolved — both must pass, which *is* the `scope ∩ role` intersection.
+Writes 403 (not 404); a non-member resolving the resource then hits the gate.
+
+```ts
+checkScope(c, "tickets:write");                                  // token dimension (unchanged)
+const ticket = await resolveTicket(idOrKey);
+await assertProjectRole(auth.user, ticket.project_id, "write", "ticket"); // role dimension → 403
+```
+
+Project-config writes (statuses, transitions, project edit) use `"manage"`.
+Instance surfaces (rules, targets, webhooks, boards, labels, users, settings,
+project *creation*) use `assertInstanceAdmin` instead — they're not project-
+scoped. Custom fields branch on `project_id`: project-scoped → `assertProjectRole
+(manage)`, global (`project_id NULL`) → `assertInstanceAdmin`.
 
 ## Rollout (6.1.x)
 
@@ -197,7 +221,40 @@ endpoint behavior change**. Enforcement is then wired per endpoint family:
     helper allowlist. Both previously-flagged files (`rules.ts`, `users.ts`) now
     reference a helper, so the gate is green.
 
-Write-path enforcement + role mapping is 6.2.
+## Rollout (6.2)
+
+- **6.2 — ✅ write-path enforcement + roles.** Every mutating handler now gates
+  on the project-role dimension on top of its existing `checkScope`. Wiring by
+  family:
+  - **Project-scoped writes → `assertProjectRole(…, "write")` (editor+):**
+    tickets (create / update / delete / transition; **move** requires write on
+    *both* source and destination), comments (create / update / delete — the
+    author-only check stays), attachments (upload / delete; an orphan attachment
+    with no parent ticket is instance-admin only), ticket links + external-refs,
+    and **ticket templates** (create / update / delete / fire_now).
+  - **Project-config writes → `assertProjectRole(…, "manage")` (project admin):**
+    project edit / archive / delete, statuses + transitions (create / update /
+    delete / reorder), and project-scoped custom fields.
+  - **Instance surfaces → `assertInstanceAdmin`:** project **creation** (a
+    project admin can't mint projects), boards, rules, targets, webhooks, labels,
+    users + API tokens, settings `PATCH`, and global (`project_id NULL`) custom
+    fields. These keep their existing `:manage`/`admin` token-scope check too.
+  - **Self-scoped, unchanged:** saved views (owner-only) and
+    `POST /v1/users/me/notifications/mark-read` (self).
+  - **Effective = token scope ∩ project role**, enforced as a conjunction of two
+    gates (`checkScope` + `assertProjectRole`) rather than via
+    `effectivePermissions`, so per-scope precision survives (a `comments:write`
+    token still can't create tickets). `checkScope`'s `admin`-scope short-circuit
+    is instance-admin; project-admin comes from the role gate — that's the
+    "split instance-admin from project-admin" the ticket asked for.
+  - **Templates decision:** the ticket grouped templates under project-admin
+    config, but they ship as **editor-tier** (`"write"`) — they're ticket-
+    adjacent (recurring ticket creation, already `tickets:write`), so an editor
+    who writes tickets can manage templates. SWY-102 was corrected to match.
+  - **Guard extended to writes** (rule 7); negative-access matrix gained a
+    `6.2 — write-path enforcement` block (viewer blocked even with a broad token;
+    editor writes tickets not config; project admin configs own project not
+    others; instance surfaces 403 for project admins; owner/agent regression).
 
 **Intentional non-goal (read visibility is soft):** a ticket you *can* see may
 link to a ticket in a project you can't — the link list still surfaces that

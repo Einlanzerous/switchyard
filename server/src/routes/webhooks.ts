@@ -93,6 +93,7 @@ export function mount(app: OpenAPIHono) {
   // ─── create (mints secret, returned once) ────────────────────────────────
   app.openapi(create, (async (c: any) => {
     checkScope(c, "webhooks:manage");
+    assertInstanceAdmin(c.get("auth").user, "webhooks");
     const body = c.req.valid("json");
     const secret = generateWebhookSecret();
 
@@ -131,6 +132,7 @@ export function mount(app: OpenAPIHono) {
   // ─── patch ───────────────────────────────────────────────────────────────
   app.openapi(update, (async (c: any) => {
     checkScope(c, "webhooks:manage");
+    assertInstanceAdmin(c.get("auth").user, "webhooks");
     const { id } = c.req.valid("param");
     const body = c.req.valid("json");
 
@@ -169,6 +171,7 @@ export function mount(app: OpenAPIHono) {
   // ─── delete ──────────────────────────────────────────────────────────────
   app.openapi(remove, (async (c: any) => {
     checkScope(c, "webhooks:manage");
+    assertInstanceAdmin(c.get("auth").user, "webhooks");
     const { id } = c.req.valid("param");
     const result = await db.delete(schema.webhookSubscriptions)
       .where(eq(schema.webhookSubscriptions.id, id))
@@ -221,6 +224,7 @@ export function mount(app: OpenAPIHono) {
   // ─── redeliver ───────────────────────────────────────────────────────────
   app.openapi(redeliver, (async (c: any) => {
     checkScope(c, "webhooks:manage");
+    assertInstanceAdmin(c.get("auth").user, "webhooks");
     const { id } = c.req.valid("param");
 
     const [updated] = await db.update(schema.webhookDeliveries)

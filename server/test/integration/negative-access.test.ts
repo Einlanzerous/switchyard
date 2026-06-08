@@ -20,7 +20,7 @@
 //   A new scoped read without a matrix row fails review.
 
 import { afterAll, beforeEach, describe, expect, test } from "bun:test";
-import { and, sql } from "drizzle-orm";
+import { and, inArray, sql } from "drizzle-orm";
 import { closeTestDb, schema, testDb } from "../db.js";
 
 process.env.DATABASE_URL = process.env.DATABASE_URL_TEST!;
@@ -62,6 +62,18 @@ async function mintToken(userId: string, scopes: string[]): Promise<string> {
 function GET(path: string, token: string) {
   return app.request(path, { headers: { authorization: `Bearer ${token}` } });
 }
+
+function body(method: string, path: string, token: string, json: unknown) {
+  return app.request(path, {
+    method,
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+    body: JSON.stringify(json),
+  });
+}
+const POST = (path: string, token: string, json: unknown) => body("POST", path, token, json);
+const PATCH2 = (path: string, token: string, json: unknown) => body("PATCH", path, token, json);
+const DELETE = (path: string, token: string) =>
+  app.request(path, { method: "DELETE", headers: { authorization: `Bearer ${token}` } });
 
 afterAll(async () => {
   await closeTestDb();
@@ -738,5 +750,116 @@ describe("6.1.5 — admin surfaces (HTTP, friend=viewer on PLEX)", () => {
     expect((await GET("/v1/settings", friendToken)).status).toBe(200);
     expect((await PATCH("/v1/settings", friendToken, { stale_in_progress_days: 14 })).status).toBe(403);
     expect((await PATCH("/v1/settings", ownerToken, { stale_in_progress_days: 14 })).status).toBe(200);
+  });
+});
+
+// ─── 6.2 — write-path enforcement (real HTTP) ────────────────────────────────
+// Reads are scoped (6.1.x); now writes gate on the PROJECT ROLE. Tokens here
+// carry BROAD scopes (tickets:write + comments:write + projects:manage) so each
+// test proves the *role* gate blocks even when the *token* would allow it —
+// effective capability = token scope ∩ project role. Non-member / under-
+// privileged writes return 403 (reads stay 404). Owners + agents bypass.
+describe("6.2 — write-path enforcement (HTTP)", () => {
+  // viewer=friend/PLEX, editor=editor/PLEX, admin=padmin/PLEX (all instance member).
+  const BROAD = ["tickets:write", "comments:write", "projects:manage"];
+  const RULE = { name: "r", trigger_event_types: ["ticket.created"], actions: [{ type: "comment", body: "x" }] };
+
+  async function seed() {
+    const ctx = await fixture();
+    const [editor] = await testDb.insert(schema.users)
+      .values({ name: "editor", type: "human", instance_role: "member" }).returning();
+    await testDb.insert(schema.userProjects).values({ user_id: editor!.id, project_id: ctx.plex.id, role: "editor" });
+    const [padmin] = await testDb.insert(schema.users)
+      .values({ name: "padmin", type: "human", instance_role: "member" }).returning();
+    await testDb.insert(schema.userProjects).values({ user_id: padmin!.id, project_id: ctx.plex.id, role: "admin" });
+
+    // A PLEX ticket (member writes) + a SWY ticket (non-member writes → 403).
+    const mk = (project: { id: string }, status: { id: string }, number: number, title: string) =>
+      testDb.insert(schema.tickets).values({
+        project_id: project.id, number, type: "task", title,
+        status_id: status.id, reporter_id: ctx.magos.id,
+      }).returning().then((r) => r[0]!);
+    const plexT = await mk(ctx.plex, ctx.plexBacklog, 1, "Plex task");
+    const swyT = await mk(ctx.swy, ctx.swyBacklog, 1, "Swy task");
+    // Manually-numbered seed rows must advance the counter so POST-create
+    // allocations don't collide on (project_id, number).
+    await testDb.update(schema.projectCounters).set({ last_used_number: 1 })
+      .where(inArray(schema.projectCounters.project_id, [ctx.plex.id, ctx.swy.id]));
+
+    return {
+      ctx, plexT, swyT,
+      friendToken: await mintToken(ctx.friend.id, BROAD),
+      editorToken: await mintToken(editor!.id, BROAD),
+      padminToken: await mintToken(padmin!.id, BROAD),
+      ownerToken: await mintToken(ctx.magos.id, ["admin"]),
+      agentToken: await mintToken(ctx.claude.id, ["tickets:write"]),
+    };
+  }
+
+  test("viewer (broad token) is blocked on every write, on member + non-member projects", async () => {
+    const { friendToken } = await seed();
+    // PLEX (member as viewer) → 403, NOT a silent success.
+    expect((await POST("/v1/tickets", friendToken, { project_key: "PLEX", type: "task", title: "x" })).status).toBe(403);
+    expect((await PATCH2("/v1/tickets/PLEX-1", friendToken, { title: "y" })).status).toBe(403);
+    expect((await POST("/v1/tickets/PLEX-1/comments", friendToken, { body: "hi" })).status).toBe(403);
+    expect((await DELETE("/v1/tickets/PLEX-1", friendToken)).status).toBe(403);
+    // SWY (not a member at all) → 403 on write, not the 404 reads get.
+    expect((await POST("/v1/tickets", friendToken, { project_key: "SWY", type: "task", title: "x" })).status).toBe(403);
+  });
+
+  test("editor: ticket + comment writes succeed on PLEX; project config is 403", async () => {
+    const { editorToken } = await seed();
+    expect((await POST("/v1/tickets", editorToken, { project_key: "PLEX", type: "task", title: "new" })).status).toBe(201);
+    expect((await POST("/v1/tickets/PLEX-1/comments", editorToken, { body: "hi" })).status).toBe(201);
+    expect((await PATCH2("/v1/tickets/PLEX-1", editorToken, { title: "edited" })).status).toBe(200);
+    // Config requires `manage` (project admin) — editor cannot.
+    expect((await POST("/v1/projects/PLEX/statuses", editorToken, { category: "in_progress", display_name: "WIP" })).status).toBe(403);
+    expect((await PATCH2("/v1/projects/PLEX", editorToken, { name: "X" })).status).toBe(403);
+  });
+
+  test("project admin: config on own project succeeds; other project is 403", async () => {
+    const { padminToken } = await seed();
+    expect((await PATCH2("/v1/projects/PLEX", padminToken, { name: "Plex2" })).status).toBe(200);
+    expect((await POST("/v1/projects/PLEX/statuses", padminToken, { category: "in_progress", display_name: "WIP" })).status).toBe(201);
+    // Not a member of SWY → 403 (writes), even though the token has projects:manage.
+    expect((await PATCH2("/v1/projects/SWY", padminToken, { name: "X" })).status).toBe(403);
+    expect((await POST("/v1/projects/SWY/statuses", padminToken, { category: "in_progress", display_name: "WIP" })).status).toBe(403);
+  });
+
+  test("instance surfaces gate on instance role: project admin → 403; project create is instance-only", async () => {
+    const { ctx, padminToken, ownerToken } = await seed();
+    expect((await POST("/v1/rules", padminToken, RULE)).status).toBe(403);
+    expect((await POST("/v1/labels", padminToken, { name: "l", color: "#abcdef" })).status).toBe(403);
+    expect((await POST("/v1/boards", padminToken, { name: "b", project_ids: [ctx.plex.id] })).status).toBe(403);
+    expect((await POST("/v1/users", padminToken, { name: "u", type: "human" })).status).toBe(403);
+    expect((await PATCH2("/v1/settings", padminToken, { stale_in_progress_days: 14 })).status).toBe(403);
+    // projects.create is instance-level — a project admin cannot mint projects.
+    expect((await POST("/v1/projects", padminToken, { key: "NEW", name: "New" })).status).toBe(403);
+    expect((await POST("/v1/projects", ownerToken, { key: "NEW", name: "New" })).status).toBe(201);
+  });
+
+  test("cross-project move requires write on BOTH ends", async () => {
+    const { editorToken, ownerToken } = await seed();
+    // editor is write on PLEX but not a member of SWY → blocked on the destination.
+    expect((await POST("/v1/tickets/PLEX-1/move", editorToken, { project_key: "SWY" })).status).toBe(403);
+    // owner bypasses → move succeeds.
+    expect((await POST("/v1/tickets/PLEX-1/move", ownerToken, { project_key: "SWY" })).status).toBe(200);
+  });
+
+  test("templates are editor-tier: editor 201, viewer 403", async () => {
+    const { editorToken, friendToken } = await seed();
+    const tpl = { title: "T", type: "task", trigger_at: "2027-01-01T00:00:00.000Z" };
+    expect((await POST("/v1/projects/PLEX/templates", editorToken, tpl)).status).toBe(201);
+    expect((await POST("/v1/projects/PLEX/templates", friendToken, tpl)).status).toBe(403);
+  });
+
+  test("regression: owner + agent retain full write access", async () => {
+    const { ownerToken, agentToken } = await seed();
+    // Owner (admin token) writes anywhere, including project config + instance surfaces.
+    expect((await POST("/v1/tickets", ownerToken, { project_key: "SWY", type: "task", title: "o" })).status).toBe(201);
+    expect((await POST("/v1/projects/PLEX/statuses", ownerToken, { category: "in_progress", display_name: "WIP" })).status).toBe(201);
+    expect((await POST("/v1/rules", ownerToken, RULE)).status).toBe(201);
+    // Agent (plain tickets:write token) bypasses project membership — imperium-loop stays unbroken.
+    expect((await POST("/v1/tickets", agentToken, { project_key: "SWY", type: "task", title: "a" })).status).toBe(201);
   });
 });

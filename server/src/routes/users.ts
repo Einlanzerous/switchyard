@@ -12,7 +12,7 @@ import { idempotency } from "../lib/idempotency.js";
 import { errorResponses, okJson, createdJson, noContent, z, checkScope } from "./_helpers.js";
 import { mapUser, mapApiToken, mapTicketSummary } from "../lib/mappers.js";
 import { getUserById } from "../lib/lookups.js";
-import { visibleUserIds } from "../lib/authz.js";
+import { assertInstanceAdmin, visibleUserIds } from "../lib/authz.js";
 import { buildPage, cursorOrderBy, cursorWhere, decodeCursor, encodeCursor } from "../lib/pagination.js";
 import { generateApiToken } from "../lib/id.js";
 import { badRequest, catchUnique, notFound } from "../errors.js";
@@ -302,6 +302,7 @@ export function mount(app: OpenAPIHono) {
 
   app.openapi(create, (async (c: any) => {
     checkScope(c, "users:manage");
+    assertInstanceAdmin(c.get("auth").user, "users");
     const body = c.req.valid("json");
     const [created] = await catchUnique(`user "${body.name}" already exists`, () =>
       db.insert(schema.users).values({
@@ -316,6 +317,7 @@ export function mount(app: OpenAPIHono) {
 
   app.openapi(update, (async (c: any) => {
     checkScope(c, "users:manage");
+    assertInstanceAdmin(c.get("auth").user, "users");
     const { id } = c.req.valid("param");
     const body = c.req.valid("json");
     await getUserById(id);
@@ -342,6 +344,7 @@ export function mount(app: OpenAPIHono) {
 
   app.openapi(remove, (async (c: any) => {
     checkScope(c, "users:manage");
+    assertInstanceAdmin(c.get("auth").user, "users");
     const { id } = c.req.valid("param");
     await getUserById(id);
     await db.update(schema.users)
@@ -364,6 +367,7 @@ export function mount(app: OpenAPIHono) {
 
   app.openapi(createToken, (async (c: any) => {
     checkScope(c, "users:manage");
+    assertInstanceAdmin(c.get("auth").user, "users");
     const { id } = c.req.valid("param");
     const body = c.req.valid("json");
     await getUserById(id);
@@ -383,6 +387,7 @@ export function mount(app: OpenAPIHono) {
 
   app.openapi(revokeToken, (async (c: any) => {
     checkScope(c, "users:manage");
+    assertInstanceAdmin(c.get("auth").user, "users");
     const { id, tokenId } = c.req.valid("param");
     const [updated] = await db.update(schema.apiTokens)
       .set({ revoked_at: new Date().toISOString() })

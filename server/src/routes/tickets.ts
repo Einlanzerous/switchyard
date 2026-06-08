@@ -27,7 +27,7 @@ import {
   loadTicketDetail, loadTicketSummary, allocateTicketNumber, fetchExternalRefsByTicket,
 } from "../lib/tickets.js";
 import { detectAndNotify, detectAndNotifyOnEdit } from "../lib/mentions.js";
-import { assertProjectReadable, visibleProjectFilter } from "../lib/authz.js";
+import { assertProjectReadable, assertProjectRole, visibleProjectFilter } from "../lib/authz.js";
 import { badRequest, unprocessable } from "../errors.js";
 
 const tag = "Tickets";
@@ -397,6 +397,7 @@ export function mount(app: OpenAPIHono) {
     const auth = c.get("auth");
 
     const project = await getProjectByKey(body.project_key, { includeArchived: false });
+    await assertProjectRole(auth.user, project.id, "write", "ticket");
 
     // Validate parent (epic in same project, not deleted). Trigger backstops.
     if (body.parent_id) {
@@ -500,6 +501,7 @@ export function mount(app: OpenAPIHono) {
     const existing = await resolveTicket(param);
     const project = await db.select().from(schema.projects).where(eq(schema.projects.id, existing.project_id)).limit(1).then((r) => r[0]);
     if (!project) throw badRequest("orphan ticket: project missing");
+    await assertProjectRole(auth.user, existing.project_id, "write", "ticket");
 
     // Validate parent if changed.
     if (body.parent_id !== undefined && body.parent_id !== null) {
@@ -613,6 +615,7 @@ export function mount(app: OpenAPIHono) {
     const { idOrKey: param } = c.req.valid("param");
     const auth = c.get("auth");
     const existing = await resolveTicket(param);
+    await assertProjectRole(auth.user, existing.project_id, "write", "ticket");
 
     const summary = await loadTicketSummary(existing);
 
@@ -639,6 +642,7 @@ export function mount(app: OpenAPIHono) {
     const body = c.req.valid("json");
     const auth = c.get("auth");
     const existing = await resolveTicket(param);
+    await assertProjectRole(auth.user, existing.project_id, "write", "ticket");
 
     const fromStatus = await getStatusById(existing.status_id);
     const toStatus = await getStatusById(body.status_id);
@@ -765,6 +769,9 @@ export function mount(app: OpenAPIHono) {
     const existing = await resolveTicket(param);
     const fromProject = await getProjectById(existing.project_id);
     const toProject = await getProjectByKey(body.project_key);
+    // A move writes to both ends — require write on the source and the target.
+    await assertProjectRole(auth.user, fromProject.id, "write", "ticket");
+    await assertProjectRole(auth.user, toProject.id, "write", "ticket");
 
     if (fromProject.id === toProject.id) {
       throw badRequest("ticket is already in this project");
