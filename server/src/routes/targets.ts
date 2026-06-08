@@ -20,6 +20,7 @@ import { idempotency } from "../lib/idempotency.js";
 import { errorResponses, okJson, createdJson, noContent, checkScope, z, idempotencyHeader } from "./_helpers.js";
 import { buildPage, cursorOrderBy, cursorWhere, decodeCursor } from "../lib/pagination.js";
 import { generateWebhookSecret } from "../lib/id.js";
+import { assertInstanceAdmin } from "../lib/authz.js";
 import { badRequest, conflict, notFound, catchUnique } from "../errors.js";
 import type {
   Target as ApiTarget, TargetWithSecret as ApiTargetWithSecret,
@@ -89,6 +90,7 @@ export function mount(app: OpenAPIHono) {
 
   // ─── list ────────────────────────────────────────────────────────────────
   app.openapi(list, (async (c: any) => {
+    assertInstanceAdmin(c.get("auth").user, "targets");
     const q = c.req.valid("query");
     const limit = q.limit;
     const conds: SQL[] = [];
@@ -139,6 +141,7 @@ export function mount(app: OpenAPIHono) {
 
   // ─── get ─────────────────────────────────────────────────────────────────
   app.openapi(get, (async (c: any) => {
+    assertInstanceAdmin(c.get("auth").user, "targets");
     const { id } = c.req.valid("param");
     const [row] = await db.select().from(schema.targets).where(eq(schema.targets.id, id)).limit(1);
     if (!row) throw notFound("target");

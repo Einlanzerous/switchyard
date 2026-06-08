@@ -71,7 +71,8 @@ beforeEach(async () => {
   await testDb.execute(
     sql`TRUNCATE events, ticket_labels, comments, attachments, tickets,
         boards, project_counters, statuses, status_transitions, labels, projects,
-        api_tokens, idempotency_keys, user_projects, users
+        api_tokens, idempotency_keys, user_projects, users,
+        rules, targets, webhook_subscriptions
         RESTART IDENTITY CASCADE`,
   );
 });
@@ -646,5 +647,96 @@ describe("6.1.4 — aggregates & feeds (HTTP, friend=viewer on PLEX, stranger=0 
     // The SWY-ticket notification is present despite friend not being a SWY member.
     const swyNote = body.items.find((n: any) => n.ticket?.project?.key === "SWY");
     expect(swyNote).toBeTruthy();
+  });
+});
+
+describe("6.1.5 — admin surfaces (HTTP, friend=viewer on PLEX)", () => {
+  function PATCH(path: string, token: string, body: unknown) {
+    return app.request(path, {
+      method: "PATCH",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  }
+
+  async function seed() {
+    const ctx = await fixture();
+    // mate: a co-member of friend on PLEX → friend SHOULD see them in the directory.
+    const [mate] = await testDb.insert(schema.users)
+      .values({ name: "mate", type: "human", instance_role: "member" }).returning();
+    await testDb.insert(schema.userProjects).values({ user_id: mate!.id, project_id: ctx.plex.id, role: "viewer" });
+    // outsider: member of SWY only → friend should NOT see them.
+    const [outsider] = await testDb.insert(schema.users)
+      .values({ name: "outsider", type: "human", instance_role: "member" }).returning();
+    await testDb.insert(schema.userProjects).values({ user_id: outsider!.id, project_id: ctx.swy.id, role: "viewer" });
+
+    // Admin infra, all referencing the project friend can't see where applicable.
+    const [rule] = await testDb.insert(schema.rules).values({
+      project_id: ctx.swy.id, name: "swy rule", trigger_event_types: ["ticket.created"],
+      conditions: {}, actions: [], webhook_secret: "wh",
+    }).returning();
+    await testDb.insert(schema.targets).values({ name: "n8n", url: "https://n8n.example/hook", hmac_secret: "s" });
+    const [sub] = await testDb.insert(schema.webhookSubscriptions).values({
+      url: "https://hooks.example/x", event_types: ["ticket.created"], secret: "s",
+    }).returning();
+
+    const friendToken = await mintToken(ctx.friend.id, ["tickets:read"]);
+    const ownerToken = await mintToken(ctx.magos.id, ["admin"]);
+    // Agent with a plain read token — proves the gate keys on instance role
+    // (agent), not on token scope, so imperium-loop reads keep working.
+    const agentToken = await mintToken(ctx.claude.id, ["tickets:read"]);
+    return { ctx, mate: mate!, outsider: outsider!, rule: rule!, sub: sub!, friendToken, ownerToken, agentToken };
+  }
+
+  test("admin infra reads: friend → 403; owner + agent → 200", async () => {
+    const { rule, sub, friendToken, ownerToken, agentToken } = await seed();
+
+    for (const path of ["/v1/rules", "/v1/targets", "/v1/webhooks"]) {
+      expect((await GET(path, friendToken)).status).toBe(403);
+      expect((await GET(path, ownerToken)).status).toBe(200);
+      expect((await GET(path, agentToken)).status).toBe(200);
+    }
+    // Detail + debugging sublists gate the same way (before any row lookup).
+    expect((await GET(`/v1/rules/${rule.id}`, friendToken)).status).toBe(403);
+    expect((await GET(`/v1/rules/${rule.id}/firings`, friendToken)).status).toBe(403);
+    expect((await GET(`/v1/webhooks/${sub.id}/deliveries`, friendToken)).status).toBe(403);
+    expect((await GET(`/v1/rules/${rule.id}`, ownerToken)).status).toBe(200);
+    expect((await GET(`/v1/webhooks/${sub.id}/deliveries`, ownerToken)).status).toBe(200);
+  });
+
+  test("user directory: member sees co-members ∪ agents ∪ self; owner sees all", async () => {
+    const { friendToken, ownerToken } = await seed();
+
+    const fNames = new Set(
+      (await (await GET("/v1/users", friendToken)).json()).items.map((u: any) => u.name),
+    );
+    // friend + mate (PLEX co-member) + claude (agent). NOT magos (owner, no
+    // membership row), NOT outsider (SWY-only).
+    expect(fNames).toEqual(new Set(["friend", "mate", "claude"]));
+
+    const oNames = new Set(
+      (await (await GET("/v1/users", ownerToken)).json()).items.map((u: any) => u.name),
+    );
+    for (const n of ["magos", "claude", "friend", "mate", "outsider"]) expect(oNames.has(n)).toBe(true);
+  });
+
+  test("user detail: 404 outside the directory, 200 for co-member + self", async () => {
+    const { ctx, mate, outsider, friendToken } = await seed();
+    expect((await GET(`/v1/users/${outsider.id}`, friendToken)).status).toBe(404);
+    expect((await GET(`/v1/users/${mate.id}`, friendToken)).status).toBe(200);
+    expect((await GET(`/v1/users/${ctx.friend.id}`, friendToken)).status).toBe(200);
+  });
+
+  test("token metadata is admin-only: friend → 403 (even own), owner → 200", async () => {
+    const { ctx, friendToken, ownerToken } = await seed();
+    expect((await GET(`/v1/users/${ctx.friend.id}/tokens`, friendToken)).status).toBe(403);
+    expect((await GET(`/v1/users/${ctx.magos.id}/tokens`, ownerToken)).status).toBe(200);
+  });
+
+  test("settings: readable by a member (display config), PATCH admin-only", async () => {
+    const { friendToken, ownerToken } = await seed();
+    expect((await GET("/v1/settings", friendToken)).status).toBe(200);
+    expect((await PATCH("/v1/settings", friendToken, { stale_in_progress_days: 14 })).status).toBe(403);
+    expect((await PATCH("/v1/settings", ownerToken, { stale_in_progress_days: 14 })).status).toBe(200);
   });
 });

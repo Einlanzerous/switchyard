@@ -1,4 +1,4 @@
-// Phase 6 authz guard (SWY-96 / 6.1.0) — ADVISORY.
+// Phase 6 authz guard (SWY-96 / 6.1.0) — ENFORCING (flipped in 6.1.5 / SWY-101).
 //
 //   bun server/scripts/authz-guard.ts
 //
@@ -8,17 +8,17 @@
 // (list reads) or `assertProjectReadable` / `canSeeProject` (detail reads), so a
 // `member` human can't see projects they don't belong to.
 //
-// It is ADVISORY in 6.1.0 — nothing is scoped yet, so it flags every handler by
-// design. It exists so the 6.1.x sub-milestones can watch the unscoped list
-// shrink, and so it can be flipped into a failing CI gate once 6.1.5 lands.
-//
-// TO ENFORCE (after 6.1.5): set `ENFORCE = true` below and add a step to
-// .github/workflows/ci.yml: `cd server && bun scripts/authz-guard.ts`.
+// It was ADVISORY through 6.1.0–6.1.4 while the read path was wired family by
+// family. 6.1.5 (the admin-surface audit) closed the last gaps, so it now ENFORCES:
+// it runs in .github/workflows/ci.yml and a new unscoped handler fails the build.
+// A handler that legitimately touches these tables outside the project-scoped
+// read model (e.g. self-scoped notification hydration) satisfies the guard by
+// referencing any helper in AUTHZ_HELPERS.
 
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-const ENFORCE = false;
+const ENFORCE = true;
 
 const ROUTES_DIR = join(import.meta.dir, "..", "src", "routes");
 
@@ -30,6 +30,8 @@ const AUTHZ_HELPERS = [
   "canSeeProject",
   "visibleProjectIds",
   "hasInstanceWideAccess",
+  "assertInstanceAdmin",
+  "visibleUserIds",
 ] as const;
 
 type Finding = { file: string; tables: string[] };

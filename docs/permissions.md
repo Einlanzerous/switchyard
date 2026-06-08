@@ -60,9 +60,13 @@ which is `user.type === 'agent' || user.instance_role === 'owner'`.
 
 7. **CI grep-guard.** `server/scripts/authz-guard.ts` flags route handlers that
    query `tickets` / `projects` / `boards` without routing through an authz
-   helper. **Advisory in 6.1.0** (it would flag every handler today — nothing is
-   scoped yet); flip it to a failing `ci.yml` gate once 6.1.5 completes. Run it
-   any time with `bun server/scripts/authz-guard.ts`.
+   helper. It was **advisory through 6.1.0–6.1.4** while the read path was wired
+   family by family; **6.1.5 flipped it to ENFORCING** — it runs in
+   `.github/workflows/ci.yml` and a new unscoped handler fails the build. A
+   handler that legitimately touches these tables outside the project-scoped read
+   model (e.g. self-scoped notification hydration in `users.ts`) satisfies the
+   guard by referencing any helper in its `AUTHZ_HELPERS` list. Run it any time
+   with `bun server/scripts/authz-guard.ts`.
 
 ## Helper API (`server/src/lib/authz.ts`)
 
@@ -73,6 +77,8 @@ which is `user.type === 'agent' || user.instance_role === 'owner'`.
 | `visibleProjectFilter(user, projectIdCol)` | **List reads.** Returns a `WHERE` predicate for `conds[]`: `null` for instance-wide (no filter), `project_id IN (…)` for members, a `FALSE` predicate for a member with zero projects (empty page, pagination intact). |
 | `canSeeProject(user, projectId)` | Boolean membership check; cheaper than `visibleProjectIds` for a single resource. |
 | `assertProjectReadable(user, projectId, resource)` | **Detail reads.** Throws `404 not_found` for non-members; resolves for members + instance-wide actors. |
+| `assertInstanceAdmin(user, surface)` | **Admin surfaces (6.1.5).** Throws `403 forbidden` unless the user is instance-wide (owner/agent). Gates reads on rules/targets/webhooks — whole subsystems, not project-scoped resources, so they 403 (not 404). |
+| `visibleUserIds(user)` | **People directory (6.1.5).** Set of user ids a member may see — co-members of their visible projects ∪ all agents ∪ self; `null` (no filter) for instance-wide actors. |
 | `effectivePermissions(user, token, projectId)` | Token scopes ∩ project role → `read`/`write`/`manage` capability set. The basis for 6.2 write enforcement. |
 
 ### List-read pattern
@@ -152,7 +158,44 @@ endpoint behavior change**. Enforcement is then wired per endpoint family:
   (read-visibility is soft; write-isolation is the goal). `users.ts` therefore
   stays on the advisory `authz-guard` list intentionally; when 6.1.5 flips the
   guard to a failing gate it needs an allowlist entry for this carve-out.
-- 6.1.5 admin-surface audit.
+- **6.1.5 — ✅ admin-surface audit.** Audited `rules.ts`, `targets.ts`,
+  `webhooks.ts`, `settings.ts`, `users.ts`, `llmObservations.ts`. Findings +
+  decisions:
+  - **Admin infra → instance-admin only (403).** All **reads** on `rules`,
+    `targets`, and `webhooks` (list / detail / `firings` / `deliveries`) now gate
+    on `assertInstanceAdmin` — a `member` human gets `403`, owner + agents pass.
+    These gate on **instance role**, not token scope, so an owner's read-only
+    token still works and imperium-loop agents keep cross-project access. Rules
+    carry a `project_id`, but their reads are *fully* instance-admin in 6.1.5
+    (automation is a *manage* capability) — no project-member rules view; revisit
+    in 6.2 if wanted. Writes stay on the `:manage` token scope until 6.2 realigns
+    the write path onto instance role. (Transient wrinkle, never created by the
+    intended deployment: a member holding a fluke `admin`-scoped token could
+    *write* a rule but not *read* it back — 6.2 closes this by moving writes to
+    instance role too.)
+  - **`users.ts` directory policy → co-members, not the full roster.** A blanket
+    directory leaks the roster; a blanket 403 breaks assignee / mention pickers.
+    `GET /v1/users` is filtered to **co-members of the member's visible projects
+    ∪ all agents ∪ self** (`visibleUserIds`); `GET /v1/users/{id}` returns `404`
+    for anyone outside that set (a member can't probe the roster by enumerating
+    ids). Owners without an explicit `user_projects` row on a shared project do
+    **not** appear in a member's directory — acceptable under the co-member rule.
+    Owner/agent see everyone.
+  - **`GET /v1/users/{id}/tokens` → admin-only (gap fix).** It had **no** scope
+    check, leaking token metadata (name / prefix / scopes) for any user to any
+    caller. Now `checkScope("users:manage")`, matching its `createToken` /
+    `revokeToken` siblings.
+  - **`settings.ts` → deliberate carve-out.** `GET /v1/settings` stays readable
+    by any authenticated user — it's non-secret global *display* config
+    (`stale_in_progress_days`, `board_closed_window_days`) the member UI needs to
+    render stale badges / board windows, same reasoning as the 6.1.2 labels /
+    global-fields carve-out. `PATCH /v1/settings` remains `admin`.
+  - **`llmObservations.ts` → no change.** Write-only (`POST`, `llm-obs:write`);
+    no read path to leak.
+  - **Guard flipped.** `authz-guard.ts` is now `ENFORCE = true` and runs as a
+    `ci.yml` step; `assertInstanceAdmin` + `visibleUserIds` were added to its
+    helper allowlist. Both previously-flagged files (`rules.ts`, `users.ts`) now
+    reference a helper, so the gate is green.
 
 Write-path enforcement + role mapping is 6.2.
 
