@@ -7,6 +7,7 @@ import { requireAuth } from "../auth.js";
 import { errorResponses, okJson, z } from "./_helpers.js";
 import { mapEvent } from "../lib/mappers.js";
 import { decodeCursor, encodeCursor } from "../lib/pagination.js";
+import { assertProjectReadable, visibleProjectFilter } from "../lib/authz.js";
 import { badRequest } from "../errors.js";
 import { gte, lte } from "drizzle-orm";
 
@@ -33,6 +34,7 @@ export function mount(app: OpenAPIHono) {
 
   app.openapi(list, (async (c: any) => {
     const q = c.req.valid("query");
+    const auth = c.get("auth");
     const limit = q.limit;
     const conds: SQL[] = [];
 
@@ -42,8 +44,16 @@ export function mount(app: OpenAPIHono) {
       if (!p) {
         return c.json({ items: [], page: { next_cursor: null, has_more: false } }, 200);
       }
+      // 6.1.4: a non-member naming a real project they can't see gets 404, not
+      // that project's audit trail.
+      await assertProjectReadable(auth.user, p.id, "project");
       conds.push(eq(schema.events.project_id, p.id));
     }
+
+    // 6.1.4: scope the feed to the member's visible projects (null = instance-
+    // wide, no filter). Members never see project-less / instance-level events.
+    const scope = await visibleProjectFilter(auth.user, schema.events.project_id);
+    if (scope) conds.push(scope);
 
     if (q.ticket_id) conds.push(eq(schema.events.ticket_id, q.ticket_id));
     if (q.actor_id) conds.push(eq(schema.events.actor_id, q.actor_id));

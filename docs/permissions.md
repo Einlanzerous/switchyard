@@ -132,7 +132,27 @@ endpoint behavior change**. Enforcement is then wired per endpoint family:
   (project/assignee/epic/type) are computed client-side from the columns' cards,
   so the card filter is what guarantees a non-member project row never surfaces —
   there's no separate server-side swimlane to gate.
-- 6.1.4 aggregates & feeds, 6.1.5 admin-surface audit.
+- **6.1.4 — ✅ aggregates & feeds.** Scoped: `GET /v1/events` (feed via
+  `visibleProjectFilter`; explicit `?project=` a non-member can't see → 404), and
+  all of `stats.ts` — `GET /v1/projects/{key}/stats` (`assertProjectReadable`),
+  `/v1/stats/projects` (member-scoped bulk SQL), `/v1/stats/throughput`,
+  `/v1/stats/cycle-time`, `/v1/stats/cumulative-flow` (a shared
+  `resolveStatsScope` helper), and `/v1/stats/stale` (`visibleProjectFilter`).
+  **The conflation fix:** the window endpoints previously used
+  `projectIds.length === 0` to mean *both* "all projects" (instance-wide, no
+  `?project=`) *and* "named keys, none matched" — for a zero-project member that
+  branch leaked the whole instance. `resolveStatsScope` returns an explicit
+  `{ projectIds, unfiltered }` where a member is **never** `unfiltered`, so a
+  member with no visible projects gets empty aggregates, never all-data.
+  **Already covered:** the search DSL (`?project=`/`assignee=`) was scoped in
+  6.1.1 via the tickets list — matrix assertion only, no new code.
+  **Deliberate carve-out:** `/v1/users/me/notifications` (+ unread-count) is
+  **not** scoped — they're the user's own @-mentions, and hiding a notification
+  for a ticket in a project they've left is the wrong kind of strictness
+  (read-visibility is soft; write-isolation is the goal). `users.ts` therefore
+  stays on the advisory `authz-guard` list intentionally; when 6.1.5 flips the
+  guard to a failing gate it needs an allowlist entry for this carve-out.
+- 6.1.5 admin-surface audit.
 
 Write-path enforcement + role mapping is 6.2.
 

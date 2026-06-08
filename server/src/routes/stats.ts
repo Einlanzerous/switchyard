@@ -24,6 +24,9 @@ import { errorResponses, okJson, z } from "./_helpers.js";
 import { badRequest } from "../errors.js";
 import { mapProjectRef, mapUserRef, mapTicketSummary } from "../lib/mappers.js";
 import { getProjectByKey } from "../lib/lookups.js";
+import {
+  assertProjectReadable, hasInstanceWideAccess, visibleProjectFilter, visibleProjectIds,
+} from "../lib/authz.js";
 import { readSettings } from "./settings.js";
 import { alias } from "drizzle-orm/pg-core";
 import {
@@ -123,6 +126,39 @@ async function resolveProjects(csv: string | undefined) {
     .where(and(inArray(schema.projects.key, keys), isNull(schema.projects.deleted_at)));
 }
 
+// 6.1.4: resolve the project scope for an aggregate request, membership-aware.
+// Returns the concrete project ids to aggregate over plus `unfiltered` — true
+// ONLY for an instance-wide actor with no explicit `?project=` (aggregate over
+// everything, no IN filter). A `member` is NEVER unfiltered: with no `?project=`
+// they get their full visible set; with `?project=` they get the intersection;
+// a member with no visible projects gets an empty set. This replaces the old
+// `projectIds.length === 0` overload that conflated "all projects" with "named
+// but none matched" — for a zero-project member that branch leaked everything.
+async function resolveStatsScope(
+  user: Parameters<typeof hasInstanceWideAccess>[0] & { id: string },
+  csv: string | undefined,
+): Promise<{ projectIds: string[]; unfiltered: boolean }> {
+  const rows = await resolveProjects(csv);
+  const hasCsv = !!csv && csv.trim().length > 0;
+  if (hasInstanceWideAccess(user)) {
+    return { projectIds: rows.map((r) => r.id), unfiltered: !hasCsv };
+  }
+  const visible = await visibleProjectIds(user);
+  return {
+    projectIds: rows.filter((r) => visible.has(r.id)).map((r) => r.id),
+    unfiltered: false,
+  };
+}
+
+// Inline `AND <col> IN (...)` fragment for the raw-SQL aggregates, or empty SQL
+// when unfiltered. Only ever called with a non-empty id list (callers early-
+// return on the `!unfiltered && empty` case first). ids are DB-issued UUIDs;
+// inline-quoting matches the existing throughput pattern.
+function projectInSql(projectIds: string[], unfiltered: boolean, col: string): SQL {
+  if (unfiltered) return sql``;
+  return sql.raw(`AND ${col} IN (${projectIds.map((id) => `'${id}'`).join(",")})`) as unknown as SQL;
+}
+
 // One-shot SELECT with COUNT(*) FILTER (...) for every breakdown bucket.
 // `extraStaleClause` is a SQL fragment that produces an INTERVAL — it lives
 // inside the FILTER so we only count "stale in_progress" tickets.
@@ -210,6 +246,8 @@ export function mount(app: OpenAPIHono) {
   app.openapi(projectStats, (async (c: any) => {
     const { key } = c.req.valid("param");
     const project = await getProjectByKey(key, { includeArchived: true });
+    // 6.1.4: a non-member asking for a project's stats gets 404, not its counts.
+    await assertProjectReadable(c.get("auth").user, project.id, "project");
     const settings = await readSettings();
 
     const agg = await fetchProjectAgg(project.id, settings.stale_in_progress_days);
@@ -281,7 +319,14 @@ export function mount(app: OpenAPIHono) {
   // ─── bulk feed for the Projects directory ────────────────────────────────
 
   app.openapi(projectsStatsList, (async (c: any) => {
-    // One query: all non-deleted projects + their counts, joined through
+    // 6.1.4: members see only their projects' rows; a zero-project member gets
+    // an empty directory, never the full instance.
+    const user = c.get("auth").user;
+    const visible = hasInstanceWideAccess(user) ? null : await visibleProjectIds(user);
+    if (visible && visible.size === 0) return c.json({ items: [] }, 200);
+    const projFilter = visible ? projectInSql([...visible], false, "p.id") : sql``;
+
+    // One query: all visible non-deleted projects + their counts, joined through
     // tickets+statuses. A project with zero tickets still returns a row
     // (totals = 0) so the directory shows it.
     const rows = await db.execute<{
@@ -304,6 +349,7 @@ export function mount(app: OpenAPIHono) {
       LEFT JOIN tickets t ON t.project_id = p.id AND t.deleted_at IS NULL
       LEFT JOIN statuses s ON s.id = t.status_id
       WHERE p.deleted_at IS NULL
+        ${projFilter}
       GROUP BY p.id, p.key, p.name, p.color
       ORDER BY p.key
     `);
@@ -333,17 +379,10 @@ export function mount(app: OpenAPIHono) {
     const q = c.req.valid("query");
     const bucket: StatsBucket = q.bucket ?? "week";
     const { since, until } = resolveWindow(q);
-    const projectRows = await resolveProjects(q.project);
-    const projectIds = projectRows.map((p) => p.id);
-
-    const conds: SQL[] = [
-      eq(schema.events.event_type, "ticket.closed"),
-      gte(schema.events.created_at, since.toISOString()),
-      lte(schema.events.created_at, until.toISOString()),
-    ];
-    if (projectIds.length > 0) conds.push(inArray(schema.events.project_id, projectIds));
-    if (q.project && projectIds.length === 0) {
-      // User passed project keys but none matched → empty series, not all data.
+    const { projectIds, unfiltered } = await resolveStatsScope(c.get("auth").user, q.project);
+    // Member with no visible projects (or named keys none of which they can see)
+    // → empty series, never the all-projects fallback.
+    if (!unfiltered && projectIds.length === 0) {
       return c.json({ bucket, points: [], total: 0 }, 200);
     }
 
@@ -357,11 +396,10 @@ export function mount(app: OpenAPIHono) {
       WHERE e.event_type = 'ticket.closed'
         AND e.created_at >= ${since.toISOString()}
         AND e.created_at <= ${until.toISOString()}
-        ${projectIds.length > 0 ? sql`AND e.project_id IN ${sql.raw(`(${projectIds.map((id) => `'${id}'`).join(",")})`)}` : sql``}
+        ${projectInSql(projectIds, unfiltered, "e.project_id")}
       GROUP BY 1
       ORDER BY 1 ASC
     `);
-    void conds; // (kept above for readability; SQL above is the actual exec)
 
     const tRows = ((rows as any).rows ?? rows) as Array<{ start: string; count: number }>;
     const points = tRows.map((r) => ({
@@ -378,9 +416,8 @@ export function mount(app: OpenAPIHono) {
   app.openapi(cycleTime, (async (c: any) => {
     const q = c.req.valid("query");
     const { since, until } = resolveWindow(q);
-    const projectRows = await resolveProjects(q.project);
-    const projectIds = projectRows.map((p) => p.id);
-    if (q.project && projectIds.length === 0) {
+    const { projectIds, unfiltered } = await resolveStatsScope(c.get("auth").user, q.project);
+    if (!unfiltered && projectIds.length === 0) {
       return c.json(emptyCycleTime(), 200);
     }
 
@@ -399,7 +436,7 @@ export function mount(app: OpenAPIHono) {
           eq(schema.events.event_type, "ticket.closed"),
           gte(schema.events.created_at, since.toISOString()),
           lte(schema.events.created_at, until.toISOString()),
-          ...(projectIds.length > 0
+          ...(!unfiltered
             ? [inArray(schema.events.project_id, projectIds)]
             : [])
         )
@@ -491,9 +528,8 @@ export function mount(app: OpenAPIHono) {
     const q = c.req.valid("query");
     const bucket: StatsBucket = q.bucket ?? "week";
     const { since, until } = resolveWindow(q);
-    const projectRows = await resolveProjects(q.project);
-    const projectIds = projectRows.map((p) => p.id);
-    if (q.project && projectIds.length === 0) {
+    const { projectIds, unfiltered } = await resolveStatsScope(c.get("auth").user, q.project);
+    if (!unfiltered && projectIds.length === 0) {
       return c.json({ bucket, points: [] }, 200);
     }
 
@@ -513,7 +549,7 @@ export function mount(app: OpenAPIHono) {
             "ticket.deleted",
           ]),
           lte(schema.events.created_at, until.toISOString()),
-          ...(projectIds.length > 0
+          ...(!unfiltered
             ? [inArray(schema.events.project_id, projectIds)]
             : [])
         )
@@ -554,6 +590,9 @@ export function mount(app: OpenAPIHono) {
     const assigneeAlias = alias(schema.users, "stale_assignee");
     const reporterAlias = alias(schema.users, "stale_reporter");
 
+    // 6.1.4: members roll up only their own projects' stale tickets.
+    const scope = await visibleProjectFilter(c.get("auth").user, schema.projects.id);
+
     const rows = await db
       .select({
         t: schema.tickets,
@@ -573,7 +612,8 @@ export function mount(app: OpenAPIHono) {
           isNull(schema.projects.deleted_at),
           isNull(schema.projects.archived_at),
           eq(schema.statuses.category, "in_progress"),
-          lte(schema.tickets.updated_at, cutoffIso)
+          lte(schema.tickets.updated_at, cutoffIso),
+          ...(scope ? [scope] : [])
         )
       );
 
