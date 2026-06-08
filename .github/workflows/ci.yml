@@ -22,6 +22,9 @@ jobs:
       - name: Typecheck (shared + server + client)
         run: bun run typecheck
 
+      - name: Authz guard (Phase 6 — no unscoped project-table reads)
+        run: cd server && bun scripts/authz-guard.ts
+
       - name: Unit tests (no DB needed)
         run: cd server && bun run test:unit
 

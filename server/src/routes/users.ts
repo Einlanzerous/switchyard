@@ -12,6 +12,7 @@ import { idempotency } from "../lib/idempotency.js";
 import { errorResponses, okJson, createdJson, noContent, z, checkScope } from "./_helpers.js";
 import { mapUser, mapApiToken, mapTicketSummary } from "../lib/mappers.js";
 import { getUserById } from "../lib/lookups.js";
+import { visibleUserIds } from "../lib/authz.js";
 import { buildPage, cursorOrderBy, cursorWhere, decodeCursor, encodeCursor } from "../lib/pagination.js";
 import { generateApiToken } from "../lib/id.js";
 import { badRequest, catchUnique, notFound } from "../errors.js";
@@ -106,6 +107,10 @@ export function mount(app: OpenAPIHono) {
     const q = c.req.valid("query");
     const limit = q.limit;
     const conds: SQL[] = [isNull(schema.users.deleted_at)];
+    // 6.1.5 directory policy: a member sees only co-members of their projects
+    // (∪ agents ∪ self); owner/agent see the full roster (null = no filter).
+    const visible = await visibleUserIds(c.get("auth").user);
+    if (visible) conds.push(inArray(schema.users.id, [...visible]));
     if (q.cursor) {
       const cur = decodeCursor(q.cursor);
       if (!cur) throw badRequest("invalid cursor");
@@ -287,6 +292,11 @@ export function mount(app: OpenAPIHono) {
   app.openapi(get, (async (c: any) => {
     const { id } = c.req.valid("param");
     const u = await getUserById(id);
+    // 6.1.5: a member can only resolve users inside their directory (co-members
+    // ∪ agents ∪ self). 404 (not 403) for anyone outside it — a member can't
+    // probe the roster by enumerating ids. Owner/agent (null) see everyone.
+    const visible = await visibleUserIds(c.get("auth").user);
+    if (visible && !visible.has(id)) throw notFound("user");
     return c.json(mapUser(u), 200);
   }) as any);
 
@@ -341,6 +351,9 @@ export function mount(app: OpenAPIHono) {
   }) as any);
 
   app.openapi(listTokens, (async (c: any) => {
+    // Token metadata is admin-only — mirrors createToken / revokeToken below.
+    // (Was missing a scope check before 6.1.5; closed in the admin-surface audit.)
+    checkScope(c, "users:manage");
     const { id } = c.req.valid("param");
     await getUserById(id);
     const rows = await db.select().from(schema.apiTokens)

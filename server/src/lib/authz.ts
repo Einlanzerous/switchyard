@@ -16,7 +16,7 @@
 // `effectivePermissions`. The written playbook lives in docs/permissions.md.
 import { and, eq, inArray, isNull, sql, type Column, type SQL } from "drizzle-orm";
 import { db, schema } from "../db.js";
-import { notFound } from "../errors.js";
+import { forbidden, notFound } from "../errors.js";
 
 type AuthUser = typeof schema.users.$inferSelect;
 type AuthToken = typeof schema.apiTokens.$inferSelect;
@@ -125,6 +125,53 @@ export async function assertProjectReadable(
 ): Promise<void> {
   if (await canSeeProject(user, projectId)) return;
   throw notFound(resource);
+}
+
+// ─── 6.1.5 admin-surface gate ─────────────────────────────────────────────────
+
+// Assert the user is an instance admin (owner or agent), else throw 403 —
+// deliberately 403, NOT 404. Admin surfaces (rules / targets / webhooks) are
+// whole subsystems, not project-scoped resources a member could probe for
+// existence, so the 404-not-403 read convention doesn't apply here: a member
+// simply isn't allowed in. Reads on these surfaces gate on instance role (this
+// helper) rather than token scope, so an owner's read-only token still works
+// and agents keep their cross-project access. (Writes on these surfaces stay on
+// the `:manage` token scope until 6.2 realigns the write path onto instance
+// role.) `surface` shapes the message, e.g. "rules".
+export function assertInstanceAdmin(
+  user: Pick<AuthUser, "type" | "instance_role">,
+  surface = "this resource",
+): void {
+  if (hasInstanceWideAccess(user)) return;
+  throw forbidden(`${surface} is restricted to instance admins`);
+}
+
+// The set of user ids a `member` may see in the people directory: every user
+// who is a co-member of a project the requester can see, ∪ all agents (instance-
+// wide service accounts that appear as actors everywhere), ∪ the requester. A
+// blanket directory would leak the full roster; a blanket 403 would break
+// assignee / mention pickers — co-membership is the middle ground (6.1.5). The
+// `null` return signals "no filter" for instance-wide actors (owner/agent),
+// matching the `visibleProjectFilter` convention.
+export async function visibleUserIds(
+  user: Pick<AuthUser, "id" | "type" | "instance_role">,
+): Promise<Set<string> | null> {
+  if (hasInstanceWideAccess(user)) return null;
+  const projectIds = await visibleProjectIds(user);
+  const coMembers = projectIds.size > 0
+    ? await db
+        .select({ id: schema.userProjects.user_id })
+        .from(schema.userProjects)
+        .where(inArray(schema.userProjects.project_id, [...projectIds]))
+    : [];
+  const agents = await db
+    .select({ id: schema.users.id })
+    .from(schema.users)
+    .where(and(eq(schema.users.type, "agent"), isNull(schema.users.deleted_at)));
+  const ids = new Set<string>([user.id]);
+  for (const r of coMembers) ids.add(r.id);
+  for (const r of agents) ids.add(r.id);
+  return ids;
 }
 
 // ─── internals ──────────────────────────────────────────────────────────────

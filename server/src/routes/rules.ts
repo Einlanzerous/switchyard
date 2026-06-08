@@ -23,6 +23,7 @@ import { mapRule, mapRuleWithSecret, mapRuleFiring } from "../lib/mappers.js";
 import { buildPage, cursorOrderBy, cursorWhere, decodeCursor, encodeCursor } from "../lib/pagination.js";
 import { getProjectById } from "../lib/lookups.js";
 import { generateWebhookSecret } from "../lib/id.js";
+import { assertInstanceAdmin } from "../lib/authz.js";
 import { badRequest, notFound } from "../errors.js";
 
 const tag = "Rules";
@@ -84,6 +85,7 @@ export function mount(app: OpenAPIHono) {
 
   // ─── list ────────────────────────────────────────────────────────────────
   app.openapi(list, (async (c: any) => {
+    assertInstanceAdmin(c.get("auth").user, "rules");
     const q = c.req.valid("query");
     const limit = q.limit;
     const conds: SQL[] = [];
@@ -148,6 +150,7 @@ export function mount(app: OpenAPIHono) {
 
   // ─── get ─────────────────────────────────────────────────────────────────
   app.openapi(get, (async (c: any) => {
+    assertInstanceAdmin(c.get("auth").user, "rules");
     const { id } = c.req.valid("param");
     const [row] = await db.select().from(schema.rules).where(eq(schema.rules.id, id)).limit(1);
     if (!row) throw notFound("rule");
@@ -197,6 +200,7 @@ export function mount(app: OpenAPIHono) {
 
   // ─── firings log ────────────────────────────────────────────────────────
   app.openapi(firings, (async (c: any) => {
+    assertInstanceAdmin(c.get("auth").user, "rules");
     const { id } = c.req.valid("param");
     const q = c.req.valid("query");
     const limit = q.limit;

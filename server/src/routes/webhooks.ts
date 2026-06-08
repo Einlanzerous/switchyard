@@ -15,6 +15,7 @@ import {
 } from "../lib/mappers.js";
 import { buildPage, cursorOrderBy, cursorWhere, decodeCursor, encodeCursor } from "../lib/pagination.js";
 import { generateWebhookSecret } from "../lib/id.js";
+import { assertInstanceAdmin } from "../lib/authz.js";
 import { badRequest, notFound } from "../errors.js";
 
 const tag = "Webhooks";
@@ -73,6 +74,7 @@ export function mount(app: OpenAPIHono) {
 
   // ─── list ────────────────────────────────────────────────────────────────
   app.openapi(list, (async (c: any) => {
+    assertInstanceAdmin(c.get("auth").user, "webhooks");
     const q = c.req.valid("query");
     const limit = q.limit;
     const conds: SQL[] = [];
@@ -118,6 +120,7 @@ export function mount(app: OpenAPIHono) {
 
   // ─── get ─────────────────────────────────────────────────────────────────
   app.openapi(get, (async (c: any) => {
+    assertInstanceAdmin(c.get("auth").user, "webhooks");
     const { id } = c.req.valid("param");
     const [row] = await db.select().from(schema.webhookSubscriptions)
       .where(eq(schema.webhookSubscriptions.id, id)).limit(1);
@@ -176,6 +179,7 @@ export function mount(app: OpenAPIHono) {
 
   // ─── deliveries log ─────────────────────────────────────────────────────
   app.openapi(deliveries, (async (c: any) => {
+    assertInstanceAdmin(c.get("auth").user, "webhooks");
     const { id } = c.req.valid("param");
     const q = c.req.valid("query");
     const limit = q.limit;
