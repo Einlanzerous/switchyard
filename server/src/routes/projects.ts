@@ -14,7 +14,7 @@ import { getProjectByKey } from "../lib/lookups.js";
 import { addProjectToDefaultBoard, removeProjectFromDefaultBoard } from "../lib/defaultBoard.js";
 import { buildPage, cursorOrderBy, cursorWhere, decodeCursor } from "../lib/pagination.js";
 import { writeEvent } from "../lib/events.js";
-import { assertProjectReadable, visibleProjectFilter } from "../lib/authz.js";
+import { assertInstanceAdmin, assertProjectReadable, assertProjectRole, visibleProjectFilter } from "../lib/authz.js";
 import { badRequest, catchUnique } from "../errors.js";
 
 const tag = "Projects";
@@ -98,8 +98,11 @@ export function mount(app: OpenAPIHono) {
 
   app.openapi(create, (async (c: any) => {
     checkScope(c, "projects:manage");
-    const body = c.req.valid("json");
     const auth = c.get("auth");
+    // Creating a project is an instance-level act — a project-admin role can't
+    // mint new projects, only owners/agents (or an instance-admin token).
+    assertInstanceAdmin(auth.user, "project creation");
+    const body = c.req.valid("json");
 
     const project = await catchUnique(`project key "${body.key}" already exists`, () =>
       db.transaction(async (tx) => {
@@ -151,6 +154,7 @@ export function mount(app: OpenAPIHono) {
     const body = c.req.valid("json");
     const auth = c.get("auth");
     const existing = await getProjectByKey(key, { includeArchived: true });
+    await assertProjectRole(auth.user, existing.id, "manage", "project");
 
     const sets: Partial<typeof schema.projects.$inferInsert> = {};
     if (body.name !== undefined) sets.name = body.name;
@@ -211,6 +215,7 @@ export function mount(app: OpenAPIHono) {
     const { key } = c.req.valid("param");
     const auth = c.get("auth");
     const existing = await getProjectByKey(key, { includeArchived: true });
+    await assertProjectRole(auth.user, existing.id, "manage", "project");
 
     await db.transaction(async (tx) => {
       await tx.update(schema.projects)

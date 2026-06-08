@@ -15,7 +15,7 @@ import { errorResponses, okJson, createdJson, noContent, checkScope, z } from ".
 import { mapTicketSummary, mapProjectRef } from "../lib/mappers.js";
 import { fetchExternalRefsByTicket } from "../lib/tickets.js";
 import { buildPage, cursorOrderBy, cursorWhere, decodeCursor } from "../lib/pagination.js";
-import { hasInstanceWideAccess, visibleProjectIds } from "../lib/authz.js";
+import { assertInstanceAdmin, hasInstanceWideAccess, visibleProjectIds } from "../lib/authz.js";
 import { badRequest, notFound } from "../errors.js";
 
 const tag = "Boards";
@@ -268,6 +268,7 @@ export function mount(app: OpenAPIHono) {
   // ─── create ──────────────────────────────────────────────────────────────
   app.openapi(create, (async (c: any) => {
     checkScope(c, "projects:manage");
+    assertInstanceAdmin(c.get("auth").user, "boards");
     const body = c.req.valid("json");
     if (!body.project_ids || body.project_ids.length === 0) {
       throw badRequest("project_ids must contain at least one project");
@@ -296,6 +297,7 @@ export function mount(app: OpenAPIHono) {
   // ─── update ──────────────────────────────────────────────────────────────
   app.openapi(update, (async (c: any) => {
     checkScope(c, "projects:manage");
+    assertInstanceAdmin(c.get("auth").user, "boards");
     const { id } = c.req.valid("param");
     const body = c.req.valid("json");
 
@@ -353,6 +355,7 @@ export function mount(app: OpenAPIHono) {
   // ─── delete ──────────────────────────────────────────────────────────────
   app.openapi(remove, (async (c: any) => {
     checkScope(c, "projects:manage");
+    assertInstanceAdmin(c.get("auth").user, "boards");
     const { id } = c.req.valid("param");
 
     await db.transaction(async (tx) => {

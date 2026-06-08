@@ -13,7 +13,7 @@ import { loadTicketSummary } from "../lib/tickets.js";
 import {
   resolveSniff, checkSizeCap, buildStoragePath, writeBytes, unlinkSafe, safeResolve,
 } from "../lib/attachments.js";
-import { assertProjectReadable } from "../lib/authz.js";
+import { assertInstanceAdmin, assertProjectReadable, assertProjectRole } from "../lib/authz.js";
 import { badRequest, notFound, unprocessable } from "../errors.js";
 
 const tag = "Attachments";
@@ -101,6 +101,7 @@ export function mount(app: OpenAPIHono) {
     const { idOrKey: param } = c.req.valid("param");
     const auth = c.get("auth");
     const ticket = await resolveTicket(param);
+    await assertProjectRole(auth.user, ticket.project_id, "write", "attachment");
 
     // We parse the multipart body manually rather than via c.req.valid("form")
     // because @hono/zod-openapi doesn't yet bind file fields cleanly.
@@ -223,6 +224,11 @@ export function mount(app: OpenAPIHono) {
     const ticket = ticketId
       ? (await db.select().from(schema.tickets).where(eq(schema.tickets.id, ticketId)).limit(1))[0]
       : null;
+
+    // Gate on the parent ticket's project; an orphan attachment (no ticket nor
+    // resolvable comment) has no project, so it's instance-admin only.
+    if (ticket) await assertProjectRole(auth.user, ticket.project_id, "write", "attachment");
+    else assertInstanceAdmin(auth.user, "attachment");
 
     await db.transaction(async (tx) => {
       await tx.delete(schema.attachments).where(eq(schema.attachments.id, id));

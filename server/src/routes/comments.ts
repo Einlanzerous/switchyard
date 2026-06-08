@@ -12,7 +12,7 @@ import { buildPage, cursorOrderBy, cursorWhere, decodeCursor } from "../lib/pagi
 import { writeEvent } from "../lib/events.js";
 import { loadTicketSummary } from "../lib/tickets.js";
 import { detectAndNotify, detectAndNotifyOnEdit } from "../lib/mentions.js";
-import { assertProjectReadable } from "../lib/authz.js";
+import { assertProjectReadable, assertProjectRole } from "../lib/authz.js";
 import { badRequest, forbidden, notFound } from "../errors.js";
 
 const tag = "Comments";
@@ -122,6 +122,7 @@ export function mount(app: OpenAPIHono) {
     const body = c.req.valid("json");
     const auth = c.get("auth");
     const ticket = await resolveTicket(param);
+    await assertProjectRole(auth.user, ticket.project_id, "write", "comment");
 
     const inserted = await db.transaction(async (tx) => {
       const [created] = await tx.insert(schema.comments).values({
@@ -169,6 +170,10 @@ export function mount(app: OpenAPIHono) {
     if (!existing) throw notFound("comment");
     // Author-only: a comment can only be edited by the user who wrote it.
     if (existing.author_id !== auth.user.id) throw forbidden("only the author can edit this comment");
+    const editTicket = (await db.select({ project_id: schema.tickets.project_id })
+      .from(schema.tickets).where(eq(schema.tickets.id, existing.ticket_id)).limit(1))[0];
+    if (!editTicket) throw notFound("comment");
+    await assertProjectRole(auth.user, editTicket.project_id, "write", "comment");
 
     if (body.body === undefined) {
       const author = (await db.select().from(schema.users).where(eq(schema.users.id, existing.author_id)).limit(1))[0]!;
@@ -237,6 +242,7 @@ export function mount(app: OpenAPIHono) {
     if (existing.author_id !== auth.user.id) throw forbidden("only the author can delete this comment");
 
     const ticket = (await db.select().from(schema.tickets).where(eq(schema.tickets.id, existing.ticket_id)).limit(1))[0]!;
+    await assertProjectRole(auth.user, ticket.project_id, "write", "comment");
     const summary = await loadTicketSummary(ticket);
 
     await db.transaction(async (tx) => {

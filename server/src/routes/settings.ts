@@ -15,6 +15,7 @@ import {
 import { db } from "../db.js";
 import * as schema from "../../drizzle/schema.js";
 import { requireAuth } from "../auth.js";
+import { assertInstanceAdmin } from "../lib/authz.js";
 import { errorResponses, okJson, checkScope } from "./_helpers.js";
 
 const tag = "Settings";
@@ -84,6 +85,7 @@ export function mount(app: OpenAPIHono) {
   // openapi's c.req.valid binding — see Phase 1.6 pattern note).
   app.openapi(patch, (async (c: any) => {
     checkScope(c, "admin");
+    assertInstanceAdmin(c.get("auth").user, "settings");
     const body = c.req.valid("json");
     const nowIso = new Date().toISOString();
 

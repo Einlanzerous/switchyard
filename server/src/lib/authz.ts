@@ -146,6 +146,35 @@ export function assertInstanceAdmin(
   throw forbidden(`${surface} is restricted to instance admins`);
 }
 
+// ─── 6.2 write-path gate ──────────────────────────────────────────────────────
+
+// Assert the user holds at least `capability` on `projectId`, else throw 403 —
+// deliberately 403, NOT 404. Writes return forbidden (the actor already named
+// the resource by id, so existence-hiding doesn't apply); only reads 404. This
+// is the PROJECT-ROLE dimension; the handler's existing `checkScope` enforces
+// the TOKEN-SCOPE dimension, and the conjunction of the two IS the effective
+// `scope ∩ role` intersection (kept as two gates so checkScope's per-scope
+// precision survives — `scopeCapabilities` is intentionally coarse). Owners and
+// agents bypass via `hasInstanceWideAccess`; `admin` token scope is instance-
+// admin (checkScope), project-admin comes from the `admin` project role here.
+// `capability` is "write" (editor+) or "manage" (project admin). `resource`
+// shapes the message, e.g. "ticket" → "writing ticket requires editor access".
+export async function assertProjectRole(
+  user: Pick<AuthUser, "id" | "type" | "instance_role">,
+  projectId: string,
+  capability: Exclude<Capability, "read">,
+  resource = "resource",
+): Promise<void> {
+  if (hasInstanceWideAccess(user)) return;
+  const role = await projectRole(user.id, projectId);
+  if (role && ROLE_CAPABILITIES[role].includes(capability)) return;
+  throw forbidden(
+    `${capability === "manage" ? "managing" : "writing"} ${resource} requires ${
+      capability === "manage" ? "project-admin" : "editor"
+    } access to this project`,
+  );
+}
+
 // The set of user ids a `member` may see in the people directory: every user
 // who is a co-member of a project the requester can see, ∪ all agents (instance-
 // wide service accounts that appear as actors everywhere), ∪ the requester. A

@@ -10,7 +10,7 @@ import * as schema from "../../drizzle/schema.js";
 import { errorResponses, okJson, createdJson, noContent, z, checkScope } from "./_helpers.js";
 import { mapStatus } from "../lib/mappers.js";
 import { getProjectByKey } from "../lib/lookups.js";
-import { assertProjectReadable } from "../lib/authz.js";
+import { assertProjectReadable, assertProjectRole } from "../lib/authz.js";
 import { badRequest, catchUnique, notFound, unprocessable } from "../errors.js";
 
 const tag = "Statuses";
@@ -110,6 +110,7 @@ export function mount(app: OpenAPIHono) {
     const { key } = c.req.valid("param");
     const body = c.req.valid("json");
     const project = await getProjectByKey(key, { includeArchived: true });
+    await assertProjectRole(c.get("auth").user, project.id, "manage", "status");
 
     const status = await catchUnique(`status "${body.display_name}" already exists in this project`, () =>
       db.transaction(async (tx) => {
@@ -152,6 +153,7 @@ export function mount(app: OpenAPIHono) {
     const { key, id } = c.req.valid("param");
     const body = c.req.valid("json");
     const project = await getProjectByKey(key, { includeArchived: true });
+    await assertProjectRole(c.get("auth").user, project.id, "manage", "status");
 
     const [existing] = await db.select().from(schema.statuses)
       .where(and(eq(schema.statuses.id, id), eq(schema.statuses.project_id, project.id)))
@@ -194,6 +196,7 @@ export function mount(app: OpenAPIHono) {
     checkScope(c, "projects:manage");
     const { key, id } = c.req.valid("param");
     const project = await getProjectByKey(key, { includeArchived: true });
+    await assertProjectRole(c.get("auth").user, project.id, "manage", "status");
 
     const [existing] = await db.select().from(schema.statuses)
       .where(and(eq(schema.statuses.id, id), eq(schema.statuses.project_id, project.id)))
@@ -218,6 +221,7 @@ export function mount(app: OpenAPIHono) {
     const { key } = c.req.valid("param");
     const body = c.req.valid("json");
     const project = await getProjectByKey(key, { includeArchived: true });
+    await assertProjectRole(c.get("auth").user, project.id, "manage", "statuses");
 
     // All ids must belong to this project, and the list should cover every
     // status (so we don't leave orphans with stale positions).
@@ -263,6 +267,7 @@ export function mount(app: OpenAPIHono) {
     const { key } = c.req.valid("param");
     const body = c.req.valid("json");
     const project = await getProjectByKey(key, { includeArchived: true });
+    await assertProjectRole(c.get("auth").user, project.id, "manage", "transition");
 
     // Both statuses must belong to this project. from is nullable (wildcard).
     const ids = [body.to_status_id, ...(body.from_status_id ? [body.from_status_id] : [])];
@@ -298,6 +303,7 @@ export function mount(app: OpenAPIHono) {
     checkScope(c, "projects:manage");
     const { key, id } = c.req.valid("param");
     const project = await getProjectByKey(key, { includeArchived: true });
+    await assertProjectRole(c.get("auth").user, project.id, "manage", "transition");
     const result = await db.delete(schema.statusTransitions)
       .where(and(
         eq(schema.statusTransitions.id, id),

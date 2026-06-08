@@ -25,7 +25,7 @@ import { mapTicketTemplate } from "../lib/mappers.js";
 import { getProjectByKey, getUserById } from "../lib/lookups.js";
 import { materializeFromTemplate } from "../lib/templates/materializer.js";
 import { loadTicketSummary } from "../lib/tickets.js";
-import { assertProjectReadable } from "../lib/authz.js";
+import { assertProjectReadable, assertProjectRole } from "../lib/authz.js";
 import { badRequest, notFound, unprocessable } from "../errors.js";
 
 const tag = "Ticket Templates";
@@ -120,6 +120,7 @@ export function mount(app: OpenAPIHono) {
     const { key } = c.req.valid("param");
     const body = c.req.valid("json");
     const project = await getProjectByKey(key);
+    await assertProjectRole(c.get("auth").user, project.id, "write", "template");
 
     validateScheduleMode(body);
     if (body.assignee_id) await getUserById(body.assignee_id);
@@ -186,6 +187,7 @@ export function mount(app: OpenAPIHono) {
       .where(eq(schema.ticketTemplates.id, id))
       .limit(1);
     if (!existing) throw notFound("template");
+    await assertProjectRole(c.get("auth").user, existing.project_id, "write", "template");
 
     // If the caller is flipping schedule mode, validate the merged shape.
     const merged = {
@@ -224,6 +226,13 @@ export function mount(app: OpenAPIHono) {
   app.openapi(remove, (async (c: any) => {
     checkScope(c, "tickets:write");
     const { id } = c.req.valid("param");
+    const [existing] = await db
+      .select({ project_id: schema.ticketTemplates.project_id })
+      .from(schema.ticketTemplates)
+      .where(eq(schema.ticketTemplates.id, id))
+      .limit(1);
+    if (!existing) throw notFound("template");
+    await assertProjectRole(c.get("auth").user, existing.project_id, "write", "template");
     const result = await db
       .delete(schema.ticketTemplates)
       .where(eq(schema.ticketTemplates.id, id))
@@ -242,6 +251,7 @@ export function mount(app: OpenAPIHono) {
       .where(eq(schema.ticketTemplates.id, id))
       .limit(1);
     if (!tpl) throw notFound("template");
+    await assertProjectRole(c.get("auth").user, tpl.project_id, "write", "template");
 
     const now = new Date();
     const result = await db.transaction(async (tx) => {

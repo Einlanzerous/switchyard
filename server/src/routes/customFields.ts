@@ -16,7 +16,13 @@ import { requireAuth } from "../auth.js";
 import { idempotency } from "../lib/idempotency.js";
 import { errorResponses, okJson, createdJson, noContent, checkScope, z } from "./_helpers.js";
 import { mapCustomField } from "../lib/mappers.js";
-import { assertProjectReadable, hasInstanceWideAccess, visibleProjectIds } from "../lib/authz.js";
+import {
+  assertInstanceAdmin,
+  assertProjectReadable,
+  assertProjectRole,
+  hasInstanceWideAccess,
+  visibleProjectIds,
+} from "../lib/authz.js";
 import { catchUnique, notFound } from "../errors.js";
 
 const tag = "Custom Fields";
@@ -97,11 +103,17 @@ export function mount(app: OpenAPIHono) {
   app.openapi(create, (async (c: any) => {
     checkScope(c, "projects:manage");
     const body = c.req.valid("json");
+    const auth = c.get("auth");
 
+    // A project-scoped field gates on project-admin; a global field (project_id
+    // null) is instance-wide config → instance-admin only.
     if (body.project_id) {
       const [proj] = await db.select({ id: schema.projects.id })
         .from(schema.projects).where(eq(schema.projects.id, body.project_id)).limit(1);
       if (!proj) throw notFound("project");
+      await assertProjectRole(auth.user, body.project_id, "manage", "custom field");
+    } else {
+      assertInstanceAdmin(auth.user, "global custom field");
     }
 
     const [inserted] = await catchUnique(
@@ -145,6 +157,11 @@ export function mount(app: OpenAPIHono) {
     const [existing] = await db.select().from(schema.customFields)
       .where(eq(schema.customFields.id, id)).limit(1);
     if (!existing) throw notFound("custom field");
+    if (existing.project_id) {
+      await assertProjectRole(c.get("auth").user, existing.project_id, "manage", "custom field");
+    } else {
+      assertInstanceAdmin(c.get("auth").user, "global custom field");
+    }
 
     // options is only meaningful for type=select; reject mismatches even
     // on PATCH so the field row never lies about its shape.
@@ -172,6 +189,14 @@ export function mount(app: OpenAPIHono) {
   app.openapi(remove, (async (c: any) => {
     checkScope(c, "projects:manage");
     const { id } = c.req.valid("param");
+    const [existing] = await db.select({ project_id: schema.customFields.project_id })
+      .from(schema.customFields).where(eq(schema.customFields.id, id)).limit(1);
+    if (!existing) throw notFound("custom field");
+    if (existing.project_id) {
+      await assertProjectRole(c.get("auth").user, existing.project_id, "manage", "custom field");
+    } else {
+      assertInstanceAdmin(c.get("auth").user, "global custom field");
+    }
     const result = await db.delete(schema.customFields)
       .where(eq(schema.customFields.id, id))
       .returning({ id: schema.customFields.id });

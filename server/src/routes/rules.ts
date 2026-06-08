@@ -116,6 +116,7 @@ export function mount(app: OpenAPIHono) {
   // ─── create ──────────────────────────────────────────────────────────────
   app.openapi(create, (async (c: any) => {
     checkScope(c, "rules:manage");
+    assertInstanceAdmin(c.get("auth").user, "rules");
     const body = c.req.valid("json");
 
     // Validate project exists + not deleted, but only when one is supplied.
@@ -160,6 +161,7 @@ export function mount(app: OpenAPIHono) {
   // ─── patch ───────────────────────────────────────────────────────────────
   app.openapi(update, (async (c: any) => {
     checkScope(c, "rules:manage");
+    assertInstanceAdmin(c.get("auth").user, "rules");
     const { id } = c.req.valid("param");
     const body = c.req.valid("json");
 
@@ -191,6 +193,7 @@ export function mount(app: OpenAPIHono) {
   // ─── delete ──────────────────────────────────────────────────────────────
   app.openapi(remove, (async (c: any) => {
     checkScope(c, "rules:manage");
+    assertInstanceAdmin(c.get("auth").user, "rules");
     const { id } = c.req.valid("param");
     const result = await db.delete(schema.rules).where(eq(schema.rules.id, id))
       .returning({ id: schema.rules.id });
@@ -232,6 +235,7 @@ export function mount(app: OpenAPIHono) {
   // ─── redeliver ──────────────────────────────────────────────────────────
   app.openapi(redeliver, (async (c: any) => {
     checkScope(c, "rules:manage");
+    assertInstanceAdmin(c.get("auth").user, "rules");
     const { id } = c.req.valid("param");
 
     const [updated] = await db.update(schema.ruleFirings)

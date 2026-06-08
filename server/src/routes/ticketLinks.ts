@@ -17,7 +17,7 @@ import { mapTicketLink, mapUserRef } from "../lib/mappers.js";
 import { resolveTicket } from "../lib/lookups.js";
 import { loadTicketLinks, loadTicketSummary } from "../lib/tickets.js";
 import { writeEvent } from "../lib/events.js";
-import { assertProjectReadable } from "../lib/authz.js";
+import { assertProjectReadable, assertProjectRole } from "../lib/authz.js";
 import { badRequest, notFound, catchUnique } from "../errors.js";
 
 const tag = "Ticket Links";
@@ -75,6 +75,7 @@ export function mount(app: OpenAPIHono) {
     const auth = c.get("auth");
 
     const source = await resolveTicket(param);
+    await assertProjectRole(auth.user, source.project_id, "write", "ticket link");
     const target = await resolveTicket(body.target).catch(() => {
       throw badRequest(`target ticket "${body.target}" not found`);
     });
@@ -165,6 +166,7 @@ export function mount(app: OpenAPIHono) {
       db.select().from(schema.tickets).where(eq(schema.tickets.id, existing.target_ticket_id)).limit(1).then((r) => r[0]),
     ]);
     if (!source || !target) throw notFound("ticket link"); // FK should prevent this
+    await assertProjectRole(auth.user, source.project_id, "write", "ticket link");
 
     await db.transaction(async (tx) => {
       await tx.delete(schema.ticketLinks).where(eq(schema.ticketLinks.id, id));
