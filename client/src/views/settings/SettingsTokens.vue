@@ -3,7 +3,7 @@ import { computed, ref, watch } from "vue";
 import QRCode from "qrcode";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
 import {
-  Plus, Loader2, Trash2, Copy, KeyRound, AlertTriangle,
+  Plus, Loader2, Trash2, Copy, KeyRound, AlertTriangle, Eye,
 } from "lucide-vue-next";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "vue-sonner";
@@ -51,7 +51,17 @@ const revokedCount = computed(() => allTokens.value.filter((t) => t.revoked_at).
 
 // ─── create dialog ──────────────────────────────────────────────────────────
 const showCreate = ref(false);
+// A dashboard token is read-only by construction — the server caps its scopes to
+// the read-only bundle, so the dialog hides the scope picker entirely. `personal`
+// is the regular flow with the full scope picker.
+const createKind = ref<"personal" | "dashboard">("personal");
+const isDashboard = computed(() => createKind.value === "dashboard");
 const newName = ref("");
+
+function openCreate(kind: "personal" | "dashboard") {
+  createKind.value = kind;
+  showCreate.value = true;
+}
 const SCOPE_OPTIONS: Array<{ value: ApiTokenScope; label: string; help: string }> = [
   { value: "admin", label: "admin", help: "Bypass all per-scope checks." },
   { value: "tickets:read", label: "tickets:read", help: "Read tickets, comments, attachments." },
@@ -86,12 +96,13 @@ const qrCodeUrl = ref<string | null>(null);
 const createMutation = useMutation({
   mutationFn: async () => {
     if (!auth.me) throw new Error("not authenticated");
+    // Dashboard tokens send no scopes — the server fills the read-only bundle.
+    const body = isDashboard.value
+      ? { name: newName.value.trim(), kind: "dashboard" as const }
+      : { name: newName.value.trim(), kind: "personal" as const, scopes: Array.from(scopes.value) };
     const { data, error } = await api.POST("/v1/users/{id}/tokens", {
       params: { path: { id: auth.me.id } },
-      body: {
-        name: newName.value.trim(),
-        scopes: Array.from(scopes.value),
-      },
+      body,
     });
     if (error) throw error;
     return data;
@@ -160,9 +171,14 @@ function relative(iso: string | null): string {
           Bearer tokens for accessing switchyard from your scripts and agents.
         </p>
       </div>
-      <Button size="sm" @click="showCreate = true">
-        <Plus class="h-3.5 w-3.5 mr-1.5" /> New token
-      </Button>
+      <div class="flex items-center gap-2">
+        <Button size="sm" variant="outline" @click="openCreate('dashboard')">
+          <Eye class="h-3.5 w-3.5 mr-1.5" /> Dashboard token
+        </Button>
+        <Button size="sm" @click="openCreate('personal')">
+          <Plus class="h-3.5 w-3.5 mr-1.5" /> New token
+        </Button>
+      </div>
     </header>
 
     <Card>
@@ -180,6 +196,11 @@ function relative(iso: string | null): string {
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2">
                 <span class="font-medium truncate">{{ t.name }}</span>
+                <span v-if="t.kind === 'dashboard'" title="Read-only dashboard token">
+                  <Badge variant="secondary" class="text-[10px] gap-1">
+                    <Eye class="h-3 w-3" /> read-only
+                  </Badge>
+                </span>
                 <Badge v-if="t.revoked_at" variant="destructive" class="text-[10px]">revoked</Badge>
               </div>
               <div class="flex items-center gap-1.5 mt-0.5 text-xs text-muted-foreground">
@@ -230,8 +251,13 @@ function relative(iso: string | null): string {
              modal; closing forgets it forever. -->
         <template v-if="!fresh">
           <DialogHeader>
-            <DialogTitle>New API token</DialogTitle>
-            <DialogDescription>
+            <DialogTitle>{{ isDashboard ? "New dashboard token" : "New API token" }}</DialogTitle>
+            <DialogDescription v-if="isDashboard">
+              A read-only token for embedding in dashboards or a public demo view.
+              Scopes are fixed to read-only — it can never write. The plaintext
+              value is shown ONCE on the next screen.
+            </DialogDescription>
+            <DialogDescription v-else>
               Pick a name and the scopes the token can use. The plaintext value
               is shown ONCE on the next screen.
             </DialogDescription>
@@ -241,7 +267,19 @@ function relative(iso: string | null): string {
               <Label for="t-name">Name</Label>
               <Input id="t-name" v-model="newName" placeholder="e.g. tablet 2026-05" autofocus />
             </div>
-            <div class="space-y-1.5">
+            <div
+              v-if="isDashboard"
+              class="flex items-start gap-2 rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
+            >
+              <Eye class="h-3.5 w-3.5 mt-0.5 shrink-0" />
+              <span>
+                Read-only (<code class="font-mono">tickets:read</code>). The token
+                reads whatever projects its owner can see — for a scoped public
+                demo, create it on a <strong>viewer</strong> user limited to the
+                demo project.
+              </span>
+            </div>
+            <div v-else class="space-y-1.5">
               <Label>Scopes</Label>
               <ul class="rounded-md border max-h-56 overflow-auto divide-y">
                 <li
@@ -268,7 +306,7 @@ function relative(iso: string | null): string {
             <Button
               :disabled="
                 newName.trim().length === 0
-                || scopes.size === 0
+                || (!isDashboard && scopes.size === 0)
                 || createMutation.isPending.value
               "
               @click="createMutation.mutate()"
@@ -277,7 +315,7 @@ function relative(iso: string | null): string {
                 v-if="createMutation.isPending.value"
                 class="h-3.5 w-3.5 mr-1.5 animate-spin"
               />
-              Create token
+              {{ isDashboard ? "Create dashboard token" : "Create token" }}
             </Button>
           </DialogFooter>
         </template>
