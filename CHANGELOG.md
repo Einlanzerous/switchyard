@@ -1,5 +1,23 @@
 # Changelog
 
+## [3.0.0](https://github.com/Einlanzerous/switchyard/compare/v2.29.1...v3.0.0) (2026-06-08)
+
+
+### ⚠ BREAKING CHANGES
+
+* SWY-102 — Phase 6.2 write-path enforcement + roles ([#92](https://github.com/Einlanzerous/switchyard/issues/92))
+
+### Features
+
+* SWY-100 — Phase 6.1.4 read enforcement (aggregates & feeds) ([#90](https://github.com/Einlanzerous/switchyard/issues/90)) ([cefd495](https://github.com/Einlanzerous/switchyard/commit/cefd495a761d05f9877cdbf2d2a0b977f107cb2e))
+* SWY-101 — Phase 6.1.5 read enforcement (admin-surface audit) ([#91](https://github.com/Einlanzerous/switchyard/issues/91)) ([342985f](https://github.com/Einlanzerous/switchyard/commit/342985f92dd7b4b9ecc52f15b7d2ee5620c68bf2))
+* SWY-102 — Phase 6.2 write-path enforcement + roles ([#92](https://github.com/Einlanzerous/switchyard/issues/92)) ([c8f9e20](https://github.com/Einlanzerous/switchyard/commit/c8f9e2057a7ea58c7dc030ec937ee79905c471af))
+* SWY-95 — Phase 6 authz foundation (user_projects.role + instance_role) ([#84](https://github.com/Einlanzerous/switchyard/issues/84)) ([286c455](https://github.com/Einlanzerous/switchyard/commit/286c455ccdf4901d280871fdd1f906fa41746771))
+* SWY-96 — Phase 6.1.0 enforcement primitives + playbook ([#86](https://github.com/Einlanzerous/switchyard/issues/86)) ([80e786e](https://github.com/Einlanzerous/switchyard/commit/80e786e9ddfd92e67349f8a6fca4a42b5020903d))
+* SWY-97 — Phase 6.1.1 read enforcement (ticket reads + inherited resources) ([#87](https://github.com/Einlanzerous/switchyard/issues/87)) ([a872c88](https://github.com/Einlanzerous/switchyard/commit/a872c884e66399763c126c70db8a6544a9746629))
+* SWY-98 — Phase 6.1.2 read enforcement (project config reads) ([#88](https://github.com/Einlanzerous/switchyard/issues/88)) ([bad934d](https://github.com/Einlanzerous/switchyard/commit/bad934d7d7649891d5596414ad2cd731bc992844))
+* SWY-99 — Phase 6.1.3 read enforcement (boards: cross-project column drop) ([#89](https://github.com/Einlanzerous/switchyard/issues/89)) ([7c74008](https://github.com/Einlanzerous/switchyard/commit/7c74008d6463e8b8d60855922393f7939b699726))
+
 ## [2.29.1](https://github.com/Einlanzerous/switchyard/compare/v2.29.0...v2.29.1) (2026-06-06)
 
 
