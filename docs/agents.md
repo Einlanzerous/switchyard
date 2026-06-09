@@ -29,6 +29,31 @@ also has an in-app "Scan QR" affordance for browsers that ship the
 `BarcodeDetector` API. Either path beats copy-pasting the bearer between
 devices.
 
+### Dashboard tokens (read-only by construction)
+
+Pass `"kind": "dashboard"` when creating a token to mint a **read-only** one:
+the server caps its scopes to the read-only bundle (`tickets:read` today) and
+rejects any write scope with a `400 invalid_scopes_for_kind`. It can never gain
+a write capability, so it's safe to embed in a dashboard or a public demo view.
+Omit `scopes` and the bundle is filled automatically.
+
+```bash
+curl -X POST -H "Authorization: Bearer $ADMIN_TOK" \
+  -H 'Content-Type: application/json' \
+  http://switchyard:4002/v1/users/$USER_ID/tokens \
+  -d '{"name":"demo-board","kind":"dashboard"}'
+# → 201, scopes: ["tickets:read"], kind: "dashboard"
+```
+
+A dashboard token reads **whatever projects its owning user can see**. A token
+minted on you (an owner) or any agent reads *every* project — fine for a private
+embed, wrong for a public one. For a **scoped public demo**, mint it on a user
+who is only a `viewer` on the demo project: read-only scope ∩ viewer role ∩
+single-project membership = exactly that one project, read-only. (Read-only via
+scope and read-only via role converge on one predicate — see
+[permissions.md](./permissions.md).) In the UI, the `/settings/tokens` page has a
+**Dashboard token** button (no scope picker) and badges these tokens read-only.
+
 ## Idempotency
 
 Every POST/PATCH/DELETE accepts an `Idempotency-Key` header. Replays within

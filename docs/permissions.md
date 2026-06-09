@@ -85,7 +85,7 @@ which is `user.type === 'agent' || user.instance_role === 'owner'`.
 | `assertInstanceAdmin(user, surface)` | **Admin surfaces (6.1.5).** Throws `403 forbidden` unless the user is instance-wide (owner/agent). Gates reads on rules/targets/webhooks — whole subsystems, not project-scoped resources, so they 403 (not 404). |
 | `visibleUserIds(user)` | **People directory (6.1.5).** Set of user ids a member may see — co-members of their visible projects ∪ all agents ∪ self; `null` (no filter) for instance-wide actors. |
 | `assertProjectRole(user, projectId, capability, resource)` | **Writes (6.2).** Throws `403 forbidden` unless the user holds `capability` (`"write"` = editor+, `"manage"` = project admin) on the project. The project-role dimension; pairs with the handler's existing `checkScope` (token dimension) — both must pass. Instance-wide actors bypass. |
-| `effectivePermissions(user, token, projectId)` | Token scopes ∩ project role → `read`/`write`/`manage` capability set. The documented model; load-bearing in 6.3 (read-only-token reconciliation). |
+| `effectivePermissions(user, token, projectId)` | Token scopes ∩ project role → `read`/`write`/`manage` capability set. **The single read-only convergence predicate (6.3):** a read-only `dashboard` token (capped scopes) and a `viewer`-role human both resolve here to a set without `write`. Enforcement still runs through the two gates below; this is the model they share. |
 
 ### List-read pattern
 
@@ -255,6 +255,35 @@ endpoint behavior change**. Enforcement is then wired per endpoint family:
     `6.2 — write-path enforcement` block (viewer blocked even with a broad token;
     editor writes tickets not config; project admin configs own project not
     others; instance surfaces 403 for project admins; owner/agent regression).
+
+## Rollout (6.3)
+
+- **6.3 — ✅ read-only (dashboard) tokens + viewer convergence.** Adds a `kind`
+  enum to tokens (`personal | agent | dashboard`, default `personal`; existing
+  rows backfill to `personal`). `agent` is descriptive-only — agent-ness still
+  derives from `users.type`. Only `dashboard` carries enforced behavior:
+  - **Read-only by construction.** Creating a `dashboard` token caps its scopes
+    to the read-only bundle (`READ_ONLY_SCOPES` in `shared/`, just `tickets:read`
+    today). Omit `scopes` and the bundle is filled; pass a write scope and the
+    handler returns `400 bad_request` with `details.reason =
+    "invalid_scopes_for_kind"`. (Validated in the handler, not a Zod refinement,
+    so the error uses the structured envelope. There is no token-update endpoint,
+    so the read-only guarantee can't drift after creation.)
+  - **One read-only predicate, not two.** A dashboard token is read-only via its
+    *scopes*; a `viewer`-role human is read-only via their *role*.
+    `effectivePermissions` (scope ∩ role) is the single predicate both resolve
+    through — neither path needs a new write-blocking mechanism. Enforcement
+    remains the existing two gates: `checkScope` already 403s a capped token's
+    write (no `tickets:write`), and `assertProjectRole` already 403s a viewer.
+  - **Read surface follows the owning user.** A dashboard token reads whatever
+    its user can see — instance-wide for an owner/agent, project-scoped for a
+    member. A scoped public demo = a dashboard token on a `viewer` user (manual
+    setup; see [agents.md](./agents.md)).
+  - **Error-code note:** the ticket asked for an `invalid_scopes_for_kind` error
+    *code*; `ErrorCode` is a closed HTTP-aligned enum, so the signal ships as
+    `bad_request` + a stable `details.reason` discriminator instead. SWY-74 was
+    corrected (also dropped its "optional expiry" line — tokens have no expiry
+    column).
 
 **Intentional non-goal (read visibility is soft):** a ticket you *can* see may
 link to a ticket in a project you can't — the link list still surfaces that

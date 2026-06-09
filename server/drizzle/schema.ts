@@ -648,6 +648,11 @@ export const webhookDeliveries = pgTable(
 
 // ─── api tokens ─────────────────────────────────────────────────────────────
 
+// `dashboard` tokens are read-only by construction (scopes capped to the
+// read-only bundle at creation — see shared READ_ONLY_SCOPES); `agent` is
+// descriptive-only (agent-ness derives from users.type). Default `personal`.
+export const tokenKind = pgEnum("token_kind", ["personal", "agent", "dashboard"]);
+
 export const apiTokens = pgTable(
   "api_tokens",
   {
@@ -656,6 +661,7 @@ export const apiTokens = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     name: varchar("name", { length: 100 }).notNull(),
+    kind: tokenKind("kind").notNull().default("personal"),
     hashed_token: varchar("hashed_token", { length: 200 }).notNull(),
     token_prefix: varchar("token_prefix", { length: 10 }).notNull(), // first chars of `sw_xxxx` for log identification
     scopes: text("scopes").array().notNull(),

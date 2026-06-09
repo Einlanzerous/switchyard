@@ -4,6 +4,7 @@
 // DB before importing them, and truncate fixtures per-test.
 import { afterAll, beforeEach, describe, expect, test } from "bun:test";
 import { sql } from "drizzle-orm";
+import { READ_ONLY_SCOPES, isReadOnlyScopes } from "@switchyard/shared";
 import { closeTestDb, schema, testDb } from "../db.js";
 
 process.env.DATABASE_URL = process.env.DATABASE_URL_TEST!;
@@ -129,6 +130,36 @@ describe("effectivePermissions (token scopes ∩ project role)", () => {
     const p = await makeProject("SWY", "Switchyard");
     const caps = await authz.effectivePermissions(friend, { scopes: ["admin"] }, p);
     expect(caps.size).toBe(0);
+  });
+});
+
+// 6.3 / SWY-74: a read-only `dashboard` token and a `viewer`-role human are two
+// different inputs that must converge on ONE read-only outcome. effectivePermissions
+// is that single predicate — both resolve to a capability set without `write`.
+describe("6.3 read-only convergence (dashboard token ≡ viewer role)", () => {
+  test("the dashboard scope bundle is read-only by construction", () => {
+    expect(isReadOnlyScopes([...READ_ONLY_SCOPES])).toBe(true);
+    expect(isReadOnlyScopes(["tickets:write"])).toBe(false);
+    expect(isReadOnlyScopes(["tickets:read", "comments:write"])).toBe(false);
+  });
+
+  test("a dashboard-scoped token caps at read even on an instance-wide actor", async () => {
+    // No role gate applies to an owner, so the read-only cap must come purely
+    // from the capped scopes — that's the read-only-by-construction half.
+    const owner = await makeUser("magos", "human", "owner");
+    const p = await makeProject("AAA", "Alpha");
+    const caps = await authz.effectivePermissions(owner, { scopes: [...READ_ONLY_SCOPES] }, p);
+    expect(caps.has("write")).toBe(false);
+    expect(caps).toEqual(new Set(["read"]));
+  });
+
+  test("a viewer-role human converges on the same read-only set, even with a broad token", async () => {
+    const friend = await makeUser("friend", "human", "member");
+    const p = await makeProject("PLEX", "Plex");
+    await addMember(friend.id, p, "viewer");
+    const caps = await authz.effectivePermissions(friend, { scopes: ["admin"] }, p);
+    expect(caps.has("write")).toBe(false);
+    expect(caps).toEqual(new Set(["read"]));
   });
 });
 

@@ -11,7 +11,7 @@ name: E2E
 # container under `services:` and point DATABASE_URL at it.
 #
 # Backend boot: the suite spins up its own switchyard backend from
-# source on a non-prod port (4003), wired to switchyard_test, and points
+# source on a non-prod port (4013), wired to switchyard_test, and points
 # the Vite dev server's API proxy at it (VITE_API_PROXY_TARGET). This
 # keeps the test data fully isolated from the deployed :4002 backend,
 # which reads the prod `switchyard` DB.
@@ -49,8 +49,11 @@ jobs:
       # switchyard_test by the migrate/seed step earlier in this job.
 
       # Port the test backend listens on. Must not collide with the
-      # deployed :4002 backend on the same host.
-      E2E_BACKEND_PORT: "4003"
+      # deployed :4002 backend — nor any other container on the self-hosted
+      # host. (:4003 is taken by the `centrifuge` container, whose /healthz
+      # also returns {"status":"ok"}, so a bind failure there silently passed
+      # the readiness probe and Playwright proxied at the wrong service.)
+      E2E_BACKEND_PORT: "4013"
 
       CI: "true"
 
@@ -103,7 +106,11 @@ jobs:
           bun src/index.ts > /tmp/e2e-backend.log 2>&1 &
           echo $! > /tmp/e2e-backend.pid
           for i in $(seq 1 30); do
-            if curl -fsS "http://localhost:${E2E_BACKEND_PORT}/healthz" > /dev/null 2>&1; then
+            # Require switchyard's distinctive health shape (a `subsystems`
+            # object), not just any 200 — otherwise an unrelated service
+            # squatting the port (whose /healthz also returns 200) would pass
+            # this probe and the suite would run against the wrong backend.
+            if curl -fsS "http://localhost:${E2E_BACKEND_PORT}/healthz" 2>/dev/null | grep -q '"subsystems"'; then
               echo "[e2e] backend ready on :${E2E_BACKEND_PORT}"
               exit 0
             fi
