@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import ColorPicker from "@/components/ColorPicker.vue";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
+import { PROJECT_DESCRIPTION_MAX } from "@switchyard/shared";
 
 const route = useRoute();
 const router = useRouter();
@@ -246,11 +247,18 @@ const deleteMutation = useMutation({
             <Input id="proj-name" v-model="name" />
           </div>
           <div class="space-y-1.5">
-            <Label for="proj-desc">Description</Label>
+            <div class="flex items-center justify-between">
+              <Label for="proj-desc">Description</Label>
+              <span
+                class="text-[11px] tabular-nums"
+                :class="description.length > PROJECT_DESCRIPTION_MAX ? 'text-destructive' : 'text-muted-foreground'"
+              >{{ description.length }}/{{ PROJECT_DESCRIPTION_MAX }}</span>
+            </div>
             <textarea
               id="proj-desc"
               v-model="description"
-              rows="3"
+              rows="6"
+              :maxlength="PROJECT_DESCRIPTION_MAX"
               class="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring resize-y"
             />
           </div>

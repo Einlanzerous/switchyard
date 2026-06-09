@@ -17,7 +17,7 @@ import ColorPicker from "@/components/ColorPicker.vue";
 import { pickUnusedSwatch } from "@/components/colorPalette";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
-import { isContrastSafe } from "@switchyard/shared";
+import { isContrastSafe, PROJECT_DESCRIPTION_MAX } from "@switchyard/shared";
 
 const qc = useQueryClient();
 
@@ -132,7 +132,7 @@ const canCreate = computed(() =>
                     <Archive class="h-2.5 w-2.5 mr-0.5" /> archived
                   </Badge>
                 </div>
-                <div v-if="p.description" class="text-xs text-muted-foreground truncate mt-0.5">
+                <div v-if="p.description" class="text-xs text-muted-foreground line-clamp-5 break-words mt-0.5">
                   {{ p.description }}
                 </div>
               </div>
@@ -176,11 +176,18 @@ const canCreate = computed(() =>
           </div>
 
           <div class="space-y-1.5">
-            <Label for="proj-desc">Description</Label>
+            <div class="flex items-center justify-between">
+              <Label for="proj-desc">Description</Label>
+              <span
+                class="text-[11px] tabular-nums"
+                :class="newDescription.length > PROJECT_DESCRIPTION_MAX ? 'text-destructive' : 'text-muted-foreground'"
+              >{{ newDescription.length }}/{{ PROJECT_DESCRIPTION_MAX }}</span>
+            </div>
             <textarea
               id="proj-desc"
               v-model="newDescription"
-              rows="3"
+              rows="6"
+              :maxlength="PROJECT_DESCRIPTION_MAX"
               class="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring resize-y"
               placeholder="Optional"
             />
