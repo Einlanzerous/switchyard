@@ -2,12 +2,18 @@ import { z } from "zod";
 import { Uuid, SoftDeletable, ProjectKey, HexColor } from "./common.js";
 import { ClosedWindowDays } from "./settings.js";
 
+// Project descriptions are a short blurb shown in the settings list and project
+// header — not a doc. Cap kept tight (was 10k, which let a description balloon
+// past the list view) so it word-clamps cleanly and the editor can surface a
+// counter. Longest real description at the time of this cap was ~540 chars.
+export const PROJECT_DESCRIPTION_MAX = 1_000;
+
 export const Project = z
   .object({
     id: Uuid,
     key: ProjectKey,
     name: z.string().min(1).max(200),
-    description: z.string().max(10_000).nullable(),
+    description: z.string().max(PROJECT_DESCRIPTION_MAX).nullable(),
     color: HexColor.nullable(),
     // Canonical repo URL — surfaced as a link from the project header.
     // Loose `string().url()` validation; empty/null = no link.
@@ -41,7 +47,7 @@ export type ProjectRef = z.infer<typeof ProjectRef>;
 export const CreateProject = z.object({
   key: ProjectKey, // immutable after creation
   name: z.string().min(1).max(200),
-  description: z.string().max(10_000).optional(),
+  description: z.string().max(PROJECT_DESCRIPTION_MAX).optional(),
   color: HexColor.optional(),
   repo_url: z.string().url().max(2048).optional(),
   default_test_cmd: z.string().max(2048).optional(),

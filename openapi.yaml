@@ -3086,7 +3086,7 @@ paths:
                         description:
                           type: string
                           nullable: true
-                          maxLength: 10000
+                          maxLength: 1000
                         color:
                           type: string
                           nullable: true
@@ -3341,7 +3341,7 @@ paths:
                   maxLength: 200
                 description:
                   type: string
-                  maxLength: 10000
+                  maxLength: 1000
                 color:
                   type: string
                   pattern: ^#[0-9a-fA-F]{6}$
@@ -3387,7 +3387,7 @@ paths:
                   description:
                     type: string
                     nullable: true
-                    maxLength: 10000
+                    maxLength: 1000
                   color:
                     type: string
                     nullable: true
@@ -3642,7 +3642,7 @@ paths:
                   description:
                     type: string
                     nullable: true
-                    maxLength: 10000
+                    maxLength: 1000
                   color:
                     type: string
                     nullable: true
@@ -3887,7 +3887,7 @@ paths:
                   maxLength: 200
                 description:
                   type: string
-                  maxLength: 10000
+                  maxLength: 1000
                 color:
                   type: string
                   pattern: ^#[0-9a-fA-F]{6}$
@@ -3936,7 +3936,7 @@ paths:
                   description:
                     type: string
                     nullable: true
-                    maxLength: 10000
+                    maxLength: 1000
                   color:
                     type: string
                     nullable: true
