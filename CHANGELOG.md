@@ -1,5 +1,23 @@
 # Changelog
 
+## [3.1.0](https://github.com/Einlanzerous/switchyard/compare/v3.0.0...v3.1.0) (2026-06-09)
+
+
+### Features
+
+* SWY-74 — Phase 6.3 read-only (dashboard) tokens + viewer convergence ([#93](https://github.com/Einlanzerous/switchyard/issues/93)) ([4e915bd](https://github.com/Einlanzerous/switchyard/commit/4e915bd43abf9f2c70773fa1b3fd5011b088ea5a))
+
+
+### Bug Fixes
+
+* SWY-106 — clamp project descriptions in settings list + larger editor ([#95](https://github.com/Einlanzerous/switchyard/issues/95)) ([5bc5d33](https://github.com/Einlanzerous/switchyard/commit/5bc5d331f6b6ca864db3aa99c3714e84d79b09bb))
+
+
+### Maintenance
+
+* update knowledge graph [skip ci] ([d4020fc](https://github.com/Einlanzerous/switchyard/commit/d4020fc4c47ee75e6a097517a1bb52c32b4d1f80))
+* update knowledge graph [skip ci] ([1458d34](https://github.com/Einlanzerous/switchyard/commit/1458d343a894d60eb27b841077e653ef7f2b8f8d))
+
 ## [3.0.0](https://github.com/Einlanzerous/switchyard/compare/v2.29.1...v3.0.0) (2026-06-08)
 
 
