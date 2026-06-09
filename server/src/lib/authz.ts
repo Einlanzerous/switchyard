@@ -63,6 +63,13 @@ export async function visibleProjectIds(
 // project gets nothing. (The ticket sketched a `(user, projectId)` signature;
 // scopes live on the token, which it explicitly references, so the token is a
 // required third argument.)
+//
+// This is the SINGLE read-only convergence predicate (6.3 / SWY-74): both a
+// read-only `dashboard` token (scopes capped to the read-only bundle → caps at
+// `read`) and a `viewer`-role human (role caps at `read`) resolve to a set
+// WITHOUT `write`/`manage` here — one mechanism, not two. Enforcement still runs
+// through the two 6.2 gates (`checkScope` + `assertProjectRole`); this is the
+// model both feed, and the thing tests assert convergence against.
 export async function effectivePermissions(
   user: Pick<AuthUser, "id" | "type" | "instance_role">,
   token: Pick<AuthToken, "scopes">,
@@ -226,10 +233,11 @@ const ROLE_CAPABILITIES: Record<ProjectRole, Capability[]> = {
 };
 
 // What a token's global scopes permit, collapsed to the three project-level
-// capabilities. `admin` grants everything; a read-only/dashboard token
-// (`tickets:read`) caps at `read` regardless of project role. Kept coarse on
-// purpose — 6.2 refines the precise per-endpoint mapping; here we only need the
-// read/write/manage gate for the intersection.
+// capabilities. `admin` grants everything; a read-only `dashboard` token (scopes
+// capped to READ_ONLY_SCOPES, i.e. `tickets:read`) caps at `read` regardless of
+// project role — that's the read-only-by-construction half of the 6.3
+// convergence. Kept coarse on purpose — 6.2 refines the precise per-endpoint
+// mapping; here we only need the read/write/manage gate for the intersection.
 function scopeCapabilities(scopes: readonly string[]): Set<Capability> {
   const caps = new Set<Capability>();
   if (scopes.includes("admin")) return new Set<Capability>(["read", "write", "manage"]);

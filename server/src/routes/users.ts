@@ -2,7 +2,8 @@ import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { and, desc, eq, gte, ilike, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import {
   User, CreateUser, UpdateUser, Uuid,
-  ApiToken, CreateApiToken, ApiTokenWithSecret, paginated, Pagination,
+  ApiToken, CreateApiToken, ApiTokenWithSecret, READ_ONLY_SCOPES, isReadOnlyScopes,
+  paginated, Pagination,
   NotificationsPage, ListNotificationsQuery, MarkReadInput, UnreadCount,
 } from "@switchyard/shared";
 import { db } from "../db.js";
@@ -372,13 +373,28 @@ export function mount(app: OpenAPIHono) {
     const body = c.req.valid("json");
     await getUserById(id);
 
+    // Scopes default per kind: a dashboard token is read-only by construction
+    // (fills the read-only bundle when omitted), everything else defaults to
+    // `admin`. This handler is the SINGLE authority for the read-only cap —
+    // there's no defaultHook, so a Zod refinement failure would bypass the
+    // structured envelope; throwing here yields the stable
+    // `invalid_scopes_for_kind` discriminator instead.
+    const scopes = body.scopes ?? (body.kind === "dashboard" ? [...READ_ONLY_SCOPES] : ["admin"]);
+    if (body.kind === "dashboard" && !isReadOnlyScopes(scopes)) {
+      throw badRequest("dashboard tokens are read-only", {
+        reason: "invalid_scopes_for_kind",
+        allowed: READ_ONLY_SCOPES,
+      });
+    }
+
     const { token, hash, prefix } = generateApiToken();
     const [created] = await db.insert(schema.apiTokens).values({
       user_id: id,
       name: body.name,
+      kind: body.kind,
       hashed_token: hash,
       token_prefix: prefix,
-      scopes: body.scopes,
+      scopes,
     }).returning();
     if (!created) throw new Error("insert returned nothing");
 

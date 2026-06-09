@@ -442,6 +442,7 @@ export function mapApiToken(t: TokenRow): ApiToken {
     id: t.id,
     user_id: t.user_id,
     name: t.name,
+    kind: t.kind,
     scopes: t.scopes as ApiToken["scopes"],
     last_used_at: t.last_used_at,
     revoked_at: t.revoked_at,

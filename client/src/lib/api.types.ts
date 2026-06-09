@@ -1695,6 +1695,8 @@ export interface paths {
                                 /** Format: uuid */
                                 user_id: string;
                                 name: string;
+                                /** @enum {string} */
+                                kind: "personal" | "agent" | "dashboard";
                                 scopes: ("tickets:read" | "tickets:write" | "comments:write" | "attachments:write" | "webhooks:manage" | "projects:manage" | "users:manage" | "rules:manage" | "targets:manage" | "llm-obs:write" | "admin")[];
                                 /** Format: date-time */
                                 last_used_at: string | null;
@@ -1852,10 +1854,10 @@ export interface paths {
                     "application/json": {
                         name: string;
                         /**
-                         * @default [
-                         *       "admin"
-                         *     ]
+                         * @default personal
+                         * @enum {string}
                          */
+                        kind?: "personal" | "agent" | "dashboard";
                         scopes?: ("tickets:read" | "tickets:write" | "comments:write" | "attachments:write" | "webhooks:manage" | "projects:manage" | "users:manage" | "rules:manage" | "targets:manage" | "llm-obs:write" | "admin")[];
                     };
                 };
@@ -1873,6 +1875,8 @@ export interface paths {
                             /** Format: uuid */
                             user_id: string;
                             name: string;
+                            /** @enum {string} */
+                            kind: "personal" | "agent" | "dashboard";
                             scopes: ("tickets:read" | "tickets:write" | "comments:write" | "attachments:write" | "webhooks:manage" | "projects:manage" | "users:manage" | "rules:manage" | "targets:manage" | "llm-obs:write" | "admin")[];
                             /** Format: date-time */
                             last_used_at: string | null;
@@ -5567,6 +5571,8 @@ export interface paths {
                                     /** Format: date-time */
                                     created_at: string;
                                 }[];
+                                edited?: boolean;
+                                deleted?: boolean;
                                 /** Format: date-time */
                                 created_at: string;
                                 /** Format: date-time */
@@ -5952,6 +5958,8 @@ export interface paths {
                                     /** Format: date-time */
                                     created_at: string;
                                 }[];
+                                edited?: boolean;
+                                deleted?: boolean;
                                 /** Format: date-time */
                                 created_at: string;
                                 /** Format: date-time */
@@ -6497,6 +6505,8 @@ export interface paths {
                                     /** Format: date-time */
                                     created_at: string;
                                 }[];
+                                edited?: boolean;
+                                deleted?: boolean;
                                 /** Format: date-time */
                                 created_at: string;
                                 /** Format: date-time */
@@ -6893,6 +6903,8 @@ export interface paths {
                                     /** Format: date-time */
                                     created_at: string;
                                 }[];
+                                edited?: boolean;
+                                deleted?: boolean;
                                 /** Format: date-time */
                                 created_at: string;
                                 /** Format: date-time */
@@ -7292,6 +7304,8 @@ export interface paths {
                                     /** Format: date-time */
                                     created_at: string;
                                 }[];
+                                edited?: boolean;
+                                deleted?: boolean;
                                 /** Format: date-time */
                                 created_at: string;
                                 /** Format: date-time */
@@ -8163,6 +8177,8 @@ export interface paths {
                                     /** Format: date-time */
                                     created_at: string;
                                 }[];
+                                edited?: boolean;
+                                deleted?: boolean;
                                 /** Format: date-time */
                                 created_at: string;
                                 /** Format: date-time */
@@ -8372,6 +8388,8 @@ export interface paths {
                                 /** Format: date-time */
                                 created_at: string;
                             }[];
+                            edited?: boolean;
+                            deleted?: boolean;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
@@ -8738,6 +8756,8 @@ export interface paths {
                                 /** Format: date-time */
                                 created_at: string;
                             }[];
+                            edited?: boolean;
+                            deleted?: boolean;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */

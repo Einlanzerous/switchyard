@@ -863,3 +863,70 @@ describe("6.2 — write-path enforcement (HTTP)", () => {
     expect((await POST("/v1/tickets", agentToken, { project_key: "SWY", type: "task", title: "a" })).status).toBe(201);
   });
 });
+
+// 6.3 / SWY-74 — read-only (dashboard) tokens. Creation is read-only-by-
+// construction (scopes capped server-side); a minted dashboard token then reads
+// but can't write, proving it converges on the same read-only path as a viewer.
+describe("6.3 — read-only (dashboard) tokens (HTTP)", () => {
+  test("dashboard token mints with the read-only bundle when no scopes are given", async () => {
+    const ctx = await fixture();
+    const ownerToken = await mintToken(ctx.magos.id, ["admin"]);
+    const res = await POST(`/v1/users/${ctx.magos.id}/tokens`, ownerToken, {
+      name: "demo-board",
+      kind: "dashboard",
+    });
+    expect(res.status).toBe(201);
+    const json = (await res.json()) as { kind: string; scopes: string[]; token: string };
+    expect(json.kind).toBe("dashboard");
+    expect(json.scopes).toEqual(["tickets:read"]);
+    expect(json.token).toBeTruthy();
+  });
+
+  test("a write scope on a dashboard token is rejected 400 invalid_scopes_for_kind", async () => {
+    const ctx = await fixture();
+    const ownerToken = await mintToken(ctx.magos.id, ["admin"]);
+    const res = await POST(`/v1/users/${ctx.magos.id}/tokens`, ownerToken, {
+      name: "bad-dash",
+      kind: "dashboard",
+      scopes: ["tickets:read", "tickets:write"],
+    });
+    expect(res.status).toBe(400);
+    const json = (await res.json()) as { error: { code: string; details?: { reason?: string } } };
+    expect(json.error.code).toBe("bad_request");
+    expect(json.error.details?.reason).toBe("invalid_scopes_for_kind");
+  });
+
+  test("a personal token keeps its requested scopes and personal kind", async () => {
+    const ctx = await fixture();
+    const ownerToken = await mintToken(ctx.magos.id, ["admin"]);
+    const res = await POST(`/v1/users/${ctx.magos.id}/tokens`, ownerToken, {
+      name: "agent-key",
+      scopes: ["tickets:read", "tickets:write"],
+    });
+    expect(res.status).toBe(201);
+    const json = (await res.json()) as { kind: string; scopes: string[] };
+    expect(json.kind).toBe("personal");
+    expect(json.scopes).toEqual(["tickets:read", "tickets:write"]);
+  });
+
+  test("a minted dashboard token reads but cannot write (converges on read-only)", async () => {
+    const ctx = await fixture();
+    const ownerToken = await mintToken(ctx.magos.id, ["admin"]);
+    // Seed a ticket the dashboard token can read.
+    const created = await POST("/v1/tickets", ownerToken, { project_key: "SWY", type: "task", title: "visible" });
+    expect(created.status).toBe(201);
+    const ticketKey = ((await created.json()) as { key: string }).key;
+
+    // Mint a dashboard token on the agent so it can read across projects.
+    const mintRes = await POST(`/v1/users/${ctx.claude.id}/tokens`, ownerToken, {
+      name: "public-dash",
+      kind: "dashboard",
+    });
+    const dashToken = ((await mintRes.json()) as { token: string }).token;
+
+    // Reads work…
+    expect((await GET(`/v1/tickets/${ticketKey}`, dashToken)).status).toBe(200);
+    // …writes are blocked by the token-scope gate (no tickets:write) → 403.
+    expect((await POST("/v1/tickets", dashToken, { project_key: "SWY", type: "task", title: "nope" })).status).toBe(403);
+  });
+});
