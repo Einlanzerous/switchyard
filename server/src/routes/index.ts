@@ -1,6 +1,7 @@
 import type { OpenAPIHono } from "@hono/zod-openapi";
 import * as users from "./users.js";
 import * as projects from "./projects.js";
+import * as projectMembers from "./projectMembers.js";
 import * as statuses from "./statuses.js";
 import * as labels from "./labels.js";
 import * as tickets from "./tickets.js";
@@ -24,6 +25,9 @@ import * as llmObservations from "./llmObservations.js";
 export function mountRoutes(app: OpenAPIHono) {
   users.mount(app);
   projects.mount(app);
+  // After projects.mount so the `/v1/projects/*` requireAuth+idempotency
+  // wildcard is registered first (Hono runs middleware in registration order).
+  projectMembers.mount(app);
   statuses.mount(app);
   labels.mount(app);
   tickets.mount(app);

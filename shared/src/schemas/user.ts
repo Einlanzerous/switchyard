@@ -4,12 +4,20 @@ import { Uuid, SoftDeletable } from "./common.js";
 export const UserType = z.enum(["agent", "human"]);
 export type UserType = z.infer<typeof UserType>;
 
+// Instance-wide role (Phase 6). `owner` = magos: blanket cross-project access.
+// `member` = a scoped human who sees only the projects they're a member of.
+// Agents bypass this entirely (instance-wide service accounts) regardless of
+// the column value. Backfilled by migration 0019.
+export const InstanceRole = z.enum(["owner", "member"]);
+export type InstanceRole = z.infer<typeof InstanceRole>;
+
 export const User = z
   .object({
     id: Uuid,
     name: z.string().min(1).max(100),
     icon: z.string().max(500).nullable(),
     type: UserType,
+    instance_role: InstanceRole,
   })
   .merge(SoftDeletable);
 export type User = z.infer<typeof User>;
@@ -22,6 +30,9 @@ export const CreateUser = z.object({
   name: z.string().min(1).max(100),
   icon: z.string().max(500).optional(),
   type: UserType,
+  // Optional on create — defaults to `member` server-side. Invited humans are
+  // members; promoting to owner is a deliberate later action.
+  instance_role: InstanceRole.optional(),
 });
 export type CreateUser = z.infer<typeof CreateUser>;
 

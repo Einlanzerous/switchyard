@@ -8,6 +8,13 @@ import { ClosedWindowDays } from "./settings.js";
 // counter. Longest real description at the time of this cap was ~540 chars.
 export const PROJECT_DESCRIPTION_MAX = 1_000;
 
+// Per-project role carried on `user_projects.role` (Phase 6). viewer ⊂ editor ⊂
+// admin: viewer reads, editor writes tickets/comments, admin manages project
+// config + membership. Shared so both `my_role` and the membership endpoints
+// reference one source of truth.
+export const ProjectRole = z.enum(["admin", "editor", "viewer"]);
+export type ProjectRole = z.infer<typeof ProjectRole>;
+
 export const Project = z
   .object({
     id: Uuid,
@@ -33,6 +40,13 @@ export const Project = z
     board_closed_window_days: z.union([
       z.literal(7), z.literal(14), z.literal(30), z.null(),
     ]),
+    // The requesting caller's effective role on this project (Phase 6.4) —
+    // `admin`/`editor`/`viewer` for a member, or `null` for an instance-wide
+    // actor (owner/agent) who isn't gated by membership. Populated ONLY on the
+    // single-project GET; list/ref responses omit it (hence `.optional()`),
+    // since it's per-caller and a list would need a join per row. The client
+    // gates the project Members tab on `my_role === 'admin' || isOwner`.
+    my_role: ProjectRole.nullable().optional(),
   })
   .merge(SoftDeletable);
 export type Project = z.infer<typeof Project>;

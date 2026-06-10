@@ -14,7 +14,7 @@ import { getProjectByKey } from "../lib/lookups.js";
 import { addProjectToDefaultBoard, removeProjectFromDefaultBoard } from "../lib/defaultBoard.js";
 import { buildPage, cursorOrderBy, cursorWhere, decodeCursor } from "../lib/pagination.js";
 import { writeEvent } from "../lib/events.js";
-import { assertInstanceAdmin, assertProjectReadable, assertProjectRole, visibleProjectFilter } from "../lib/authz.js";
+import { assertInstanceAdmin, assertProjectReadable, assertProjectRole, effectiveProjectRole, visibleProjectFilter } from "../lib/authz.js";
 import { badRequest, catchUnique } from "../errors.js";
 
 const tag = "Projects";
@@ -92,8 +92,12 @@ export function mount(app: OpenAPIHono) {
   app.openapi(get, (async (c: any) => {
     const { key } = c.req.valid("param");
     const p = await getProjectByKey(key, { includeArchived: true });
-    await assertProjectReadable(c.get("auth").user, p.id, "project");
-    return c.json(mapProject(p), 200);
+    const user = c.get("auth").user;
+    await assertProjectReadable(user, p.id, "project");
+    // Surface the caller's effective role so the client can gate the Members
+    // tab (6.4). Only on the single-project GET — the list omits it.
+    const my_role = await effectiveProjectRole(user, p.id);
+    return c.json({ ...mapProject(p), my_role }, 200);
   }) as any);
 
   app.openapi(create, (async (c: any) => {
