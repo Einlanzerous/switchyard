@@ -16,6 +16,7 @@ import { toast } from "vue-sonner";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { copyToClipboard } from "@/lib/clipboard";
 
 const props = defineProps<{ token: string; name: string; message?: string }>();
 
@@ -38,10 +39,9 @@ watch(
 );
 
 async function copyText(text: string, label: string) {
-  try {
-    await navigator.clipboard.writeText(text);
+  if (await copyToClipboard(text)) {
     toast.success(`${label} copied`);
-  } catch {
+  } else {
     toast.error("Couldn't copy — select and copy manually");
   }
 }
