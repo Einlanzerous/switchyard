@@ -1,6 +1,7 @@
 export * from "./schemas/common.js";
 export * from "./schemas/user.js";
 export * from "./schemas/project.js";
+export * from "./schemas/projectMember.js";
 export * from "./schemas/status.js";
 export * from "./schemas/transition.js";
 export * from "./schemas/ticket.js";

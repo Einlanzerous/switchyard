@@ -17,6 +17,7 @@ export const queryKeys = {
   project: (key: string) => ["sw", "projects", key] as const,
   projectStatuses: (key: string) => ["sw", "projects", key, "statuses"] as const,
   projectTransitions: (key: string) => ["sw", "projects", key, "transitions"] as const,
+  projectMembers: (key: string) => ["sw", "projects", key, "members"] as const,
   projectBoard: (key: string) => ["sw", "projects", key, "board"] as const,
 
   // Labels are global — single shared catalog across all projects.

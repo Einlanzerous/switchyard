@@ -1,5 +1,5 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { and, desc, eq, gte, ilike, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, gte, ilike, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import {
   User, CreateUser, UpdateUser, Uuid,
   ApiToken, CreateApiToken, ApiTokenWithSecret, READ_ONLY_SCOPES, isReadOnlyScopes,
@@ -16,7 +16,7 @@ import { getUserById } from "../lib/lookups.js";
 import { assertInstanceAdmin, visibleUserIds } from "../lib/authz.js";
 import { buildPage, cursorOrderBy, cursorWhere, decodeCursor, encodeCursor } from "../lib/pagination.js";
 import { generateApiToken } from "../lib/id.js";
-import { badRequest, catchUnique, notFound } from "../errors.js";
+import { badRequest, catchUnique, notFound, unprocessable } from "../errors.js";
 
 const tag = "Users";
 
@@ -310,6 +310,8 @@ export function mount(app: OpenAPIHono) {
         name: body.name,
         type: body.type,
         icon: body.icon ?? null,
+        // Invited humans default to `member`; promoting to owner is deliberate.
+        instance_role: body.instance_role ?? "member",
       }).returning()
     );
     if (!created) throw new Error("insert returned nothing");
@@ -321,12 +323,24 @@ export function mount(app: OpenAPIHono) {
     assertInstanceAdmin(c.get("auth").user, "users");
     const { id } = c.req.valid("param");
     const body = c.req.valid("json");
-    await getUserById(id);
+    const target = await getUserById(id);
 
     const sets: Partial<typeof schema.users.$inferInsert> = {};
     if (body.name !== undefined) sets.name = body.name;
     if (body.type !== undefined) sets.type = body.type;
     if (body.icon !== undefined) sets.icon = body.icon ?? null;
+    if (body.instance_role !== undefined) sets.instance_role = body.instance_role;
+
+    // Last-owner guard: never demote the final instance owner, or the instance
+    // loses its only blanket-access human (agents bypass membership but can't
+    // administer it). No prior precedent in the repo — this is the one
+    // membership invariant we enforce server-side.
+    if (body.instance_role === "member" && target.instance_role === "owner") {
+      const [owners] = await db.select({ n: count() })
+        .from(schema.users)
+        .where(and(eq(schema.users.instance_role, "owner"), isNull(schema.users.deleted_at)));
+      if ((owners?.n ?? 0) <= 1) throw unprocessable("cannot demote the last instance owner");
+    }
 
     if (Object.keys(sets).length === 0) {
       const u = await getUserById(id);

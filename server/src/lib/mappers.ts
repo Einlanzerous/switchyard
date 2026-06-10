@@ -15,6 +15,7 @@ import type {
   TicketTemplate as ApiTicketTemplate,
   OverlapPolicy as ApiOverlapPolicy,
   ScheduleMode as ApiScheduleMode,
+  ProjectMember, ProjectRole,
 } from "@switchyard/shared";
 import * as schema from "../../drizzle/schema.js";
 import { env } from "../env.js";
@@ -37,6 +38,7 @@ export function mapUser(u: UserRow): User {
     name: u.name,
     icon: u.icon,
     type: u.type,
+    instance_role: u.instance_role,
     created_at: u.created_at,
     updated_at: u.updated_at,
     deleted_at: u.deleted_at,
@@ -45,6 +47,15 @@ export function mapUser(u: UserRow): User {
 
 export function mapUserRef(u: UserRow): UserRef {
   return { id: u.id, name: u.name, icon: u.icon, type: u.type };
+}
+
+// Phase 6.4 — a `user_projects` row joined to its user.
+export function mapProjectMember(
+  u: UserRow,
+  role: ProjectRole,
+  created_at: string,
+): ProjectMember {
+  return { user: mapUserRef(u), role, created_at };
 }
 
 // ─── projects ──────────────────────────────────────────────────────────────

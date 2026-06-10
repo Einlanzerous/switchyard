@@ -1,25 +1,26 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import QRCode from "qrcode";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
 import {
-  Plus, Loader2, Trash2, Copy, KeyRound, AlertTriangle, Eye,
+  Plus, Loader2, Trash2, KeyRound, Eye,
 } from "lucide-vue-next";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "vue-sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import TokenSecretReveal from "@/components/settings/TokenSecretReveal.vue";
+import TokenScopePicker from "@/components/settings/TokenScopePicker.vue";
 import { useAuthStore } from "@/stores/auth";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
+import { defaultTokenScopes } from "@/lib/tokenScopes";
 import type { ApiTokenScope } from "@switchyard/shared";
 
 const auth = useAuthStore();
@@ -62,36 +63,17 @@ function openCreate(kind: "personal" | "dashboard") {
   createKind.value = kind;
   showCreate.value = true;
 }
-const SCOPE_OPTIONS: Array<{ value: ApiTokenScope; label: string; help: string }> = [
-  { value: "admin", label: "admin", help: "Bypass all per-scope checks." },
-  { value: "tickets:read", label: "tickets:read", help: "Read tickets, comments, attachments." },
-  { value: "tickets:write", label: "tickets:write", help: "Create / update / transition tickets." },
-  { value: "comments:write", label: "comments:write", help: "Add / edit / delete comments." },
-  { value: "attachments:write", label: "attachments:write", help: "Upload / delete attachments." },
-  { value: "projects:manage", label: "projects:manage", help: "Manage projects, statuses, labels." },
-  { value: "users:manage", label: "users:manage", help: "Create / edit / delete users + tokens." },
-  { value: "webhooks:manage", label: "webhooks:manage", help: "Create / delete webhook subscriptions." },
-];
-const scopes = ref<Set<ApiTokenScope>>(new Set(["tickets:read", "tickets:write", "comments:write"]));
+const scopes = ref<Set<ApiTokenScope>>(defaultTokenScopes());
 
 watch(showCreate, (v) => {
   if (v) {
     newName.value = "";
-    scopes.value = new Set(["tickets:read", "tickets:write", "comments:write"]);
+    scopes.value = defaultTokenScopes();
     fresh.value = null;
-    qrCodeUrl.value = null;
   }
 });
 
-function toggleScope(s: ApiTokenScope) {
-  const next = new Set(scopes.value);
-  if (next.has(s)) next.delete(s);
-  else next.add(s);
-  scopes.value = next;
-}
-
 const fresh = ref<{ token: string; name: string } | null>(null);
-const qrCodeUrl = ref<string | null>(null);
 
 const createMutation = useMutation({
   mutationFn: async () => {
@@ -107,34 +89,12 @@ const createMutation = useMutation({
     if (error) throw error;
     return data;
   },
-  onSuccess: async (data) => {
+  onSuccess: (data) => {
     qc.invalidateQueries({ queryKey: queryKeys.userTokens(auth.me!.id) });
-    if (data?.token) {
-      fresh.value = { token: data.token, name: data.name };
-      // Encode a login URL so a native phone scanner opens the browser
-      // directly at /login with the token pre-filled, instead of treating the
-      // raw bearer as a web search string. Same-origin keeps tailnet-only
-      // deploys intact.
-      const loginUrl = `${window.location.origin}/login?token=${encodeURIComponent(data.token)}`;
-      qrCodeUrl.value = await QRCode.toDataURL(loginUrl, {
-        errorCorrectionLevel: "M",
-        margin: 2,
-        width: 256,
-        color: { dark: "#000000", light: "#ffffff" },
-      });
-    }
+    // TokenSecretReveal renders the plaintext + QR from this once-shown value.
+    if (data?.token) fresh.value = { token: data.token, name: data.name };
   },
 });
-
-async function copyFresh() {
-  if (!fresh.value) return;
-  try {
-    await navigator.clipboard.writeText(fresh.value.token);
-    toast.success("Token copied");
-  } catch {
-    toast.error("Couldn't copy — select and copy manually");
-  }
-}
 
 // ─── revoke ─────────────────────────────────────────────────────────────────
 const revokingId = ref<string | null>(null);
@@ -281,24 +241,7 @@ function relative(iso: string | null): string {
             </div>
             <div v-else class="space-y-1.5">
               <Label>Scopes</Label>
-              <ul class="rounded-md border max-h-56 overflow-auto divide-y">
-                <li
-                  v-for="o in SCOPE_OPTIONS"
-                  :key="o.value"
-                  class="flex items-start gap-2 px-3 py-2 text-sm hover:bg-accent/40 cursor-pointer"
-                  @click="toggleScope(o.value)"
-                >
-                  <Checkbox
-                    :model-value="scopes.has(o.value)"
-                    class="mt-0.5"
-                    @click.stop="toggleScope(o.value)"
-                  />
-                  <div class="flex-1 min-w-0">
-                    <div class="font-mono text-[12px]">{{ o.label }}</div>
-                    <div class="text-[11px] text-muted-foreground">{{ o.help }}</div>
-                  </div>
-                </li>
-              </ul>
+              <TokenScopePicker v-model="scopes" />
             </div>
           </div>
           <DialogFooter>
@@ -321,35 +264,8 @@ function relative(iso: string | null): string {
         </template>
 
         <template v-else>
-          <DialogHeader>
-            <DialogTitle class="flex items-center gap-2">
-              <AlertTriangle class="h-4 w-4 text-amber-500" />
-              Copy your token now
-            </DialogTitle>
-            <DialogDescription>
-              "{{ fresh.name }}" was created. The plaintext is shown once —
-              after closing this dialog, only the hashed value remains.
-            </DialogDescription>
-          </DialogHeader>
-          <div class="rounded-md border bg-muted/40 p-3 font-mono text-xs break-all">
-            {{ fresh.token }}
-          </div>
-          <div v-if="qrCodeUrl" class="mt-4 flex flex-col items-center gap-2">
-            <div class="rounded-md bg-white p-2">
-              <img
-                :src="qrCodeUrl"
-                alt="QR code encoding the new token"
-                class="w-40 h-40 block"
-              />
-            </div>
-            <p class="text-[11px] text-muted-foreground text-center">
-              Scan from <code class="font-mono">/login</code> on another device.
-            </p>
-          </div>
+          <TokenSecretReveal :token="fresh.token" :name="fresh.name" />
           <DialogFooter>
-            <Button variant="ghost" @click="copyFresh">
-              <Copy class="h-3.5 w-3.5 mr-1.5" /> Copy
-            </Button>
             <Button @click="showCreate = false">Done</Button>
           </DialogFooter>
         </template>

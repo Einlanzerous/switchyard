@@ -13,6 +13,7 @@ import ProjectSetupView from "./views/ProjectSetupView.vue";
 import ProjectSetupRecurring from "./views/setup/ProjectSetupRecurring.vue";
 import ProjectSetupAutomations from "./views/setup/ProjectSetupAutomations.vue";
 import ProjectSetupSettings from "./views/setup/ProjectSetupSettings.vue";
+import ProjectSetupMembers from "./views/setup/ProjectSetupMembers.vue";
 import HealthView from "./views/HealthView.vue";
 
 // Settings is a nested layout so each sub-section is its own route while
@@ -65,6 +66,7 @@ export const router = createRouter({
       children: [
         { path: "recurring", name: "project-setup-recurring", component: ProjectSetupRecurring },
         { path: "automations", name: "project-setup-automations", component: ProjectSetupAutomations },
+        { path: "members", name: "project-setup-members", component: ProjectSetupMembers },
         { path: "settings", name: "project-setup-settings", component: ProjectSetupSettings },
       ],
     },

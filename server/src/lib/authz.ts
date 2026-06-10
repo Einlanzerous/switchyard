@@ -210,6 +210,19 @@ export async function visibleUserIds(
   return ids;
 }
 
+// The requesting user's effective role on a project, for surfacing as
+// `Project.my_role` (6.4 — the client gates the Members tab on it). Instance-
+// wide actors (owner/agent) aren't gated by membership, so they return `null`
+// ("not a member, but sees everything") rather than a fabricated role. A scoped
+// member returns their `user_projects.role` or `null` if they hold no row.
+export async function effectiveProjectRole(
+  user: Pick<AuthUser, "id" | "type" | "instance_role">,
+  projectId: string,
+): Promise<ProjectRole | null> {
+  if (hasInstanceWideAccess(user)) return null;
+  return projectRole(user.id, projectId);
+}
+
 // ─── internals ──────────────────────────────────────────────────────────────
 
 async function projectRole(userId: string, projectId: string): Promise<ProjectRole | null> {

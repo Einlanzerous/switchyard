@@ -6,18 +6,23 @@
 
 import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { ArrowLeft, Plus, Repeat, Zap, Settings as SettingsIcon } from "lucide-vue-next";
+import { useQuery } from "@tanstack/vue-query";
+import { ArrowLeft, Plus, Repeat, Zap, Users, Settings as SettingsIcon } from "lucide-vue-next";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useUiStore } from "@/stores/ui";
+import { useAuthStore } from "@/stores/auth";
 import { useProjectStats } from "@/composables/useProjectStats";
 import InsightsTabs from "@/components/dashboard/InsightsTabs.vue";
 import ProjectHeaderLabel from "@/components/projects/ProjectHeaderLabel.vue";
+import { api } from "@/lib/api";
+import { queryKeys } from "@/lib/queryKeys";
 import { cn } from "@/lib/utils";
 
 const route = useRoute();
 const router = useRouter();
 const ui = useUiStore();
+const auth = useAuthStore();
 
 const projectKey = computed(() => {
   const v = route.params.key;
@@ -26,9 +31,29 @@ const projectKey = computed(() => {
 
 const stats = useProjectStats(computed(() => projectKey.value || null));
 
+// Fetch the project detail for the caller's `my_role` — gates the Members tab.
+const projectQuery = useQuery({
+  queryKey: computed(() => queryKeys.project(projectKey.value)),
+  enabled: computed(() => projectKey.value.length > 0),
+  queryFn: async () => {
+    const { data, error } = await api.GET("/v1/projects/{key}", {
+      params: { path: { key: projectKey.value } },
+    });
+    if (error) throw error;
+    return data;
+  },
+});
+// Membership management is project-admin (+ instance owner) only.
+const canManageMembers = computed(
+  () => auth.isOwner || projectQuery.data.value?.my_role === "admin",
+);
+
 const subTabs = computed(() => [
   { key: "recurring",   label: "Recurring",   icon: Repeat,       path: `/projects/${projectKey.value}/setup/recurring` },
   { key: "automations", label: "Automations", icon: Zap,          path: `/projects/${projectKey.value}/setup/automations` },
+  ...(canManageMembers.value
+    ? [{ key: "members", label: "Members", icon: Users, path: `/projects/${projectKey.value}/setup/members` }]
+    : []),
   { key: "settings",    label: "Settings",    icon: SettingsIcon, path: `/projects/${projectKey.value}/setup/settings` },
 ]);
 

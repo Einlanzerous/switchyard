@@ -930,3 +930,95 @@ describe("6.3 — read-only (dashboard) tokens (HTTP)", () => {
     expect((await POST("/v1/tickets", dashToken, { project_key: "SWY", type: "task", title: "nope" })).status).toBe(403);
   });
 });
+
+// 6.4 / SWY-103 — membership CRUD + instance-role admin. Membership management
+// is project-admin (+ owner/agent) only: roster reads 404 for non-members
+// (existence hiding) and 403 for member-but-not-admin; writes gate on the
+// `manage` role + `projects:manage` token scope. Tokens carry BROAD so each
+// test proves the ROLE gate blocks even when the TOKEN would allow it.
+describe("6.4 — membership & invite (HTTP)", () => {
+  const BROAD = ["projects:manage", "users:manage"];
+
+  async function seed() {
+    const ctx = await fixture();
+    const [editor] = await testDb.insert(schema.users)
+      .values({ name: "editor", type: "human", instance_role: "member" }).returning();
+    await testDb.insert(schema.userProjects).values({ user_id: editor!.id, project_id: ctx.plex.id, role: "editor" });
+    const [padmin] = await testDb.insert(schema.users)
+      .values({ name: "padmin", type: "human", instance_role: "member" }).returning();
+    await testDb.insert(schema.userProjects).values({ user_id: padmin!.id, project_id: ctx.plex.id, role: "admin" });
+    // `stranger` belongs to no project; `newbie` is the user we add/remove.
+    const [stranger] = await testDb.insert(schema.users)
+      .values({ name: "stranger", type: "human", instance_role: "member" }).returning();
+    const [newbie] = await testDb.insert(schema.users)
+      .values({ name: "newbie", type: "human", instance_role: "member" }).returning();
+    return {
+      ctx, newbie: newbie!,
+      friendToken: await mintToken(ctx.friend.id, BROAD),
+      editorToken: await mintToken(editor!.id, BROAD),
+      padminToken: await mintToken(padmin!.id, BROAD),
+      strangerToken: await mintToken(stranger!.id, BROAD),
+      ownerToken: await mintToken(ctx.magos.id, ["admin"]),
+      agentToken: await mintToken(ctx.claude.id, ["admin"]),
+    };
+  }
+
+  test("owner: full member CRUD on any project", async () => {
+    const { newbie, ownerToken } = await seed();
+    expect((await POST("/v1/projects/SWY/members", ownerToken, { user_id: newbie.id, role: "viewer" })).status).toBe(201);
+    const listed = await GET("/v1/projects/SWY/members", ownerToken);
+    expect(listed.status).toBe(200);
+    expect(((await listed.json()) as any).items.some((m: any) => m.user.id === newbie.id && m.role === "viewer")).toBe(true);
+    expect((await PATCH2(`/v1/projects/SWY/members/${newbie.id}`, ownerToken, { role: "editor" })).status).toBe(200);
+    expect((await DELETE(`/v1/projects/SWY/members/${newbie.id}`, ownerToken)).status).toBe(204);
+  });
+
+  test("agent (instance-wide) can manage members too", async () => {
+    const { newbie, agentToken } = await seed();
+    expect((await POST("/v1/projects/PLEX/members", agentToken, { user_id: newbie.id, role: "viewer" })).status).toBe(201);
+  });
+
+  test("project admin: manages own project's members; 403 writes / 404 reads on another", async () => {
+    const { newbie, padminToken } = await seed();
+    expect((await POST("/v1/projects/PLEX/members", padminToken, { user_id: newbie.id, role: "viewer" })).status).toBe(201);
+    expect((await GET("/v1/projects/PLEX/members", padminToken)).status).toBe(200);
+    expect((await PATCH2(`/v1/projects/PLEX/members/${newbie.id}`, padminToken, { role: "editor" })).status).toBe(200);
+    expect((await DELETE(`/v1/projects/PLEX/members/${newbie.id}`, padminToken)).status).toBe(204);
+    // Not a member of SWY → writes 403, reads 404 (existence hiding) even with projects:manage.
+    expect((await POST("/v1/projects/SWY/members", padminToken, { user_id: newbie.id, role: "viewer" })).status).toBe(403);
+    expect((await GET("/v1/projects/SWY/members", padminToken)).status).toBe(404);
+  });
+
+  test("editor + viewer members: roster is admin-only (403), no writes", async () => {
+    const { newbie, editorToken, friendToken } = await seed();
+    // Members of PLEX → 403 (admin-only), NOT 404 (they can see the project exists).
+    expect((await GET("/v1/projects/PLEX/members", editorToken)).status).toBe(403);
+    expect((await GET("/v1/projects/PLEX/members", friendToken)).status).toBe(403);
+    expect((await POST("/v1/projects/PLEX/members", editorToken, { user_id: newbie.id, role: "viewer" })).status).toBe(403);
+    expect((await POST("/v1/projects/PLEX/members", friendToken, { user_id: newbie.id, role: "viewer" })).status).toBe(403);
+  });
+
+  test("non-member: roster 404 (existence hiding)", async () => {
+    const { strangerToken } = await seed();
+    expect((await GET("/v1/projects/PLEX/members", strangerToken)).status).toBe(404);
+  });
+
+  test("duplicate add → 409; unknown user → 404", async () => {
+    const { ctx, ownerToken } = await seed();
+    // friend is already a viewer on PLEX (from fixture).
+    expect((await POST("/v1/projects/PLEX/members", ownerToken, { user_id: ctx.friend.id, role: "viewer" })).status).toBe(409);
+    expect((await POST("/v1/projects/PLEX/members", ownerToken, { user_id: "00000000-0000-0000-0000-000000000000", role: "viewer" })).status).toBe(404);
+  });
+
+  test("instance_role: owner can promote; demotion allowed once a second owner exists", async () => {
+    const { ctx, newbie, ownerToken } = await seed();
+    expect((await PATCH2(`/v1/users/${newbie.id}`, ownerToken, { instance_role: "owner" })).status).toBe(200);
+    // Two owners now → demoting magos is allowed (this is the last action in the test).
+    expect((await PATCH2(`/v1/users/${ctx.magos.id}`, ownerToken, { instance_role: "member" })).status).toBe(200);
+  });
+
+  test("last-owner guard: demoting the sole owner → 422", async () => {
+    const { ctx, ownerToken } = await seed();
+    expect((await PATCH2(`/v1/users/${ctx.magos.id}`, ownerToken, { instance_role: "member" })).status).toBe(422);
+  });
+});
