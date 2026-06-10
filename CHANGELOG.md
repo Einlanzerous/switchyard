@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.2.0](https://github.com/Einlanzerous/switchyard/compare/v3.1.0...v3.2.0) (2026-06-10)
+
+
+### Features
+
+* SWY-103 — Phase 6.4 membership & invite UI ([#96](https://github.com/Einlanzerous/switchyard/issues/96)) ([b47d605](https://github.com/Einlanzerous/switchyard/commit/b47d605af02f1854ee78fd8a9c713be2fe40ea81))
+
+
+### Maintenance
+
+* update knowledge graph [skip ci] ([30ba6f0](https://github.com/Einlanzerous/switchyard/commit/30ba6f0c2361fcd49eb521da46a727b517356ad2))
+
 ## [3.1.0](https://github.com/Einlanzerous/switchyard/compare/v3.0.0...v3.1.0) (2026-06-09)
 
 
