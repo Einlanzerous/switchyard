@@ -14,6 +14,8 @@ import { useTicketFilters } from "@/composables/useTicketFilters";
 import { useTicketsList } from "@/composables/useTicketsList";
 import { useTicketSort } from "@/composables/useTicketSort";
 import SortMenu from "@/components/tickets/SortMenu.vue";
+import ReadOnlyBanner from "@/components/projects/ReadOnlyBanner.vue";
+import { useProjectPermissions } from "@/composables/useProjectPermissions";
 import { useUiStore } from "@/stores/ui";
 
 const ui = useUiStore();
@@ -63,6 +65,10 @@ watch(() => filters.value, () => {
 const singleProjectKey = computed(() =>
   filters.value.project.length === 1 ? filters.value.project[0]! : null
 );
+// Write gating only applies when scoped to a single project (otherwise the
+// create dialog picks the project and the server enforces). `canWrite` is true
+// in the multi-project / no-project case so we never hide the global CTA.
+const { canWrite, isReadOnly } = useProjectPermissions(singleProjectKey);
 const { items, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage, error } =
   useTicketsList(filters, sort);
 
@@ -280,12 +286,14 @@ watch(() => filters.value, () => { keyboardFocusIdx.value = -1; });
           <KanbanSquare class="h-3.5 w-3.5 mr-1.5" />
           Board view
         </Button>
-        <Button size="sm" class="h-8" @click="ui.openCreateTicket(singleProjectKey)">
+        <Button v-if="canWrite" size="sm" class="h-8" @click="ui.openCreateTicket(singleProjectKey)">
           <Plus class="h-3.5 w-3.5 mr-1.5" />
           New ticket
         </Button>
       </template>
     </FilterBar>
+
+    <ReadOnlyBanner v-if="isReadOnly" />
 
     <SaveViewDialog v-model:open="showSaveView" />
 

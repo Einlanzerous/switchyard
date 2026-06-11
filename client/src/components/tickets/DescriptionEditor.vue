@@ -9,9 +9,12 @@ import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
 import { useMentionAutocomplete } from "@/composables/useMentionAutocomplete";
 import MentionAutocomplete from "@/components/MentionAutocomplete.vue";
+import { useTicketCanWrite } from "@/composables/useProjectPermissions";
 import type { Ticket, UserRef } from "@switchyard/shared";
 
 const props = defineProps<{ ticket: Ticket }>();
+
+const canWrite = useTicketCanWrite();
 
 const editing = ref(false);
 const draft = ref("");
@@ -93,7 +96,7 @@ function onKeydown(e: KeyboardEvent) {
   <section>
     <div class="flex items-center justify-between mb-1.5">
       <h3 class="text-xs uppercase tracking-wider text-muted-foreground">Description</h3>
-      <Button v-if="!editing" variant="ghost" size="sm" class="h-6 text-xs text-muted-foreground" @click="startEdit">
+      <Button v-if="!editing && canWrite" variant="ghost" size="sm" class="h-6 text-xs text-muted-foreground" @click="startEdit">
         <Pencil class="h-3 w-3 mr-1" /> Edit
       </Button>
     </div>

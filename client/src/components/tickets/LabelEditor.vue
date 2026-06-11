@@ -11,10 +11,12 @@ import LabelChip from "./LabelChip.vue";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
 import { cn } from "@/lib/utils";
+import { useTicketCanWrite } from "@/composables/useProjectPermissions";
 import type { Ticket } from "@switchyard/shared";
 
 const props = defineProps<{ ticket: Ticket }>();
 
+const canWrite = useTicketCanWrite();
 const qc = useQueryClient();
 const open = ref(false);
 const search = ref("");
@@ -86,6 +88,7 @@ function remove(id: string) {
       <span class="inline-block h-1.5 w-1.5 rounded-full" :style="{ backgroundColor: lbl.color }" />
       {{ lbl.name }}
       <button
+        v-if="canWrite"
         type="button"
         class="ml-0.5 rounded p-0.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-foreground/10"
         :aria-label="`Remove ${lbl.name}`"
@@ -96,7 +99,12 @@ function remove(id: string) {
       </button>
     </span>
 
-    <Popover v-model:open="open">
+    <!-- No labels + read-only: show a muted placeholder so the row isn't empty. -->
+    <span v-if="!canWrite && ticket.labels.length === 0" class="text-xs text-muted-foreground italic">
+      No labels
+    </span>
+
+    <Popover v-if="canWrite" v-model:open="open">
       <PopoverTrigger as-child>
         <button
           type="button"

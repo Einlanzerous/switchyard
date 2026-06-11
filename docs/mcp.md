@@ -151,6 +151,78 @@ the client and the switchyard tools appear in its tool list.
 **Cline** — same shape, configured under the gear icon → MCP Servers. The
 server appears once saved; no restart required (Cline hot-reloads MCP configs).
 
+### Windows + WSL2
+
+If Claude Desktop runs on **Windows** but `bun` and the repo live in **WSL2**,
+wrap the launch in `wsl.exe` so the server runs inside the distro. The config
+lives on the Windows side (`%APPDATA%\Claude\claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "switchyard": {
+      "command": "wsl.exe",
+      "args": [
+        "-d", "Ubuntu", "-u", "magos", "-e", "bash", "-lc",
+        "SWITCHYARD_TOKEN=sw_... SWITCHYARD_URL=http://100.112.250.4:4002 exec bun /home/magos/projects/switchyard/mcp/src/index.ts"
+      ]
+    }
+  }
+}
+```
+
+- stdio passes through `wsl.exe` cleanly — that's all the MCP transport needs.
+- `-lc` runs a **login shell** so `bun` is on `PATH`; if it still isn't, use the
+  absolute path (e.g. `/home/<user>/.bun/bin/bun`). `-d` is the distro
+  (`wsl -l` lists them), `-u` the user, and `exec` replaces the shell so
+  shutdown signals propagate.
+- Use the **WSL path** (`/home/...`), not a Windows path, and inline the env in
+  the command — Windows env vars don't cross into WSL without `WSLENV`.
+- The path must point at a clone **on that machine**. A `Module not found`
+  error means the repo isn't where the arg says — your desktop WSL is a
+  different box from the server, so clone it there (and check the username; it
+  may not be the server's) or use the SSH variant below.
+
+**No clone on the desktop?** Run the server on the host that already has it over
+SSH — stdio flows over the SSH pipe, and because the server runs *on* the host,
+`SWITCHYARD_URL` becomes `http://localhost:4002` and the WSL networking question
+disappears entirely:
+
+```json
+{
+  "mcpServers": {
+    "switchyard": {
+      "command": "wsl.exe",
+      "args": ["-d", "Ubuntu", "-u", "<wsl-user>", "-e", "bash", "-lc",
+        "exec ssh imperial-construct 'SWITCHYARD_TOKEN=sw_... SWITCHYARD_URL=http://localhost:4002 bun /home/magos/projects/switchyard/mcp/src/index.ts'"]
+    }
+  }
+}
+```
+
+Requires key-based SSH from WSL to the host (`wsl ssh imperial-construct` should
+connect with no password prompt first).
+
+**Networking is the real gotcha**, not the launcher: the bun process runs
+*inside* WSL2, so WSL2 must reach the tailnet. Verify from inside WSL:
+
+```sh
+curl -s http://100.112.250.4:4002/healthz   # JSON → you're good
+```
+
+If it hangs, default WSL2 NAT can't reach the Windows Tailscale. Enable
+**mirrored networking** (Windows 11) — add to `C:\Users\<you>\.wslconfig`:
+
+```ini
+[wsl2]
+networkingMode=mirrored
+```
+
+then `wsl --shutdown` and retry; mirrored mode shares the host's `tailscale0`,
+so both `100.112.250.4` and the `imperial-construct` MagicDNS name resolve from
+WSL. (Alternatively, install `bun` natively on Windows and drop the `wsl.exe`
+wrapper — the call then originates from Windows, where Tailscale already works.)
+
 ## Local dev
 
 ```sh

@@ -17,6 +17,10 @@
 //       TEST-1 — "Backlog ticket"     (backlog,   no assignee)
 //       TEST-2 — "In progress ticket" (in_progress, assigned to test-user)
 //       TEST-3 — "Closed ticket"      (closed,    resolution=done)
+//   - User: viewer-user (human, instance_role=member) with a `viewer` role on
+//     TEST only. Drives the permissions.spec viewer-isolation suite (6.6).
+//   - Project: LOCKED (key=LOCKED). One backlog ticket (LOCKED-1). viewer-user
+//     is deliberately NOT a member — the isolation target a viewer must 404 on.
 //
 // Tests that need to mutate state should create their own short-lived
 // tickets with unique titles and let the test framework leave them; or
@@ -48,6 +52,15 @@ const PROJECT_DESC =
   + "read-only — use temp-e2e or per-test scratch tickets for write flows.";
 
 const TEST_USER_NAME = "test-user";
+
+// Viewer-isolation fixtures (6.6 / SWY-105). A `member` human scoped to TEST as
+// a read-only viewer, plus a second project they can't see.
+const VIEWER_USER_NAME = "viewer-user";
+const LOCKED_PROJECT_KEY = "LOCKED";
+const LOCKED_PROJECT_NAME = "Locked (E2E isolation)";
+const LOCKED_PROJECT_DESC =
+  "Isolation fixture — viewer-user is NOT a member. The permissions E2E asserts "
+  + "a viewer 404s on this project + its tickets.";
 
 const STATUS_SEEDS = [
   { category: "backlog" as const,     display_name: "Backlog",     position: 0, is_default: true },
@@ -102,27 +115,91 @@ async function ensureTestUser(): Promise<typeof schema.users.$inferSelect> {
   return created;
 }
 
-async function ensureProject(reporter: typeof schema.users.$inferSelect): Promise<typeof schema.projects.$inferSelect> {
+async function ensureViewerUser(): Promise<typeof schema.users.$inferSelect> {
+  const [existing] = await db
+    .select()
+    .from(schema.users)
+    .where(eq(schema.users.name, VIEWER_USER_NAME))
+    .limit(1);
+  if (existing) return existing;
+  const [created] = await db
+    .insert(schema.users)
+    .values({ name: VIEWER_USER_NAME, type: "human", instance_role: "member" })
+    .returning();
+  if (!created) throw new Error("viewer-user insert returned nothing");
+  console.log(`[test-seed] created user: ${VIEWER_USER_NAME} (member)`);
+  return created;
+}
+
+// Idempotent `user_projects` row — the membership that scopes a member to a
+// project at a role. No row = no access (the default-deny half of Phase 6).
+async function ensureMembership(
+  userId: string,
+  projectId: string,
+  role: "viewer" | "editor" | "admin",
+): Promise<void> {
+  const [existing] = await db
+    .select()
+    .from(schema.userProjects)
+    .where(and(eq(schema.userProjects.user_id, userId), eq(schema.userProjects.project_id, projectId)))
+    .limit(1);
+  if (existing) return;
+  await db.insert(schema.userProjects).values({ user_id: userId, project_id: projectId, role });
+  console.log(`[test-seed] membership: ${VIEWER_USER_NAME} → ${role}`);
+}
+
+async function ensureProject(
+  key: string,
+  name: string,
+  description: string,
+  color: string,
+): Promise<typeof schema.projects.$inferSelect> {
   let [project] = await db
     .select()
     .from(schema.projects)
-    .where(eq(schema.projects.key, PROJECT_KEY))
+    .where(eq(schema.projects.key, key))
     .limit(1);
   if (project) return project;
-  [project] = await db.insert(schema.projects).values({
-    key: PROJECT_KEY,
-    name: PROJECT_NAME,
-    description: PROJECT_DESC,
-    color: "#10b981",
-  }).returning();
-  if (!project) throw new Error("project insert returned nothing");
+  [project] = await db.insert(schema.projects).values({ key, name, description, color }).returning();
+  if (!project) throw new Error(`project ${key} insert returned nothing`);
   await db.insert(schema.projectCounters).values({ project_id: project.id });
   for (const s of STATUS_SEEDS) {
     await db.insert(schema.statuses).values({ ...s, project_id: project.id });
   }
-  console.log(`[test-seed] created project ${PROJECT_KEY} with default statuses`);
-  void reporter;
+  console.log(`[test-seed] created project ${key} with default statuses`);
   return project;
+}
+
+// A single backlog ticket in the LOCKED project — the direct-fetch isolation
+// target (`/tickets/LOCKED-1` must 404 for the viewer).
+async function seedLockedTicket(
+  project: typeof schema.projects.$inferSelect,
+  reporter: typeof schema.users.$inferSelect,
+): Promise<void> {
+  const title = "Locked ticket";
+  const [existing] = await db
+    .select()
+    .from(schema.tickets)
+    .where(and(eq(schema.tickets.project_id, project.id), eq(schema.tickets.title, title)))
+    .limit(1);
+  if (existing) return;
+  const [backlog] = await db
+    .select()
+    .from(schema.statuses)
+    .where(and(eq(schema.statuses.project_id, project.id), eq(schema.statuses.category, "backlog")))
+    .limit(1);
+  if (!backlog) throw new Error("backlog status missing in LOCKED project");
+  const number = await nextNumber(project.id);
+  await db.insert(schema.tickets).values({
+    project_id: project.id,
+    number,
+    type: "task",
+    title,
+    description: "Seeded for E2E isolation — a viewer must NOT be able to see this.",
+    status_id: backlog.id,
+    reporter_id: reporter.id,
+  });
+  console.log(`[test-seed] ${project.key}-${number} (backlog) — ${title}`);
 }
 
 async function nextNumber(projectId: string): Promise<number> {
@@ -208,8 +285,16 @@ async function main() {
   }
 
   const testUser = await ensureTestUser();
-  const project = await ensureProject(magos);
+  const project = await ensureProject(PROJECT_KEY, PROJECT_NAME, PROJECT_DESC, "#10b981");
   await seedTickets(project, magos, testUser);
+
+  // Viewer-isolation fixtures: a member scoped read-only to TEST, plus a
+  // project they can't see at all (the permissions.spec target).
+  const viewer = await ensureViewerUser();
+  await ensureMembership(viewer.id, project.id, "viewer");
+  const locked = await ensureProject(LOCKED_PROJECT_KEY, LOCKED_PROJECT_NAME, LOCKED_PROJECT_DESC, "#ef4444");
+  await seedLockedTicket(locked, magos);
+
   await pruneStaleE2eSavedViews(testUser);
 
   console.log("[test-seed] done");
