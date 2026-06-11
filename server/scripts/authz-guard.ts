@@ -14,8 +14,17 @@
 //   (`assertProjectRole` for project role, `assertInstanceAdmin` for instance
 //   surfaces). A write to a member's non-project resource must 403.
 //
+//   BYPASS (6.5 / SWY-104) — flags route files that re-derive the owner/agent
+//   instance-wide bypass with a bare `type === "agent"` comparison instead of
+//   the single `hasInstanceWideAccess` predicate. One predicate governs all
+//   instance-wide access; an ad-hoc agent check in a handler is the regression
+//   this catches. (Matches `=== "agent"` / `"agent" ===`; the `"agent" |
+//   "human"` union annotation in stats.ts is a type, not a comparison, so it
+//   doesn't trip.)
+//
 // It was ADVISORY through 6.1.0–6.1.4; 6.1.5 closed the read gaps and flipped it
-// to ENFORCING; 6.2 added the write dimension. It runs in
+// to ENFORCING; 6.2 added the write dimension; 6.5 added the bypass dimension.
+// It runs in
 // .github/workflows/ci.yml, so a new unscoped read OR write handler fails the
 // build. A file that legitimately touches these tables outside the project model
 // (self-scoped notification hydration, owner-scoped saved views, audit-event
@@ -54,7 +63,16 @@ const WRITE_TABLES = [
 const WRITE_VERBS = ["insert", "update", "delete"] as const;
 const WRITE_HELPERS = ["assertProjectRole", "assertInstanceAdmin"] as const;
 
-type Finding = { file: string; kind: "read" | "write"; tables: string[] };
+// BYPASS shape: a bare comparison against the `agent` literal. The owner/agent
+// bypass must flow through `hasInstanceWideAccess`; a handler comparing
+// `type === "agent"` itself is the ad-hoc check 6.5 forbids. The `g` flag lets
+// us report every offending line. (A `"agent" | "human"` union type annotation
+// has no `===`, so it's deliberately excluded.)
+const BYPASS_RE = /===\s*['"]agent['"]|['"]agent['"]\s*===/g;
+
+type Finding =
+  | { file: string; kind: "read" | "write"; tables: string[] }
+  | { file: string; kind: "bypass"; tables: string[] };
 
 const findings: Finding[] = [];
 
@@ -73,27 +91,35 @@ for (const entry of readdirSync(ROUTES_DIR)) {
   if (writeHit.length > 0 && !WRITE_HELPERS.some((h) => src.includes(h))) {
     findings.push({ file: entry, kind: "write", tables: writeHit });
   }
+
+  if (BYPASS_RE.test(src)) {
+    findings.push({ file: entry, kind: "bypass", tables: [] });
+  }
 }
 
 const banner = "─".repeat(72);
 console.log(banner);
-console.log(`authz-guard — ${ENFORCE ? "ENFORCING" : "ADVISORY"} (Phase 6 / SWY-96+102)`);
+console.log(`authz-guard — ${ENFORCE ? "ENFORCING" : "ADVISORY"} (Phase 6 / SWY-96+102+104)`);
 console.log(banner);
 
 if (findings.length === 0) {
-  console.log("✓ every handler touching scoped tables references the right authz gate (reads + writes).");
+  console.log("✓ every handler touching scoped tables references the right authz gate (reads + writes), and no handler re-derives the agent bypass.");
   process.exit(0);
 }
 
-console.log(`${findings.length} unscoped route finding(s):\n`);
+console.log(`${findings.length} route finding(s):\n`);
 for (const f of findings) {
+  if (f.kind === "bypass") {
+    console.log(`  • [bypass] ${f.file} — ad-hoc \`type === "agent"\`; route the owner/agent bypass through hasInstanceWideAccess`);
+    continue;
+  }
   const gate = f.kind === "read" ? "read gate" : "write gate";
   console.log(`  • [${f.kind}] ${f.file}  (${f.tables.join(", ")}) — missing ${gate}`);
 }
 console.log(
   `\nSee docs/permissions.md. ${
     ENFORCE
-      ? "Failing — wire assertProjectReadable/visibleProjectFilter (reads) or assertProjectRole/assertInstanceAdmin (writes)."
+      ? "Failing — wire assertProjectReadable/visibleProjectFilter (reads), assertProjectRole/assertInstanceAdmin (writes), or hasInstanceWideAccess (bypass)."
       : "Advisory only — not a gate yet."
   }`,
 );
