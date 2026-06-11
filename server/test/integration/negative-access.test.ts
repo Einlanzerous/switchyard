@@ -1022,3 +1022,94 @@ describe("6.4 — membership & invite (HTTP)", () => {
     expect((await PATCH2(`/v1/users/${ctx.magos.id}`, ownerToken, { instance_role: "member" })).status).toBe(422);
   });
 });
+
+// ─── 6.5 — agent service-account hardening (SWY-104) ──────────────────────────
+//
+// The agent bypass must be deliberate and verified, not accidental. These tests
+// pin the acceptance: every imperium-loop per-actor token reads + writes across
+// MULTIPLE projects with ZERO membership rows — agent-ness alone (the single
+// `hasInstanceWideAccess` predicate) carries instance-wide access. A regression
+// on any one actor — or anything that quietly starts requiring membership for
+// agents — fails the build here. Drives the real Hono app over HTTP.
+const IMPERIUM_ACTORS = [
+  "claude", "n8n-cogitation", "n8n-vox-dictate",
+  "servo-signal", "autosavant-bot", "rules-engine",
+] as const;
+
+describe("6.5 — agent service accounts (instance-wide, no membership rows)", () => {
+  // Two projects (PLEX + SWY from the fixture), each with a backlog +
+  // in_progress status and a seed ticket, plus the full imperium-loop roster as
+  // agents. None of them get a `user_projects` row.
+  async function seed() {
+    const ctx = await fixture(); // seeds `claude` already
+    const agents: Record<string, { id: string }> = { claude: ctx.claude };
+    for (const name of IMPERIUM_ACTORS) {
+      if (name === "claude") continue;
+      const [u] = await testDb
+        .insert(schema.users)
+        .values({ name, type: "agent", instance_role: "member" })
+        .returning();
+      agents[name] = u!;
+    }
+    // A second status per project so a transition has somewhere to go.
+    const mkStatus = (project: { id: string }, name: string) =>
+      testDb
+        .insert(schema.statuses)
+        .values({ project_id: project.id, category: "in_progress", display_name: name, position: 1 })
+        .returning()
+        .then((r) => r[0]!);
+    const plexWip = await mkStatus(ctx.plex, "WIP");
+    const swyWip = await mkStatus(ctx.swy, "WIP");
+    // One ticket per project as the read/comment/transition target.
+    const mkTicket = (project: { id: string }, status: { id: string }, title: string) =>
+      testDb
+        .insert(schema.tickets)
+        .values({ project_id: project.id, number: 1, type: "task", title, status_id: status.id, reporter_id: ctx.magos.id })
+        .returning()
+        .then((r) => r[0]!);
+    await mkTicket(ctx.plex, ctx.plexBacklog, "Plex seed");
+    await mkTicket(ctx.swy, ctx.swyBacklog, "Swy seed");
+    // Manually-numbered seed rows must advance the counter so POST-create
+    // allocations don't collide on (project_id, number).
+    await testDb
+      .update(schema.projectCounters)
+      .set({ last_used_number: 1 })
+      .where(inArray(schema.projectCounters.project_id, [ctx.plex.id, ctx.swy.id]));
+    return { ctx, agents, plexWip: plexWip!, swyWip: swyWip! };
+  }
+
+  test("no imperium-loop actor holds any membership row (exempt from user_projects)", async () => {
+    const { agents } = await seed();
+    const ids = Object.values(agents).map((a) => a.id);
+    const rows = await testDb
+      .select()
+      .from(schema.userProjects)
+      .where(inArray(schema.userProjects.user_id, ids));
+    expect(rows).toHaveLength(0);
+  });
+
+  // The core acceptance, table-driven over the full actor roster: each per-actor
+  // token reads + writes (create / comment / transition) across BOTH projects.
+  for (const name of IMPERIUM_ACTORS) {
+    test(`${name}: reads + writes cross-project (PLEX + SWY) with no membership`, async () => {
+      const { agents, plexWip, swyWip } = await seed();
+      const token = await mintToken(agents[name]!.id, ["tickets:write", "comments:write"]);
+
+      // READ a ticket in each project.
+      expect((await GET("/v1/tickets/PLEX-1", token)).status).toBe(200);
+      expect((await GET("/v1/tickets/SWY-1", token)).status).toBe(200);
+
+      // CREATE a ticket in each project.
+      expect((await POST("/v1/tickets", token, { project_key: "PLEX", type: "task", title: "by agent" })).status).toBe(201);
+      expect((await POST("/v1/tickets", token, { project_key: "SWY", type: "task", title: "by agent" })).status).toBe(201);
+
+      // COMMENT on a ticket in each project.
+      expect((await POST("/v1/tickets/PLEX-1/comments", token, { body: "agent note" })).status).toBe(201);
+      expect((await POST("/v1/tickets/SWY-1/comments", token, { body: "agent note" })).status).toBe(201);
+
+      // TRANSITION a ticket in each project (backlog → in_progress; no resolution).
+      expect((await POST("/v1/tickets/PLEX-1/transition", token, { status_id: plexWip.id })).status).toBe(200);
+      expect((await POST("/v1/tickets/SWY-1/transition", token, { status_id: swyWip.id })).status).toBe(200);
+    });
+  }
+});

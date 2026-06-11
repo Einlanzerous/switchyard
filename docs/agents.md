@@ -5,7 +5,7 @@ custom scripts) talks to. Same surface the web UI uses — there is no separate
 "agent" endpoint set. This page gathers the conventions agents need to know.
 
 For a curated, agent-shaped tool surface on top of the same API, see the
-[MCP server](../mcp/README.md).
+[MCP server](./mcp.md).
 
 ## Authentication
 
@@ -53,6 +53,40 @@ single-project membership = exactly that one project, read-only. (Read-only via
 scope and read-only via role converge on one predicate — see
 [permissions.md](./permissions.md).) In the UI, the `/settings/tokens` page has a
 **Dashboard token** button (no scope picker) and badges these tokens read-only.
+
+## Service accounts & permissions
+
+Agents are **instance-wide service accounts**. A user row with `type = 'agent'`
+satisfies the single bypass predicate `hasInstanceWideAccess` (`user.type ===
+'agent' || user.instance_role === 'owner'`), so an agent token **reads and
+writes across every project** and is **exempt from project membership**
+(`user_projects`) — no membership rows required. This is deliberate, not
+incidental: it keeps the imperium-loop running unchanged. Every per-actor token
+in that pipeline — `claude`, `n8n-cogitation`, `n8n-vox-dictate`,
+`servo-signal`, `autosavant-bot`, `rules-engine` — resolves cross-project on
+agent-ness alone.
+
+Humans are the opposite by default: a `member` human sees and writes only the
+projects they hold a membership row on, at their role (`viewer` / `editor` /
+`admin`). The instance `owner` (magos) shares the agent bypass. So what a token
+carries depends entirely on its owning user:
+
+| Token owner | Sees / writes |
+|---|---|
+| Agent (`type = 'agent'`) | Every project, instance-wide; no membership needed |
+| Owner (`instance_role = 'owner'`) | Every project, instance-wide |
+| Member human | Only their member projects, capped by role |
+
+The bypass is governed in exactly one place — `hasInstanceWideAccess` in
+`server/src/lib/authz.ts` — and a CI guard (`server/scripts/authz-guard.ts`)
+fails the build if any handler re-derives it with an ad-hoc `type === 'agent'`
+check. For the full two-dimensional model (token scope ∩ project role) see
+[permissions.md](./permissions.md); for how this plays out when wiring an MCP
+client, see [mcp.md](./mcp.md#what-your-token-can-see).
+
+Because an agent token is instance-wide, treat it as a high-value secret: mint
+one **per actor** (above) so the audit log attributes mutations correctly, and
+give it only the scopes that actor actually needs.
 
 ## Idempotency
 

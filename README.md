@@ -68,7 +68,7 @@ A hand-curated Model Context Protocol surface for Claude Desktop / Claude Code /
 - **Reads** — `list_projects`, `get_project`, `get_project_statuses`, `list_labels`, `list_tickets` (multi-status via array or `open: true` shortcut), `get_ticket`, `get_ticket_comments`, `query_my_open`.
 - **Writes** — `create_project` (auto-seeds the canonical 5 statuses), `create_ticket`, `update_ticket` (PATCH; `null` clears `assignee_id` / `parent_id` / `due_date`), `transition_ticket`, `transition_ticket_by_category` (sugar — skips the `get_project_statuses` round-trip), `comment_on_ticket`, `move_ticket`.
 
-Stdio transport (Claude Desktop, Cline, Claude Code, Gemini CLI). Setup, full tool descriptions, and the in-memory test harness: [`mcp/README.md`](./mcp/README.md).
+Stdio transport (Claude Desktop, Cline, Claude Code, Gemini CLI). Setup, full tool descriptions, and the in-memory test harness: [`docs/mcp.md`](./docs/mcp.md).
 
 ### Operations & observability
 
@@ -137,7 +137,8 @@ bun --cwd client run test:e2e:ui       # interactive Playwright UI
 
 ## Further reading
 
-- [`docs/agents.md`](./docs/agents.md) — auth, idempotency, cursor pagination, HMAC verification (Node + Python), filter syntax, GitHub webhook receiver setup.
-- [`mcp/README.md`](./mcp/README.md) — MCP server setup, tool surface, wiring into Claude Desktop / Claude Code / Cline.
+- [`docs/agents.md`](./docs/agents.md) — auth, the agent service-account model (instance-wide, membership-exempt), idempotency, cursor pagination, HMAC verification (Node + Python), filter syntax, GitHub webhook receiver setup.
+- [`docs/mcp.md`](./docs/mcp.md) — MCP server setup (fresh install vs. connecting over Tailscale), the token-access model, tool surface, wiring into Claude Desktop / Claude Code / Cline.
+- [`docs/permissions.md`](./docs/permissions.md) — Phase 6 access control: the two-dimensional model (token scope ∩ project role), the owner/agent bypass, and the enforcement playbook.
 - [`docs/migrations.md`](./docs/migrations.md) — migration safety rules for the hot-table additive-only ladder.
 - [`PHASES.md`](./PHASES.md) — full phased build plan + locked architectural decisions.
