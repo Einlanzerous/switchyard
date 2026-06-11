@@ -10,10 +10,12 @@ import PriorityBadge from "./PriorityBadge.vue";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
 import { cn } from "@/lib/utils";
+import { useTicketCanWrite } from "@/composables/useProjectPermissions";
 import type { Ticket, Priority } from "@switchyard/shared";
 
 const props = defineProps<{ ticket: Ticket }>();
 
+const canWrite = useTicketCanWrite();
 const qc = useQueryClient();
 
 // "Sentinel" entry for clearing the priority. Sent as null to the API.
@@ -58,14 +60,14 @@ const current = computed(() => props.ticket.priority);
           'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-sm hover:bg-accent transition-colors',
           mutation.isPending.value && 'opacity-60',
         )"
-        :disabled="mutation.isPending.value"
+        :disabled="mutation.isPending.value || !canWrite"
       >
         <Loader2 v-if="mutation.isPending.value" class="h-3.5 w-3.5 animate-spin" />
         <template v-else-if="current">
           <PriorityBadge :priority="current" show-label />
         </template>
         <span v-else class="text-muted-foreground italic">No priority</span>
-        <ChevronDown class="h-3 w-3 text-muted-foreground/60" />
+        <ChevronDown v-if="canWrite" class="h-3 w-3 text-muted-foreground/60" />
       </button>
     </DropdownMenuTrigger>
     <DropdownMenuContent align="start" class="w-44">

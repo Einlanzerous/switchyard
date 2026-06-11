@@ -23,6 +23,7 @@ import LabelEditor from "./LabelEditor.vue";
 import CreateTicketDialog from "./CreateTicketDialog.vue";
 import { cn } from "@/lib/utils";
 import { useTicketDetail } from "@/composables/useTicketDetail";
+import { useProjectPermissions, provideTicketCanWrite } from "@/composables/useProjectPermissions";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
 import type { TicketLinkType } from "@switchyard/shared";
@@ -49,6 +50,12 @@ const {
   ticket, isLoading, allowedStatuses, events, eventsLoading, error,
   parent, parentLoading, children, childrenLoading,
 } = useTicketDetail(idOrKey);
+
+// Write capability on this ticket's project, shared down to the inline editors
+// / transition / comment composer (6.5/6.6). A viewer sees the ticket but no
+// write affordances; the server enforces the same regardless.
+const { canWrite } = useProjectPermissions(() => ticket.value?.project.key ?? null);
+provideTicketCanWrite(canWrite);
 
 type Tab = "description" | "activity";
 const activeTab = ref<Tab>("description");
@@ -316,7 +323,7 @@ function openAddSubTicket() {
             <ParentEpicEditor :ticket="ticket" />
           </template>
         </div>
-        <TransitionButton :ticket="ticket" :allowed-statuses="allowedStatuses" />
+        <TransitionButton v-if="canWrite" :ticket="ticket" :allowed-statuses="allowedStatuses" />
       </div>
 
       <!-- Status + labels (editable) on one row. The pipe separator only
@@ -407,7 +414,11 @@ function openAddSubTicket() {
         </h3>
 
         <div class="mb-4">
-          <CommentComposer :ticket-key="ticket.key" />
+          <CommentComposer v-if="canWrite" :ticket-key="ticket.key" />
+          <!-- @vue-expect-error this Vue version's DOM types don't include a data-* index signature for dynamic binds -->
+          <p v-else class="text-sm text-muted-foreground italic" :data-testid="'comments-readonly'">
+            You have read-only access — commenting is disabled.
+          </p>
         </div>
 
         <ul v-if="sortedComments.length > 0" class="space-y-4">

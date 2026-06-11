@@ -18,8 +18,13 @@ import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
 import { useProjectsStats } from "@/composables/useProjectStats";
 import CreateProjectDialog from "@/components/projects/CreateProjectDialog.vue";
+import { useAuthStore } from "@/stores/auth";
 
 const router = useRouter();
+const auth = useAuthStore();
+// Project creation is an instance-admin surface (owner / agent) — a member,
+// even a project admin, can't mint projects. Hide the CTA for non-owners (6.5).
+const canCreateProject = computed(() => auth.isOwner);
 
 // Layout + filter prefs persist across reloads. Kept in localStorage rather
 // than the URL so the view feels stable as a "home" rather than a query.
@@ -116,7 +121,7 @@ function onCreated(p: { key: string }) {
           Each project owns its own statuses, transitions, and ticket numbering.
         </p>
       </div>
-      <Button size="sm" @click="showCreate = true">
+      <Button v-if="canCreateProject" size="sm" @click="showCreate = true">
         <Plus class="h-3.5 w-3.5 mr-1.5" /> New project
       </Button>
     </header>
@@ -207,7 +212,7 @@ function onCreated(p: { key: string }) {
           : "Try a different search or toggle archived projects." }}
       </p>
       <Button
-        v-if="allProjects.length === 0"
+        v-if="allProjects.length === 0 && canCreateProject"
         size="sm"
         class="mt-3"
         @click="showCreate = true"

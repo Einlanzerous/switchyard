@@ -11,10 +11,12 @@ import DueDateBadge from "./DueDateBadge.vue";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
 import { cn } from "@/lib/utils";
+import { useTicketCanWrite } from "@/composables/useProjectPermissions";
 import type { Ticket } from "@switchyard/shared";
 
 const props = defineProps<{ ticket: Ticket; isOpen?: boolean }>();
 
+const canWrite = useTicketCanWrite();
 const qc = useQueryClient();
 const popoverOpen = ref(false);
 const inputValue = ref<string>(""); // YYYY-MM-DD or ""
@@ -102,7 +104,7 @@ const hasDate = computed(() => !!props.ticket.due_date);
           'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-sm hover:bg-accent transition-colors',
           mutation.isPending.value && 'opacity-60',
         )"
-        :disabled="mutation.isPending.value"
+        :disabled="mutation.isPending.value || !canWrite"
       >
         <Loader2 v-if="mutation.isPending.value" class="h-3.5 w-3.5 animate-spin" />
         <DueDateBadge
@@ -112,7 +114,7 @@ const hasDate = computed(() => !!props.ticket.due_date);
           show-label
         />
         <span v-else class="text-muted-foreground italic">No due date</span>
-        <ChevronDown class="h-3 w-3 text-muted-foreground/60" />
+        <ChevronDown v-if="canWrite" class="h-3 w-3 text-muted-foreground/60" />
       </button>
     </PopoverTrigger>
     <PopoverContent align="start" class="w-56 p-3">

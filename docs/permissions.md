@@ -290,3 +290,45 @@ link to a ticket in a project you can't — the link list still surfaces that
 ticket's key + title. Cross-project relationship metadata is visible by design;
 only a *direct* fetch of the linked ticket 404s. The strictness budget is spent
 on write isolation (6.2), not on hiding the existence of related work.
+
+## Rollout (6.4)
+
+- **6.4 — ✅ membership & invite UI.** Settings → project **Members** tab
+  (add/remove + role) gated on project-admin (+ owner); admin user management
+  gains the instance-role editor and one-time token mint (SWY-63 QR banner).
+  The project detail payload carries **`my_role`** (`effectiveProjectRole`):
+  the caller's role on that project, or `null` for instance-wide actors. This is
+  the field the client gates UI on (6.6).
+
+## Rollout (6.5)
+
+- **6.5 — ✅ agents & service-account hardening (PR #99).** Formalized the
+  owner/agent bypass as the single `hasInstanceWideAccess` predicate and locked
+  it in: `authz-guard.ts` gained a **bypass** dimension that fails CI on any
+  bare `type === "agent"` check in a handler. A negative-access regression
+  asserts every imperium-loop per-actor token reads + writes across multiple
+  projects with **zero** membership rows. The agent service-account model is
+  documented in [agents.md](./agents.md).
+
+## Rollout (6.6)
+
+- **6.6 — ✅ docs + E2E (closeout).** This document finalized; `agents.md`
+  updated for the multi-user reality.
+- **Client-side write gating (new).** The server stays the source of truth —
+  every write still 403s if it shouldn't land — but the UI now **hides
+  affordances a user can't use** instead of letting a viewer click into a 403.
+  `useProjectPermissions(projectKey)` (client) reads `my_role` off the cached
+  project query and derives `canWrite` / `canManage` / `isReadOnly`; instance-
+  wide actors (owner/agent) short-circuit to writable. Gated surfaces: New-ticket
+  (tickets list + board), the inline ticket editors (assignee / priority / due
+  date / labels / parent / description), the transition control, the comment
+  composer, and New-project (instance-admin). A viewer also sees a read-only
+  banner on the tickets list + board. The gate is **cosmetic** — it never
+  replaces an enforcement check; `TicketBody` provides `canWrite` to its editors
+  via inject, defaulting to writable so non-ticket contexts are unaffected.
+- **E2E.** `client/e2e/permissions.spec.ts` drives the seeded `viewer-user`
+  (member, viewer on TEST only; not a member of the seeded LOCKED project) and
+  asserts the four corners: (a) sees only TEST across tickets / board /
+  directory, (b) write affordances absent + the banner, (c) direct-URL nav to
+  the LOCKED project / ticket 404s, (d) the API rejects viewer writes with 403.
+  Runs on chromium + firefox.

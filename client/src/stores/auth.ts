@@ -40,9 +40,16 @@ export const useAuthStore = defineStore("auth", () => {
   // Instance owner = blanket cross-project admin (magos). Used to gate admin
   // surfaces like the project Members tab and the instance-role editor (6.4).
   const isOwner = computed(() => me.value?.instance_role === "owner");
+  // Instance-wide actors (owner + agent service accounts) bypass per-project
+  // membership entirely — the client mirror of `hasInstanceWideAccess` on the
+  // server (6.5). Used by useProjectPermissions to short-circuit write gating
+  // (they can write everywhere, no `my_role` lookup needed).
+  const isInstanceWide = computed(
+    () => me.value?.instance_role === "owner" || me.value?.type === "agent",
+  );
   // Expose error as a top-level computed so consumers don't have to know about
   // the underlying Vue Query ref shape (which Pinia auto-unwraps awkwardly).
   const error = computed(() => meQuery.error.value);
 
-  return { me, loading, isAuthenticated, isOwner, hasToken, error, login, logout };
+  return { me, loading, isAuthenticated, isOwner, isInstanceWide, hasToken, error, login, logout };
 });

@@ -11,7 +11,9 @@ import { Switch } from "@/components/ui/switch";
 import BoardColumn from "@/components/tickets/BoardColumn.vue";
 import InsightsTabs from "@/components/dashboard/InsightsTabs.vue";
 import ProjectHeaderLabel from "@/components/projects/ProjectHeaderLabel.vue";
+import ReadOnlyBanner from "@/components/projects/ReadOnlyBanner.vue";
 import SortMenu from "@/components/tickets/SortMenu.vue";
+import { useProjectPermissions } from "@/composables/useProjectPermissions";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
 import { useUiStore } from "@/stores/ui";
@@ -57,6 +59,10 @@ function setSortMode(next: SortMode) {
 }
 
 const { project, columns, isLoading, error, refetch, closedWindowDays } = useProjectBoard(projectKey, showEpics, sortMode);
+
+// Hide the New-ticket CTA + show a banner when the user is a viewer on this
+// project (6.5/6.6). Drag-to-transition is gated server-side regardless.
+const { canWrite, isReadOnly } = useProjectPermissions(projectKey);
 
 // ─── drop → transition wiring ────────────────────────────────────────────────
 
@@ -364,7 +370,7 @@ const errMessage = computed(() => {
         <Button variant="outline" size="sm" class="h-8" @click="viewAsList">
           <List class="h-3.5 w-3.5 mr-1.5" /> List
         </Button>
-        <Button size="sm" class="h-8" @click="ui.openCreateTicket(projectKey)">
+        <Button v-if="canWrite" size="sm" class="h-8" @click="ui.openCreateTicket(projectKey)">
           <Plus class="h-3.5 w-3.5 mr-1.5" /> New ticket
         </Button>
         <Loader2
@@ -373,6 +379,8 @@ const errMessage = computed(() => {
         />
       </div>
     </div>
+
+    <ReadOnlyBanner v-if="isReadOnly" />
 
     <!-- Loading -->
     <div v-if="isLoading" class="flex-1 p-4 flex gap-3 overflow-x-auto">
