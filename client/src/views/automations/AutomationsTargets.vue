@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
+import { copyToClipboard } from "@/lib/clipboard";
 import type { Target } from "@switchyard/shared";
 
 const qc = useQueryClient();
@@ -167,10 +168,9 @@ const deleteMutation = useMutation({
 
 async function copySecret() {
   if (!fresh.value?.secret) return;
-  try {
-    await navigator.clipboard.writeText(fresh.value.secret);
+  if (await copyToClipboard(fresh.value.secret)) {
     toast.success("Secret copied");
-  } catch {
+  } else {
     toast.error("Couldn't copy — select and copy manually");
   }
 }
