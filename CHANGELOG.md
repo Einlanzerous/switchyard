@@ -1,5 +1,25 @@
 # Changelog
 
+## [3.3.0](https://github.com/Einlanzerous/switchyard/compare/v3.2.0...v3.3.0) (2026-06-11)
+
+
+### Features
+
+* SWY-104 — Phase 6.5 agent & service-account hardening ([#99](https://github.com/Einlanzerous/switchyard/issues/99)) ([d5f3ae6](https://github.com/Einlanzerous/switchyard/commit/d5f3ae6511c2cc03b034eee666d134a369005f37))
+* SWY-105 — Phase 6.6 docs + E2E (viewer isolation) ([#100](https://github.com/Einlanzerous/switchyard/issues/100)) ([8274f3b](https://github.com/Einlanzerous/switchyard/commit/8274f3b725d8db44deb93bac9048e27a1fdc2e97))
+
+
+### Bug Fixes
+
+* copy buttons work over plain HTTP (tailnet) ([#98](https://github.com/Einlanzerous/switchyard/issues/98)) ([5760417](https://github.com/Einlanzerous/switchyard/commit/57604178c22c5c3f15031c3b3fe5748ef9b269fc))
+
+
+### Maintenance
+
+* update knowledge graph [skip ci] ([3a9d994](https://github.com/Einlanzerous/switchyard/commit/3a9d9947631fe337d25866b4fb7adfc4fe33aeb8))
+* update knowledge graph [skip ci] ([38b0ed5](https://github.com/Einlanzerous/switchyard/commit/38b0ed52ca6d9c17ecbf2fe788c06f0e76fce5f4))
+* update knowledge graph [skip ci] ([eade891](https://github.com/Einlanzerous/switchyard/commit/eade891458b548f2fd3a6b51a9670070cbaec345))
+
 ## [3.2.0](https://github.com/Einlanzerous/switchyard/compare/v3.1.0...v3.2.0) (2026-06-10)
 
 
