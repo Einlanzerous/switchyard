@@ -13133,6 +13133,8 @@ export interface paths {
                         "application/json": {
                             stale_in_progress_days: number;
                             board_closed_window_days: 7 | 14 | 30;
+                            llm_obs_usd_per_kwh: number;
+                            llm_obs_retention_days: number;
                             /** Format: date-time */
                             updated_at: string;
                         };
@@ -13284,6 +13286,8 @@ export interface paths {
                     "application/json": {
                         stale_in_progress_days?: number;
                         board_closed_window_days?: 7 | 14 | 30;
+                        llm_obs_usd_per_kwh?: number;
+                        llm_obs_retention_days?: number;
                     };
                 };
             };
@@ -13297,6 +13301,8 @@ export interface paths {
                         "application/json": {
                             stale_in_progress_days: number;
                             board_closed_window_days: 7 | 14 | 30;
+                            llm_obs_usd_per_kwh: number;
+                            llm_obs_retention_days: number;
                             /** Format: date-time */
                             updated_at: string;
                         };

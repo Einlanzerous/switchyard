@@ -15,7 +15,7 @@
     "seed:swy": "bun scripts/seed-switchyard-project.ts",
     "seed:test-e2e": "bun scripts/seed-test-fixtures.ts",
     "seed:imperium-fields": "bun scripts/seed-imperium-loop-fields.ts",
-    "seed:model-pricing": "bun scripts/seed-model-pricing.ts",
+    "seed:llm-obs": "bun scripts/seed-llm-observations.ts",
     "openapi:gen": "DATABASE_URL=postgres://codegen@localhost:5432/codegen bun src/lib/openapi-gen.ts",
     "test": "bun test --parallel=1",
     "test:unit": "bun test test/lib/pagination.test.ts test/lib/hmac.test.ts test/lib/hex-color.test.ts test/lib/github-webhook-parse.test.ts",

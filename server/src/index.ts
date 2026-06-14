@@ -27,6 +27,7 @@ import { startScheduler, stopScheduler } from "./lib/rules/scheduler.js";
 import {
   startExternalRefPoller, stopExternalRefPoller,
 } from "./lib/externalRefs/poller.js";
+import { startLlmObsRollup, stopLlmObsRollup } from "./lib/llm-obs/rollup.js";
 import { cleanupExpiredIdempotencyKeys } from "./lib/idempotency.js";
 import { accessLog } from "./lib/access-log.js";
 import { buildHealthReport } from "./lib/health.js";
@@ -89,6 +90,7 @@ startDispatcher();
 startRulesDispatcher();
 startScheduler();
 startExternalRefPoller();
+startLlmObsRollup();
 const idempotencyCleanup = setInterval(
   () => void cleanupExpiredIdempotencyKeys().catch((e) => console.warn("[idempotency cleanup]", e)),
   60 * 60 * 1000
@@ -116,6 +118,7 @@ const shutdown = async (signal: string) => {
   await Promise.all([
     stopScheduler(),
     stopExternalRefPoller(Math.min(2_000, dispatcherBudget)),
+    stopLlmObsRollup(Math.min(2_000, dispatcherBudget)),
   ]);
   await Promise.all([
     stopDispatcher(dispatcherBudget),
