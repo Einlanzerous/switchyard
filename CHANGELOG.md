@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.4.0](https://github.com/Einlanzerous/switchyard/compare/v3.3.0...v3.4.0) (2026-06-14)
+
+
+### Features
+
+* SWY-48 Phase 5.1.3 — LLM cost seed (energy model), rollup & retention ([#102](https://github.com/Einlanzerous/switchyard/issues/102)) ([8de304e](https://github.com/Einlanzerous/switchyard/commit/8de304e17075e2c0f04c4d70206596d8c07e3ed8))
+
+
+### Maintenance
+
+* update knowledge graph [skip ci] ([629610b](https://github.com/Einlanzerous/switchyard/commit/629610bf59ad4f607bfe5ceb8eb20abf032b0b21))
+* update knowledge graph [skip ci] ([54fc1fc](https://github.com/Einlanzerous/switchyard/commit/54fc1fce5d736085fbe9a9fdb115c51fd1ecac49))
+
 ## [3.3.0](https://github.com/Einlanzerous/switchyard/compare/v3.2.0...v3.3.0) (2026-06-11)
 
 
