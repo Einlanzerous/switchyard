@@ -10,6 +10,7 @@ import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import {
   SystemSettings, UpdateSystemSettings,
   DEFAULT_STALE_IN_PROGRESS_DAYS, DEFAULT_BOARD_CLOSED_WINDOW_DAYS,
+  DEFAULT_LLM_OBS_USD_PER_KWH, DEFAULT_LLM_OBS_RETENTION_DAYS,
   type ClosedWindowDays,
 } from "@switchyard/shared";
 import { db } from "../db.js";
@@ -37,11 +38,15 @@ const patch = createRoute({
 const SETTING_DEFAULTS = {
   stale_in_progress_days: DEFAULT_STALE_IN_PROGRESS_DAYS,
   board_closed_window_days: DEFAULT_BOARD_CLOSED_WINDOW_DAYS,
+  llm_obs_usd_per_kwh: DEFAULT_LLM_OBS_USD_PER_KWH,
+  llm_obs_retention_days: DEFAULT_LLM_OBS_RETENTION_DAYS,
 } as const;
 
 type StoredSettings = {
   stale_in_progress_days: number;
   board_closed_window_days: ClosedWindowDays;
+  llm_obs_usd_per_kwh: number;
+  llm_obs_retention_days: number;
   updated_at: string;
 };
 
@@ -68,6 +73,8 @@ export async function readSettings(): Promise<StoredSettings> {
       "board_closed_window_days",
       SETTING_DEFAULTS.board_closed_window_days,
     ),
+    llm_obs_usd_per_kwh: get("llm_obs_usd_per_kwh", SETTING_DEFAULTS.llm_obs_usd_per_kwh),
+    llm_obs_retention_days: get("llm_obs_retention_days", SETTING_DEFAULTS.llm_obs_retention_days),
     updated_at: latest,
   };
 }
@@ -95,6 +102,12 @@ export function mount(app: OpenAPIHono) {
     }
     if (body.board_closed_window_days !== undefined) {
       writes.push({ key: "board_closed_window_days", value: body.board_closed_window_days });
+    }
+    if (body.llm_obs_usd_per_kwh !== undefined) {
+      writes.push({ key: "llm_obs_usd_per_kwh", value: body.llm_obs_usd_per_kwh });
+    }
+    if (body.llm_obs_retention_days !== undefined) {
+      writes.push({ key: "llm_obs_retention_days", value: body.llm_obs_retention_days });
     }
 
     for (const w of writes) {

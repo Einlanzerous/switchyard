@@ -9,6 +9,8 @@ import { Iso8601 } from "./common.js";
 export const SystemSettingKey = z.enum([
   "stale_in_progress_days",
   "board_closed_window_days",
+  "llm_obs_usd_per_kwh",
+  "llm_obs_retention_days",
 ]);
 export type SystemSettingKey = z.infer<typeof SystemSettingKey>;
 
@@ -29,6 +31,12 @@ export const SystemSettings = z.object({
   // Default window for the Closed column on kanban boards. Per-project
   // override lives on the project row; null there = inherit this value.
   board_closed_window_days: ClosedWindowDays,
+  // Electricity rate (USD per kWh) used to cost local/energy-priced LLM calls
+  // in the llm_observations_with_cost view. Default 0.17 (Chicago). SWY-48.
+  llm_obs_usd_per_kwh: z.number().min(0).max(10),
+  // How long raw llm_observations rows are retained before the cleanup job
+  // deletes them. Daily rollups are kept forever. Default 180. SWY-48.
+  llm_obs_retention_days: z.number().int().min(1).max(3650),
   updated_at: Iso8601,
 });
 export type SystemSettings = z.infer<typeof SystemSettings>;
@@ -39,9 +47,15 @@ export const UpdateSystemSettings = z
   .object({
     stale_in_progress_days: z.number().int().min(1).max(3650).optional(),
     board_closed_window_days: ClosedWindowDays.optional(),
+    llm_obs_usd_per_kwh: z.number().min(0).max(10).optional(),
+    llm_obs_retention_days: z.number().int().min(1).max(3650).optional(),
   })
   .refine((b) => Object.keys(b).length > 0, "at least one field required");
 export type UpdateSystemSettings = z.infer<typeof UpdateSystemSettings>;
 
 export const DEFAULT_STALE_IN_PROGRESS_DAYS = 30;
 export const DEFAULT_BOARD_CLOSED_WINDOW_DAYS: ClosedWindowDays = 14;
+// Chicago residential rate mid-2026; tune in Settings as the grid rate drifts.
+export const DEFAULT_LLM_OBS_USD_PER_KWH = 0.17;
+// Half a year of raw observations covers the realistic investigation window.
+export const DEFAULT_LLM_OBS_RETENTION_DAYS = 180;

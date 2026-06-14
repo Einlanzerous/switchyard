@@ -128,10 +128,21 @@ BEGIN
 END $$;
 
 -- Cost-on-the-fly view. Joins each observation to the model_pricing row
--- whose [effective_from, effective_to) range contains occurred_at. Local
--- models seeded with zero rates resolve to cost_usd = 0 without special-
--- casing. NULL pricing (no matching row) yields NULL cost_usd, which the
--- UI surfaces as "unpriced" so the gap is visible.
+-- whose [effective_from, effective_to) range contains occurred_at.
+--
+-- Two pricing modes (SWY-48 Phase 5.1):
+--   * Token-priced (API providers): cost from input/output/cache token rates.
+--   * Energy-priced (local Ollama models, avg_power_watts NOT NULL): cost from
+--     (watts/1000) × (latency_ms/3.6e6) kWh × the llm_obs_usd_per_kwh setting.
+--     A measured `metadata.energy_wh` (watt-hours) wins over the configured
+--     average when present — the Tier-2 hook for imperium-loop emit-side.
+-- NULL pricing (no matching row) yields NULL cost_usd, which the UI surfaces
+-- as "unpriced" so the gap is visible.
+--
+-- Dropped-and-recreated (not CREATE OR REPLACE) because adding avg_power_watts
+-- ahead of cost_usd reorders existing view columns, which REPLACE forbids
+-- (42P16). The view has no dependents beyond ad-hoc queries, so this is safe.
+DROP VIEW IF EXISTS llm_observations_with_cost;
 CREATE OR REPLACE VIEW llm_observations_with_cost AS
 SELECT
   o.*,
@@ -139,8 +150,24 @@ SELECT
   p.output_usd_per_mtok,
   p.cache_creation_multiplier,
   p.cache_read_multiplier,
+  p.avg_power_watts,
   CASE
     WHEN p.id IS NULL THEN NULL
+    WHEN p.avg_power_watts IS NOT NULL THEN (
+      -- kWh: measured energy_wh/1000 if emitted, else watts × latency.
+      COALESCE(
+        (o.metadata ->> 'energy_wh')::double precision / 1000.0,
+        (p.avg_power_watts / 1000.0) * (o.latency_ms / 3600000.0)
+      )
+      * COALESCE(
+        (
+          SELECT (s.value #>> '{}')::double precision
+          FROM system_settings s
+          WHERE s.key = 'llm_obs_usd_per_kwh'
+        ),
+        0.17
+      )
+    )
     ELSE (
       (o.input_tokens / 1000000.0) * p.input_usd_per_mtok
       + (o.output_tokens / 1000000.0) * p.output_usd_per_mtok
@@ -158,4 +185,4 @@ LEFT JOIN model_pricing p
   AND (p.effective_to IS NULL OR o.occurred_at < p.effective_to);
 
 COMMENT ON VIEW llm_observations_with_cost IS
-  'Observations joined to point-in-time pricing. cost_usd is NULL when no pricing row covers occurred_at.';
+  'Observations joined to point-in-time pricing. Token- or energy-priced per model_pricing.avg_power_watts. cost_usd is NULL when no pricing row covers occurred_at.';

@@ -1,0 +1,3 @@
+ALTER TABLE "model_pricing" DROP CONSTRAINT "model_pricing_non_negative";--> statement-breakpoint
+ALTER TABLE "model_pricing" ADD COLUMN "avg_power_watts" double precision;--> statement-breakpoint
+ALTER TABLE "model_pricing" ADD CONSTRAINT "model_pricing_non_negative" CHECK ("model_pricing"."input_usd_per_mtok" >= 0 AND "model_pricing"."output_usd_per_mtok" >= 0 AND "model_pricing"."cache_creation_multiplier" >= 0 AND "model_pricing"."cache_read_multiplier" >= 0 AND ("model_pricing"."avg_power_watts" IS NULL OR "model_pricing"."avg_power_watts" >= 0));

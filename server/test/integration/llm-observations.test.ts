@@ -378,6 +378,70 @@ describe("llm_observations_with_cost — cost view", () => {
     )) as unknown as Array<{ cost_usd: number }>;
     expect(rows[0]!.cost_usd).toBe(0);
   });
+
+  test("energy-priced local model costs by watts × latency × $/kWh", async () => {
+    const actor = await seedActor();
+    // No llm_obs_usd_per_kwh row → view COALESCEs to the 0.17 default.
+    await testDb.insert(schema.modelPricing).values({
+      model: "gemma4:31b",
+      provider: "ollama",
+      input_usd_per_mtok: 0,
+      output_usd_per_mtok: 0,
+      cache_creation_multiplier: 0,
+      cache_read_multiplier: 0,
+      avg_power_watts: 300, // R9700 board power
+      effective_from: "2026-01-01T00:00:00Z",
+      effective_to: null,
+    });
+    await testDb.insert(schema.llmObservations).values({
+      occurred_at: "2026-05-18T05:12:59Z",
+      actor_id: actor.id,
+      service: "servo-signal",
+      operation: "greenfield",
+      model: "gemma4:31b",
+      provider: "ollama",
+      input_tokens: 9_999,
+      output_tokens: 1_234,
+      latency_ms: 3_600_000, // exactly 1 hour → 0.3 kW × 1h × $0.17 = $0.051
+    });
+
+    const rows = (await testDb.execute(
+      sql`SELECT cost_usd FROM llm_observations_with_cost`,
+    )) as unknown as Array<{ cost_usd: number }>;
+    expect(rows[0]!.cost_usd).toBeCloseTo(0.051, 6);
+  });
+
+  test("measured metadata.energy_wh overrides the configured average", async () => {
+    const actor = await seedActor();
+    await testDb.insert(schema.modelPricing).values({
+      model: "gemma4:31b",
+      provider: "ollama",
+      input_usd_per_mtok: 0,
+      output_usd_per_mtok: 0,
+      cache_creation_multiplier: 0,
+      cache_read_multiplier: 0,
+      avg_power_watts: 300, // ignored when energy_wh is present
+      effective_from: "2026-01-01T00:00:00Z",
+      effective_to: null,
+    });
+    await testDb.insert(schema.llmObservations).values({
+      occurred_at: "2026-05-18T05:12:59Z",
+      actor_id: actor.id,
+      service: "servo-signal",
+      operation: "greenfield",
+      model: "gemma4:31b",
+      provider: "ollama",
+      input_tokens: 10,
+      output_tokens: 10,
+      latency_ms: 50, // ignored — energy_wh wins
+      metadata: { energy_wh: 500 }, // 0.5 kWh × $0.17 = $0.085
+    });
+
+    const rows = (await testDb.execute(
+      sql`SELECT cost_usd FROM llm_observations_with_cost`,
+    )) as unknown as Array<{ cost_usd: number }>;
+    expect(rows[0]!.cost_usd).toBeCloseTo(0.085, 6);
+  });
 });
 
 describe("llm_observations — indexes exist (smoke)", () => {

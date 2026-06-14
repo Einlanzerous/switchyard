@@ -9,14 +9,18 @@
 //     (one-shot file the user reads then deletes).
 //   - Once any tokens exist and BOOTSTRAP_TOKEN is unset, the bootstrap path
 //     is silent. No re-prompts.
-import { eq, isNull } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve, dirname } from "node:path";
 import { db, schema } from "../db.js";
 import { env } from "../env.js";
 import { generateApiToken, hashToken } from "./id.js";
-import { DEFAULT_STALE_IN_PROGRESS_DAYS, DEFAULT_BOARD_CLOSED_WINDOW_DAYS } from "@switchyard/shared";
+import {
+  DEFAULT_STALE_IN_PROGRESS_DAYS, DEFAULT_BOARD_CLOSED_WINDOW_DAYS,
+  DEFAULT_LLM_OBS_USD_PER_KWH, DEFAULT_LLM_OBS_RETENTION_DAYS,
+} from "@switchyard/shared";
 import { DEFAULT_BOARD_DELETED_KEY } from "./defaultBoard.js";
+import { PRICING_SEED, PRICING_EFFECTIVE_FROM } from "./llm-obs/pricing-seed.js";
 
 type CanonicalUser = {
   name: string;
@@ -71,6 +75,7 @@ export async function seed(opts: { bootstrapToken?: string } = {}): Promise<void
   await ensureOwner(magosId);
   await ensureBootstrapToken(magosId, opts.bootstrapToken);
   await ensureDefaultSettings();
+  await ensureModelPricing();
   await ensureLabels();
   await ensureDefaultBoard();
   await ensureOwnerMemberships(magosId);
@@ -174,6 +179,8 @@ async function ensureDefaultSettings(): Promise<void> {
   const defaults = [
     { key: "stale_in_progress_days", value: DEFAULT_STALE_IN_PROGRESS_DAYS },
     { key: "board_closed_window_days", value: DEFAULT_BOARD_CLOSED_WINDOW_DAYS },
+    { key: "llm_obs_usd_per_kwh", value: DEFAULT_LLM_OBS_USD_PER_KWH },
+    { key: "llm_obs_retention_days", value: DEFAULT_LLM_OBS_RETENTION_DAYS },
   ];
   for (const d of defaults) {
     const [existing] = await db
@@ -184,6 +191,35 @@ async function ensureDefaultSettings(): Promise<void> {
     if (existing) continue;
     await db.insert(schema.systemSettings).values({ key: d.key, value: d.value });
     console.log(`[seed] default system_settings.${d.key} = ${JSON.stringify(d.value)}`);
+  }
+}
+
+// Seed canonical model_pricing rows (SWY-48). Skips any (model, provider) that
+// already has a *current* rate (effective_to IS NULL) — so an admin's edited
+// rate survives, and the order vs. any manual re-seed never matters (two
+// current rows would violate the tstzrange no-overlap constraint). To change a
+// rate, close the old row (set effective_to) and the new one lands on next
+// boot. Unknown models seen in the wild are NOT seeded here — they surface in
+// the warn-list for review.
+async function ensureModelPricing(): Promise<void> {
+  for (const row of PRICING_SEED) {
+    const [existing] = await db
+      .select({ id: schema.modelPricing.id })
+      .from(schema.modelPricing)
+      .where(
+        and(
+          eq(schema.modelPricing.model, row.model),
+          eq(schema.modelPricing.provider, row.provider),
+          isNull(schema.modelPricing.effective_to),
+        ),
+      )
+      .limit(1);
+    if (existing) continue;
+    await db.insert(schema.modelPricing).values({
+      ...row,
+      effective_from: PRICING_EFFECTIVE_FROM,
+    });
+    console.log(`[seed] model_pricing ${row.provider}/${row.model}`);
   }
 }
 

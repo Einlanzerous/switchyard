@@ -1066,6 +1066,11 @@ export const modelPricing = pgTable(
       .notNull()
       .default(1.0),
     cache_read_multiplier: doublePrecision("cache_read_multiplier").notNull().default(0.1),
+    // Energy-priced models (local Ollama inference) carry watts instead of
+    // token rates: cost = (watts/1000) × (latency_ms/3.6e6) × llm_obs_usd_per_kwh.
+    // NULL = token-priced (API providers). The cost view in triggers.sql
+    // branches on this; a measured `metadata.energy_wh` wins over the average.
+    avg_power_watts: doublePrecision("avg_power_watts"),
     effective_from: timestamp("effective_from", { withTimezone: true, mode: "string" }).notNull(),
     effective_to: timestamp("effective_to", { withTimezone: true, mode: "string" }),
     notes: text("notes"),
@@ -1075,7 +1080,7 @@ export const modelPricing = pgTable(
     modelProviderIdx: index("model_pricing_model_provider_idx").on(t.model, t.provider),
     nonNegRates: check(
       "model_pricing_non_negative",
-      sql`${t.input_usd_per_mtok} >= 0 AND ${t.output_usd_per_mtok} >= 0 AND ${t.cache_creation_multiplier} >= 0 AND ${t.cache_read_multiplier} >= 0`,
+      sql`${t.input_usd_per_mtok} >= 0 AND ${t.output_usd_per_mtok} >= 0 AND ${t.cache_creation_multiplier} >= 0 AND ${t.cache_read_multiplier} >= 0 AND (${t.avg_power_watts} IS NULL OR ${t.avg_power_watts} >= 0)`,
     ),
   }),
 );
