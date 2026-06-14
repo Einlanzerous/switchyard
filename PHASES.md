@@ -496,6 +496,52 @@ This is **multi-user, still single-tenant** — not the multi-tenant / multi-org
 6. **Every read-endpoint PR extends the negative-access matrix** — a new read without a matrix row fails review.
 7. **Optional CI guard:** a grep-test flagging handlers that query `tickets`/`projects`/`boards` without routing through the scoped helper.
 
+## Phase 7 — Plan-as-PR ⏳
+
+Phase 7 promotes agents from blind code-generators to architects by inserting a reviewable **plan** gate before any build. The plan is a first-class, versioned, diffable artifact — the "intent diff": a human approves it or bounces it back line by line, and the build doesn't start until the blueprint is approved. switchyard owns rendering, gating, and enforcement; imperium-loop (and any future agent) generates the plan. Tracked as **SWY-### epic** (filed alongside this section).
+
+**Plans are optional by design.** "Make this button bigger" never needs a plan. A ticket gets a plan only when one is created; strictness is opt-in via policy (default: epics).
+
+### Locked decisions for Phase 7
+
+- **Optional by default; policy makes it stricter.** No ticket requires a plan. A configurable **plan policy** (global default + per-project override, default = `epic` type) declares which tickets need an approved plan before entering Building (`in_progress`). Projects widen (types/labels), narrow, or disable entirely. Levers, not a burden.
+- **Enforced as a hardcoded transition guard, configurable via the policy** — precedent: the kept epic-close guard (`server/src/routes/tickets.ts:504`). Reject transition to `in_progress` with 422 + reason when a policy-covered ticket lacks an approved plan. This is the narrow, single-purpose guard the epic-close one already established — NOT the deferred *pluggable* guard system.
+- **One plan per ticket, many revisions.** `plans` (entity, bound to ticket) + `plan_revisions` (each submission); supersede-on-rerun (the shape SWY-53 already chose for variant sets).
+- **Hybrid artifact.** Each revision = narrative markdown (Summary / Approach / Risks) + a structured, individually-checkable **acceptance-criteria** list. The AC list is the machine-checkable contract the build is verified against.
+- **PR-style multi-round loop.** Reviewer approves/rejects per-criterion + leaves change requests → agent submits a new revision → re-review until approved. Revisions are versioned + diffable (what changed since last review).
+- **Plan events drive ticket status via async rules.** `plan.submitted` → Awaiting Plan Review; `plan.approved` → Building; `plan.changes_requested` → Planning. The after-the-fact rules shape (already built) keeps switchyard the ground-truth SRE for agents.
+- **Comments reused for plan threads.** `comments` gains nullable `plan_revision_id` + `plan_anchor` (`criterion:<id>` | `section:<name>` | `plan`) so markdown / @mentions / notifications / attachments come free.
+- **No new status category.** "Awaiting Plan Review" stays a named status under `planning` — already first-class precisely so plan-time and build-time don't conflate in cycle-time.
+- **Circuit breakers** (Gemini's race-condition warning). Per-plan revision cap (configurable, default 5) → on exceed, auto-apply a `plan-stuck` label + stop auto-firing the planner. Plan-submission rate-limit per ticket (reuses the rule rate-limit pattern). Plan-driven rules skip `rules-engine` events (existing loop-prevention).
+- **Authz reuses Phase 6.** Submit/revise = project `editor` (agents instance-wide, unchanged); review/approve = `editor`/`admin` write + transition rights. No new scope.
+- **SWY-53 folds in as 7.4.** Visual-variant comparison is one kind of plan artifact; its locked design (standalone HTML, LLM-combine, attachments-shaped, supersede-on-rerun) carries over intact.
+
+### Schema (new migration)
+
+- `plans` — `id, ticket_id UNIQUE, status (draft|in_review|changes_requested|approved|superseded), current_revision_id, revision_count, created_at, updated_at`
+- `plan_revisions` — `id, plan_id, rev_number, narrative_md, status, submitted_by, submitted_at`
+- `plan_criteria` — `id, revision_id, position, text, verdict (pending|approved|rejected), reviewer_note` (full list resubmitted each revision; diff computed at render time — no stable-key bookkeeping in v1)
+- `plan_reviews` — `id, revision_id, reviewer_id, verdict (approved|changes_requested|rejected), note, created_at`
+- `comments` gains nullable `plan_revision_id` + `plan_anchor`
+- Plan policy: global default in `system_settings`; per-project override
+- New event types: `plan.submitted`, `plan.revised`, `plan.approved`, `plan.changes_requested`, `plan.rejected` (webhook + rule fan-out)
+
+### Milestones
+
+- **7.0 — Plan data model + REST (foundations) ⏳.** Migration; `shared/src/schemas/plan.ts`; submit / revise / review / get endpoints; event types + webhook/rule fan-out; revision numbering + plan state machine; diff computation. Tests: unit (transitions, revision increment, diff), integration (submit→approve emits events + drives no rule loop; changes_requested→revise increments). Codegen `client/src/lib/api.types.ts`.
+- **7.1 — Review UI (the intent diff) ⏳.** `<PlanReview>` on TicketDetail (drawer + page): narrative render + checkable AC with per-item approve/reject, "Request changes" / "Approve all → Building", revision history with diff-since-last-review, comment threads anchored to criteria/sections. Board card "plan in review" badge (mirrors external-ref badges). "Plans awaiting your review" homepage widget (mirrors "What needs me"). Empty/skeleton states. E2E.
+- **7.2 — Plan policy + state-machine wiring + circuit breakers ⏳.** Plan-required policy (global default + per-project, default epics) surfaced in project Setup → Automations; hardcoded transition-guard enforcement (422 + reason). Seeded global rules bridging plan events ↔ ticket status. Per-plan revision cap + `plan-stuck` escalation + submission rate-limit. Plan-queue surfacing in health. `docs/plan-as-pr.md` documenting the state machine.
+- **7.3 — Agent contract via MCP ⏳.** `submit_plan`, `revise_plan`, `get_plan` / `get_plan_feedback` (returns outstanding change requests + per-criterion verdicts so the agent knows exactly what to fix) over the 7.0 REST. Invariants in tool descriptions. mcp/ harness tests. `docs/mcp.md` update.
+- **7.4 — Visual variants as a plan artifact (absorbs SWY-53) ⏳.** Per-revision variant set (N standalone HTML mockups), side-by-side compare, "combine" = LLM refinement round (imperium-loop side), choose-variant as part of approval, chosen HTML threaded into the build prompt. Attachments-shaped, supersede-on-rerun.
+- **7.5 — imperium-loop integration + docs + E2E ⏳.** Cogitation Engine planner step posts a plan; on `plan.approved` the build agent starts; on `plan.changes_requested` the planner revises against the change requests. Greenfield verifier reports per-AC pass/fail against the approved criteria — the approved AC list becomes the verification contract. README "Plan-as-PR" section + worked examples. Full E2E.
+
+### Out of scope for Phase 7 (deferred)
+
+- Stable per-criterion identity across revisions (render-time text diff suffices for v1).
+- Non-UI variant comparison (backend / load-test options) — SWY-53's original stretch goal stays deferred.
+- New status category (plan-review lives under `planning`).
+- Pluggable transition guards (the narrow plan-required guard follows the epic-close precedent; the general system stays deferred).
+
 ---
 
 ## Locked architectural decisions
@@ -528,6 +574,8 @@ These were settled during planning. Don't relitigate without naming the *why* li
 | Transition guards (Phase 4) | Out of scope; hardcoded epic-close stays | Guards are sync-and-reject — a different shape from async after-the-fact rules. Revisit when daily use surfaces the needed primitives. |
 | Authz model (Phase 6) | Two-dimensional: token scopes ∩ per-project role; reads 404 (not 403) for non-member resources | Adds the project dimension the global-scope model lacks without discarding scopes. 404-on-read avoids leaking the existence of projects/tickets a viewer can't see. |
 | User roles (Phase 6) | Instance `owner\|member` + per-project `admin\|editor\|viewer`; agents are instance-wide service accounts | Lets a human be scoped read-only to one project while agents keep cross-project access, so imperium-loop is untouched. |
+| Plan requirement (Phase 7) | Optional by default; configurable plan policy (default: epics) enforced as a hardcoded transition guard | "Make this button bigger" needs no plan; epics usually do. Policy gives strictness levers without making plans a burden. Hardcoded guard follows the kept epic-close precedent, not the deferred pluggable-guard system. |
+| Plan artifact (Phase 7) | One plan per ticket, many versioned revisions; hybrid narrative-md + checkable acceptance criteria; PR-style multi-round review | The AC list is the machine-checkable contract the build is verified against; versioned revisions make the "intent diff" reviewable line-by-line like a code PR. |
 
 ## Non-goals (deliberately out of scope)
 
