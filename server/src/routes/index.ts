@@ -21,6 +21,7 @@ import * as ticketExternalRefs from "./ticketExternalRefs.js";
 import * as external from "./external.js";
 import * as ticketTemplates from "./ticketTemplates.js";
 import * as llmObservations from "./llmObservations.js";
+import * as llmInsights from "./llmInsights.js";
 
 export function mountRoutes(app: OpenAPIHono) {
   users.mount(app);
@@ -38,6 +39,9 @@ export function mountRoutes(app: OpenAPIHono) {
   events.mount(app);
   settings.mount(app);
   stats.mount(app);
+  // After stats.mount so the `/v1/stats/*` requireAuth wildcard is registered
+  // first — llmInsights routes live under /v1/stats/llm/* and rely on it.
+  llmInsights.mount(app);
   savedViews.mount(app);
   rules.mount(app);
   targets.mount(app);

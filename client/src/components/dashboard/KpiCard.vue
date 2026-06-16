@@ -18,6 +18,11 @@ const props = defineProps<{
   deltaPercent?: number | null;
   deltaGoodWhen?: "up" | "down";
   subline?: string;
+  // Optional short text shown to the RIGHT of the label (e.g. "164 calls",
+  // "elevated") — keeps the card compact vs. a full subline row. `noteTone`
+  // paints it in the warning color.
+  note?: string | null;
+  noteTone?: "default" | "warn";
   // Optional inline subline that paints in the destructive color — used for
   // the "⚠ N stale" warning on the in-progress card.
   warning?: string | null;
@@ -57,8 +62,15 @@ const deltaColor = computed(() => {
 <template>
   <Card>
     <CardContent class="p-4 flex flex-col gap-1.5">
-      <div class="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
-        {{ label }}
+      <div class="flex items-center justify-between gap-2">
+        <span class="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+          {{ label }}
+        </span>
+        <span
+          v-if="note"
+          class="text-[11px] tabular-nums shrink-0"
+          :class="noteTone === 'warn' ? 'text-rose-600 dark:text-rose-500 font-medium' : 'text-muted-foreground'"
+        >{{ note }}</span>
       </div>
 
       <div v-if="loading" class="flex items-end gap-3">
@@ -76,7 +88,7 @@ const deltaColor = computed(() => {
             <ArrowUp v-if="deltaPercent > 0" class="h-3 w-3 mr-0.5" />
             <ArrowDown v-else-if="deltaPercent < 0" class="h-3 w-3 mr-0.5" />
             <Minus v-else class="h-3 w-3 mr-0.5" />
-            {{ Math.abs(deltaPercent) }}%
+            {{ Math.round(Math.abs(deltaPercent) * 10) / 10 }}%
           </span>
         </div>
         <div v-if="spark && spark.length > 1" class="w-24 h-10 shrink-0">

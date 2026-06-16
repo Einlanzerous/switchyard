@@ -68,6 +68,22 @@ export const queryKeys = {
     ["sw", "stats", "cumulative-flow", params] as const,
   statsStale: () => ["sw", "stats", "stale"] as const,
 
+  // LLM Insights (SWY-48 / 5.1.2). Params (project scope + window) carried in
+  // the key so the global and per-project tabs coexist in the cache.
+  statsLlmKpi: (params: Record<string, unknown>) => ["sw", "stats", "llm", "kpi", params] as const,
+  statsLlmTokenSpend: (params: Record<string, unknown>) =>
+    ["sw", "stats", "llm", "token-spend", params] as const,
+  statsLlmCostLeaderboard: (params: Record<string, unknown>) =>
+    ["sw", "stats", "llm", "cost-leaderboard", params] as const,
+  statsLlmLatency: (params: Record<string, unknown>) =>
+    ["sw", "stats", "llm", "latency", params] as const,
+  statsLlmErrorRate: (params: Record<string, unknown>) =>
+    ["sw", "stats", "llm", "error-rate", params] as const,
+  statsLlmHitlStalls: (params: Record<string, unknown>) =>
+    ["sw", "stats", "llm", "hitl-stalls", params] as const,
+  llmPendingValues: (params?: Record<string, unknown>) =>
+    ["sw", "admin", "llm-obs", "pending-values", params ?? {}] as const,
+
   myNotifications: (params?: Record<string, unknown>) =>
     ["sw", "users", "me", "notifications", params ?? {}] as const,
   myUnreadCount: () => ["sw", "users", "me", "notifications", "unread-count"] as const,

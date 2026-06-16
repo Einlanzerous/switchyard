@@ -5,12 +5,15 @@
 
 import { useRoute, useRouter } from "vue-router";
 import { computed } from "vue";
-import { KanbanSquare, BarChart2, Settings as SettingsIcon } from "lucide-vue-next";
+import { KanbanSquare, BarChart2, Zap, Settings as SettingsIcon } from "lucide-vue-next";
 import { cn } from "@/lib/utils";
 
 const props = defineProps<{
   boardPath: string;
   insightsPath: string;
+  // Optional: when set, renders an "LLM" tab for the per-project LLM Insights
+  // view (SWY-48). Sits between Insights and Admin.
+  llmPath?: string;
   // Optional: when set, renders a third "Admin" tab containing the
   // project's recurring templates, project-scoped automations, and
   // project settings as sub-tabs. Project-scoped views pass this;
@@ -26,6 +29,9 @@ const tabs = computed(() => {
     { key: "board", label: "Board", icon: KanbanSquare, path: props.boardPath },
     { key: "insights", label: "Insights", icon: BarChart2, path: props.insightsPath },
   ];
+  if (props.llmPath) {
+    base.push({ key: "llm", label: "LLM", icon: Zap, path: props.llmPath });
+  }
   if (props.setupPath) {
     base.push({ key: "setup", label: "Admin", icon: SettingsIcon, path: props.setupPath });
   }

@@ -9,6 +9,8 @@ import BoardView from "./views/BoardView.vue";
 import BoardInsightsView from "./views/BoardInsightsView.vue";
 import ProjectsView from "./views/ProjectsView.vue";
 import ProjectInsightsView from "./views/ProjectInsightsView.vue";
+import ProjectInsightsLlmView from "./views/ProjectInsightsLlmView.vue";
+import LlmInsightsView from "./views/LlmInsightsView.vue";
 import ProjectSetupView from "./views/ProjectSetupView.vue";
 import ProjectSetupRecurring from "./views/setup/ProjectSetupRecurring.vue";
 import ProjectSetupAutomations from "./views/setup/ProjectSetupAutomations.vue";
@@ -30,6 +32,7 @@ import SettingsProjectTransitions from "./views/settings/SettingsProjectTransiti
 import SettingsUsers from "./views/settings/SettingsUsers.vue";
 import SettingsCustomFields from "./views/settings/SettingsCustomFields.vue";
 import SettingsSystem from "./views/settings/SettingsSystem.vue";
+import SettingsObservability from "./views/settings/SettingsObservability.vue";
 
 // Automations is its own top-level area; webhooks (and Phase-4 rules) live
 // under it rather than under /settings, since they're a primary integration
@@ -55,8 +58,15 @@ export const router = createRouter({
     { path: "/boards/:id", name: "board", component: BoardView },
     { path: "/boards/:id/insights", name: "board-insights", component: BoardInsightsView },
     { path: "/projects", name: "projects", component: ProjectsView },
+    // Global LLM Insights — pipeline-wide, across all visible projects (SWY-48).
+    { path: "/insights/llm", name: "insights-llm", component: LlmInsightsView },
     { path: "/projects/:key/board", name: "project-board", component: ProjectBoardView },
     { path: "/projects/:key/insights", name: "project-insights", component: ProjectInsightsView },
+    {
+      path: "/projects/:key/insights/llm",
+      name: "project-insights-llm",
+      component: ProjectInsightsLlmView,
+    },
     // Setup tab replaces the standalone Recurring tab. Old /recurring URL
     // redirects below to preserve any bookmarks.
     {
@@ -100,6 +110,7 @@ export const router = createRouter({
         { path: "users", name: "settings-users", component: SettingsUsers },
         { path: "custom-fields", name: "settings-custom-fields", component: SettingsCustomFields },
         { path: "system", name: "settings-system", component: SettingsSystem },
+        { path: "observability", name: "settings-observability", component: SettingsObservability },
       ],
     },
 

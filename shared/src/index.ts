@@ -14,6 +14,7 @@ export * from "./schemas/webhook.js";
 export * from "./schemas/token.js";
 export * from "./schemas/settings.js";
 export * from "./schemas/stats.js";
+export * from "./schemas/llmInsights.js";
 export * from "./schemas/savedView.js";
 export * from "./schemas/notification.js";
 export * from "./schemas/rule.js";

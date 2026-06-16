@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { RouterLink, useRoute } from "vue-router";
 import { computed } from "vue";
-import { Inbox, LayoutDashboard, KanbanSquare, FolderKanban, Settings, Zap, HeartPulse } from "lucide-vue-next";
+import { Inbox, LayoutDashboard, KanbanSquare, FolderKanban, Settings, Zap, Activity, HeartPulse } from "lucide-vue-next";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import SwitchyardLogo from "@/components/SwitchyardLogo.vue";
@@ -14,6 +14,7 @@ const items: NavItem[] = [
   { to: "/tickets", label: "Tickets", icon: Inbox, group: "main" },
   { to: "/boards", label: "Boards", icon: KanbanSquare, group: "main" },
   { to: "/projects", label: "Projects", icon: FolderKanban, group: "main" },
+  { to: "/insights/llm", label: "LLM Insights", icon: Activity, group: "main" },
   { to: "/automations", label: "Automations", icon: Zap, group: "main" },
   { to: "/settings", label: "Settings", icon: Settings, group: "admin" },
   { to: "/health", label: "Health", icon: HeartPulse, group: "admin" },

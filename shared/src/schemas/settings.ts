@@ -11,6 +11,8 @@ export const SystemSettingKey = z.enum([
   "board_closed_window_days",
   "llm_obs_usd_per_kwh",
   "llm_obs_retention_days",
+  "hitl_stall_in_progress_hours",
+  "hitl_stall_silent_hours",
 ]);
 export type SystemSettingKey = z.infer<typeof SystemSettingKey>;
 
@@ -37,6 +39,10 @@ export const SystemSettings = z.object({
   // How long raw llm_observations rows are retained before the cleanup job
   // deletes them. Daily rollups are kept forever. Default 180. SWY-48.
   llm_obs_retention_days: z.number().int().min(1).max(3650),
+  // HITL stall detector (Insights → LLM): a ticket in_progress longer than
+  // this many hours with no LLM activity in the last `silent_hours` is flagged.
+  hitl_stall_in_progress_hours: z.number().min(1).max(8760),
+  hitl_stall_silent_hours: z.number().min(1).max(8760),
   updated_at: Iso8601,
 });
 export type SystemSettings = z.infer<typeof SystemSettings>;
@@ -49,6 +55,8 @@ export const UpdateSystemSettings = z
     board_closed_window_days: ClosedWindowDays.optional(),
     llm_obs_usd_per_kwh: z.number().min(0).max(10).optional(),
     llm_obs_retention_days: z.number().int().min(1).max(3650).optional(),
+    hitl_stall_in_progress_hours: z.number().min(1).max(8760).optional(),
+    hitl_stall_silent_hours: z.number().min(1).max(8760).optional(),
   })
   .refine((b) => Object.keys(b).length > 0, "at least one field required");
 export type UpdateSystemSettings = z.infer<typeof UpdateSystemSettings>;
@@ -59,3 +67,7 @@ export const DEFAULT_BOARD_CLOSED_WINDOW_DAYS: ClosedWindowDays = 14;
 export const DEFAULT_LLM_OBS_USD_PER_KWH = 0.17;
 // Half a year of raw observations covers the realistic investigation window.
 export const DEFAULT_LLM_OBS_RETENTION_DAYS = 180;
+// A ticket in_progress > 1 day with no model call in the last 4h likely stalled
+// on a human (HITL) — defaults tuned for the imperium-loop cadence.
+export const DEFAULT_HITL_STALL_IN_PROGRESS_HOURS = 24;
+export const DEFAULT_HITL_STALL_SILENT_HOURS = 4;

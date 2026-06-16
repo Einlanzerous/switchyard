@@ -48,6 +48,12 @@ const READ_HELPERS = [
   "hasInstanceWideAccess",
   "assertInstanceAdmin",
   "visibleUserIds",
+  // Membership-aware aggregate-scope resolver (stats.ts). Wraps
+  // hasInstanceWideAccess + visibleProjectIds and returns the concrete project
+  // ids to filter on; the stats + LLM-insights aggregate handlers route their
+  // tickets/projects reads through it (+ projectInSql) rather than the
+  // per-resource helpers above.
+  "resolveStatsScope",
 ] as const;
 
 // WRITE shapes: `.insert|update|delete(schema.<table>)` on a table whose writes

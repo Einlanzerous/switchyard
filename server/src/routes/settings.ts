@@ -11,6 +11,7 @@ import {
   SystemSettings, UpdateSystemSettings,
   DEFAULT_STALE_IN_PROGRESS_DAYS, DEFAULT_BOARD_CLOSED_WINDOW_DAYS,
   DEFAULT_LLM_OBS_USD_PER_KWH, DEFAULT_LLM_OBS_RETENTION_DAYS,
+  DEFAULT_HITL_STALL_IN_PROGRESS_HOURS, DEFAULT_HITL_STALL_SILENT_HOURS,
   type ClosedWindowDays,
 } from "@switchyard/shared";
 import { db } from "../db.js";
@@ -40,6 +41,8 @@ const SETTING_DEFAULTS = {
   board_closed_window_days: DEFAULT_BOARD_CLOSED_WINDOW_DAYS,
   llm_obs_usd_per_kwh: DEFAULT_LLM_OBS_USD_PER_KWH,
   llm_obs_retention_days: DEFAULT_LLM_OBS_RETENTION_DAYS,
+  hitl_stall_in_progress_hours: DEFAULT_HITL_STALL_IN_PROGRESS_HOURS,
+  hitl_stall_silent_hours: DEFAULT_HITL_STALL_SILENT_HOURS,
 } as const;
 
 type StoredSettings = {
@@ -47,6 +50,8 @@ type StoredSettings = {
   board_closed_window_days: ClosedWindowDays;
   llm_obs_usd_per_kwh: number;
   llm_obs_retention_days: number;
+  hitl_stall_in_progress_hours: number;
+  hitl_stall_silent_hours: number;
   updated_at: string;
 };
 
@@ -75,6 +80,11 @@ export async function readSettings(): Promise<StoredSettings> {
     ),
     llm_obs_usd_per_kwh: get("llm_obs_usd_per_kwh", SETTING_DEFAULTS.llm_obs_usd_per_kwh),
     llm_obs_retention_days: get("llm_obs_retention_days", SETTING_DEFAULTS.llm_obs_retention_days),
+    hitl_stall_in_progress_hours: get(
+      "hitl_stall_in_progress_hours",
+      SETTING_DEFAULTS.hitl_stall_in_progress_hours,
+    ),
+    hitl_stall_silent_hours: get("hitl_stall_silent_hours", SETTING_DEFAULTS.hitl_stall_silent_hours),
     updated_at: latest,
   };
 }
@@ -108,6 +118,12 @@ export function mount(app: OpenAPIHono) {
     }
     if (body.llm_obs_retention_days !== undefined) {
       writes.push({ key: "llm_obs_retention_days", value: body.llm_obs_retention_days });
+    }
+    if (body.hitl_stall_in_progress_hours !== undefined) {
+      writes.push({ key: "hitl_stall_in_progress_hours", value: body.hitl_stall_in_progress_hours });
+    }
+    if (body.hitl_stall_silent_hours !== undefined) {
+      writes.push({ key: "hitl_stall_silent_hours", value: body.hitl_stall_silent_hours });
     }
 
     for (const w of writes) {

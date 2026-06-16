@@ -13,8 +13,9 @@
 
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import * as schema from "../drizzle/schema.js";
+import { backfillRollup } from "../src/lib/llm-obs/rollup.js";
 
 const url = process.env.DATABASE_URL;
 if (!url) {
@@ -104,6 +105,14 @@ async function main() {
   }
 
   console.log(`[seed-llm-obs] inserted ${inserted} new observations (target ${COUNT}).`);
+
+  // Backfill the daily rollup over the full sample window so the daily-backed
+  // tiles (KPI / token-spend / latency / error-rate) populate immediately —
+  // the hourly job's 2-day window can't reach 14 days of history.
+  const rolled = await backfillRollup(db as never, 20);
+  console.log(`[seed-llm-obs] backfilled ${rolled} daily rollup rows.`);
+
+  await seedHitlStalls();
   console.log("[seed-llm-obs] cost preview (top by frozen cost over last 14d):");
   const preview = (await db.execute(sql`
     SELECT model, provider,
@@ -119,6 +128,68 @@ async function main() {
   }
 
   await client.end();
+}
+
+// Create a couple of in_progress tickets backdated past the HITL threshold with
+// no LLM activity, so the stall detector has examples. The BEFORE UPDATE bump
+// trigger means updated_at must be set at INSERT time (it can't be backdated via
+// UPDATE). Idempotent via the "[HITL demo]" title marker.
+async function seedHitlStalls() {
+  const projRes = await db.execute(sql`
+    SELECT p.id AS project_id, p.key AS project_key, s.id AS status_id
+    FROM projects p
+    JOIN statuses s ON s.project_id = p.id
+    WHERE p.deleted_at IS NULL AND p.archived_at IS NULL AND s.category = 'in_progress'
+    ORDER BY (p.key = 'SAMPLE') DESC, p.created_at
+    LIMIT 1
+  `);
+  const proj = (((projRes as any).rows ?? projRes)[0]) as
+    | { project_id: string; project_key: string; status_id: string }
+    | undefined;
+  if (!proj) {
+    console.log("[seed-llm-obs] no in_progress status found; skipping HITL examples.");
+    return;
+  }
+
+  const existing = await db.execute(
+    sql`SELECT COUNT(*)::int AS n FROM tickets WHERE title LIKE '[HITL demo]%' AND deleted_at IS NULL`,
+  );
+  if (Number((((existing as any).rows ?? existing)[0]).n) >= 2) {
+    console.log("[seed-llm-obs] HITL demo stalls already present.");
+    return;
+  }
+
+  const [reporter] = await db
+    .select({ id: schema.users.id })
+    .from(schema.users)
+    .where(eq(schema.users.name, "claude"))
+    .limit(1);
+  if (!reporter) return;
+
+  const examples = [
+    { title: "[HITL demo] Awaiting plan approval", hours: 30 },
+    { title: "[HITL demo] Blocked on human review", hours: 54 },
+  ];
+  for (const ex of examples) {
+    const numRes = await db.execute(sql`
+      UPDATE project_counters SET last_used_number = last_used_number + 1
+      WHERE project_id = ${proj.project_id} RETURNING last_used_number
+    `);
+    const number = Number((((numRes as any).rows ?? numRes)[0]).last_used_number);
+    // No `key` column — the ticket key is derived (project.key + number) at read.
+    await db.execute(sql`
+      INSERT INTO tickets
+        (project_id, number, title, type, reporter_id, status_id, position, created_at, updated_at)
+      VALUES (
+        ${proj.project_id}, ${number},
+        ${ex.title}, 'task', ${reporter.id}, ${proj.status_id},
+        EXTRACT(EPOCH FROM now()) * 1000,
+        now() - (${ex.hours} * INTERVAL '1 hour'),
+        now() - (${ex.hours} * INTERVAL '1 hour')
+      )
+    `);
+    console.log(`[seed-llm-obs] HITL stall example: ${proj.project_key}-${number} (${ex.hours}h)`);
+  }
 }
 
 main().catch((err) => {
