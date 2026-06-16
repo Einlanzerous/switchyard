@@ -262,21 +262,42 @@ describe("GET /v1/stats/llm/latency", () => {
 });
 
 describe("GET /v1/stats/llm/error-rate", () => {
-  test("time-bucketed totals from daily + by-code breakdown from raw", async () => {
+  test("per-bucket call totals + error counts stacked by code (from raw)", async () => {
     const { token, userId } = await mintAgentToken();
-    await testDb.insert(schema.llmObservationsDaily).values([
-      daily({ bucket_date: dayAgo(2), call_count: 100, error_count: 5 }),
-    ]);
     await testDb.insert(schema.llmObservations).values([
+      // 10 successful calls + 3 errors in one bucket.
+      ...Array.from({ length: 10 }, () => rawObs(userId, { occurred_at: dayAgo(2) })),
       rawObs(userId, { occurred_at: dayAgo(2), error_code: "rate_limited" }),
       rawObs(userId, { occurred_at: dayAgo(2), error_code: "rate_limited" }),
       rawObs(userId, { occurred_at: dayAgo(2), error_code: "timeout" }),
     ]);
     const body = await (await GET("/v1/stats/llm/error-rate", token)).json();
-    expect(body.total_calls).toBe(100);
-    expect(body.error_calls).toBe(5);
-    expect(body.by_code[0]).toEqual({ error_code: "rate_limited", count: 2 });
-    expect(body.by_code.find((c: { error_code: string }) => c.error_code === "timeout").count).toBe(1);
+    expect(body.total_calls).toBe(13);
+    expect(body.error_calls).toBe(3);
+    expect(body.codes).toEqual(["rate_limited", "timeout"]); // most-frequent first
+    expect(body.points).toHaveLength(1);
+    expect(body.points[0].call_count).toBe(13);
+    expect(body.points[0].by_code).toEqual({ rate_limited: 2, timeout: 1 });
+  });
+});
+
+describe("GET /v1/stats/llm/cost-leaderboard?group_by=project", () => {
+  test("rolls cost up to the project", async () => {
+    const { token, userId } = await mintAgentToken();
+    await seedPricing();
+    const { project, ticket } = await seedTicket("PRJ");
+    await testDb.insert(schema.llmObservations).values([
+      rawObs(userId, { ticket_id: ticket.id }),
+      rawObs(userId, { ticket_id: ticket.id }),
+      rawObs(userId, { ticket_id: null }), // ambient
+    ]);
+    const body = await (await GET("/v1/stats/llm/cost-leaderboard?group_by=project", token)).json();
+    expect(body.group_by).toBe("project");
+    const prj = body.items.find((r: { project: { key: string } | null }) => r.project?.key === "PRJ");
+    expect(prj).toBeDefined();
+    expect(prj.ticket).toBeNull();
+    expect(prj.call_count).toBe(2);
+    expect(body.items.some((r: { project: unknown }) => r.project === null)).toBe(true); // ambient bucket
   });
 });
 

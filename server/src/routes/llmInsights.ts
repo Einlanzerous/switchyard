@@ -15,8 +15,9 @@ import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { inArray, sql } from "drizzle-orm";
 import {
   LlmKpiStrip, LlmTokenSpend, LlmStatsWindowQuery,
-  LlmCostLeaderboard, LlmLatency, LlmErrorRate, LlmHitlStalls, LlmHitlQuery,
-  type LlmTokenSpendSeries, type LlmLatencyRow, type LlmErrorCodeCount,
+  LlmCostLeaderboard, LlmCostLeaderboardQuery, LlmLatency, LlmErrorRate,
+  LlmHitlStalls, LlmHitlQuery,
+  type LlmTokenSpendSeries, type LlmLatencyRow,
   type LlmCostLeaderboardRow, type LlmHitlStallRow, type StatsBucket,
 } from "@switchyard/shared";
 import { db } from "../db.js";
@@ -24,6 +25,7 @@ import * as schema from "../../drizzle/schema.js";
 import { errorResponses, okJson } from "./_helpers.js";
 import { resolveStatsScope, projectInSql } from "./stats.js";
 import { loadTicketSummary } from "../lib/tickets.js";
+import { mapProjectRef } from "../lib/mappers.js";
 import { readSettings } from "./settings.js";
 
 const tag = "Stats";
@@ -50,8 +52,8 @@ const costLeaderboard = createRoute({
   method: "get",
   path: "/v1/stats/llm/cost-leaderboard",
   tags: [tag],
-  summary: "Top tickets by LLM cost (with an Ambient bucket)",
-  request: { query: LlmStatsWindowQuery },
+  summary: "Top tickets or projects by LLM cost (with an Ambient bucket)",
+  request: { query: LlmCostLeaderboardQuery },
   responses: { ...okJson(LlmCostLeaderboard), ...errorResponses },
 });
 
@@ -214,18 +216,22 @@ export function mount(app: OpenAPIHono) {
 
   app.openapi(costLeaderboard, (async (c: any) => {
     const q = c.req.valid("query");
+    const groupBy: "ticket" | "project" = q.group_by === "project" ? "project" : "ticket";
     const user = c.get("auth").user;
     const scope = await resolveStatsScope(user, q.project);
     if (!scope.unfiltered && scope.projectIds.length === 0) {
-      return c.json({ items: [] } satisfies LlmCostLeaderboard, 200);
+      return c.json({ group_by: groupBy, items: [] } satisfies LlmCostLeaderboard, 200);
     }
     const { since, until } = window(q, 14);
     const projFilter = projectInSql(scope.projectIds, scope.unfiltered, "t.project_id");
+    // Group by the ticket itself, or by its project (ambient rows — no ticket,
+    // hence no project — collapse to a single NULL bucket either way).
+    const groupCol = groupBy === "project" ? sql`t.project_id` : sql`c.ticket_id`;
 
     const res = await db.execute<{
-      ticket_id: string | null; cost_usd: number; call_count: number; avg_latency_ms: number;
+      group_id: string | null; cost_usd: number; call_count: number; avg_latency_ms: number;
     }>(sql`
-      SELECT c.ticket_id,
+      SELECT ${groupCol} AS group_id,
         COALESCE(SUM(c.cost_usd), 0) AS cost_usd,
         COUNT(*)::int AS call_count,
         COALESCE(AVG(c.latency_ms), 0)::int AS avg_latency_ms
@@ -233,29 +239,44 @@ export function mount(app: OpenAPIHono) {
       LEFT JOIN tickets t ON t.id = c.ticket_id
       WHERE c.occurred_at >= ${since.toISOString()} AND c.occurred_at < ${until.toISOString()}
         ${projFilter}
-      GROUP BY c.ticket_id
+      GROUP BY ${groupCol}
       ORDER BY cost_usd DESC NULLS LAST
       LIMIT ${LEADERBOARD_LIMIT}
     `);
     const rows = ((res as any).rows ?? res) as Array<{
-      ticket_id: string | null; cost_usd: number; call_count: number; avg_latency_ms: number;
+      group_id: string | null; cost_usd: number; call_count: number; avg_latency_ms: number;
     }>;
+    const ids = rows.map((r) => r.group_id).filter((id): id is string => !!id);
 
-    // Batch-load TicketSummary for the (non-ambient) ticket ids in the page.
-    const ids = rows.map((r) => r.ticket_id).filter((id): id is string => !!id);
-    const summaries = new Map<string, Awaited<ReturnType<typeof loadTicketSummary>>>();
-    if (ids.length > 0) {
-      const ticketRows = await db.select().from(schema.tickets).where(inArray(schema.tickets.id, ids));
-      for (const tr of ticketRows) summaries.set(tr.id, await loadTicketSummary(tr));
+    let items: LlmCostLeaderboardRow[];
+    if (groupBy === "project") {
+      const projects = new Map<string, ReturnType<typeof mapProjectRef>>();
+      if (ids.length > 0) {
+        const pr = await db.select().from(schema.projects).where(inArray(schema.projects.id, ids));
+        for (const p of pr) projects.set(p.id, mapProjectRef(p));
+      }
+      items = rows.map((r) => ({
+        ticket: null,
+        project: r.group_id ? projects.get(r.group_id) ?? null : null,
+        cost_usd: num(r.cost_usd),
+        call_count: num(r.call_count),
+        avg_latency_ms: num(r.avg_latency_ms),
+      }));
+    } else {
+      const summaries = new Map<string, Awaited<ReturnType<typeof loadTicketSummary>>>();
+      if (ids.length > 0) {
+        const ticketRows = await db.select().from(schema.tickets).where(inArray(schema.tickets.id, ids));
+        for (const tr of ticketRows) summaries.set(tr.id, await loadTicketSummary(tr));
+      }
+      items = rows.map((r) => ({
+        ticket: r.group_id ? summaries.get(r.group_id) ?? null : null,
+        project: null,
+        cost_usd: num(r.cost_usd),
+        call_count: num(r.call_count),
+        avg_latency_ms: num(r.avg_latency_ms),
+      }));
     }
-
-    const items: LlmCostLeaderboardRow[] = rows.map((r) => ({
-      ticket: r.ticket_id ? summaries.get(r.ticket_id) ?? null : null,
-      cost_usd: num(r.cost_usd),
-      call_count: num(r.call_count),
-      avg_latency_ms: num(r.avg_latency_ms),
-    }));
-    return c.json({ items } satisfies LlmCostLeaderboard, 200);
+    return c.json({ group_by: groupBy, items } satisfies LlmCostLeaderboard, 200);
   }) as any);
 
   app.openapi(latency, (async (c: any) => {
@@ -296,44 +317,48 @@ export function mount(app: OpenAPIHono) {
     const scope = await resolveStatsScope(user, q.project);
     const bucket: StatsBucket = q.bucket === "day" ? "day" : "week";
     if (!scope.unfiltered && scope.projectIds.length === 0) {
-      return c.json({ bucket, total_calls: 0, error_calls: 0, by_code: [], points: [] } satisfies LlmErrorRate, 200);
+      return c.json({ bucket, total_calls: 0, error_calls: 0, codes: [], points: [] } satisfies LlmErrorRate, 200);
     }
     const { since, until } = window(q, 14);
-    const sinceIso = since.toISOString();
-    const untilIso = until.toISOString();
     const projFilter = projectInSql(scope.projectIds, scope.unfiltered, "t.project_id");
     const truncUnit = bucket === "day" ? sql`'day'` : sql`'week'`;
 
-    // Time-bucketed totals from the daily rollup (error_count is dimension-
-    // agnostic there); per-code breakdown from raw (daily loses the code).
-    const pointsRes = await db.execute<{ start: string; call_count: number; error_count: number }>(sql`
-      SELECT date_trunc(${truncUnit}, d.bucket_date)::text AS start,
-        COALESCE(SUM(d.call_count), 0)::int AS call_count,
-        COALESCE(SUM(d.error_count), 0)::int AS error_count
-      FROM llm_observations_daily d
-      LEFT JOIN tickets t ON t.id = d.ticket_id
-      WHERE d.bucket_date >= ${sinceIso} AND d.bucket_date < ${untilIso}
-        ${projFilter}
-      GROUP BY 1 ORDER BY 1
-    `);
-    const points = (((pointsRes as any).rows ?? pointsRes) as Array<{ start: string; call_count: number; error_count: number }>)
-      .map((r) => ({ start: new Date(r.start).toISOString(), call_count: num(r.call_count), error_count: num(r.error_count) }));
-
-    const codeRes = await db.execute<{ error_code: string; count: number }>(sql`
-      SELECT o.error_code, COUNT(*)::int AS count
+    // Per (bucket, error_code) from raw — daily doesn't keep the code. NULL
+    // error_code = a successful call; it still counts toward the bucket total
+    // (the denominator) but not toward any code's stack segment.
+    const res = await db.execute<{ start: string; error_code: string | null; n: number }>(sql`
+      SELECT date_trunc(${truncUnit}, o.occurred_at)::text AS start,
+        o.error_code, COUNT(*)::int AS n
       FROM llm_observations o
       LEFT JOIN tickets t ON t.id = o.ticket_id
-      WHERE o.occurred_at >= ${sinceIso} AND o.occurred_at < ${untilIso}
-        AND o.error_code IS NOT NULL
+      WHERE o.occurred_at >= ${since.toISOString()} AND o.occurred_at < ${until.toISOString()}
         ${projFilter}
-      GROUP BY o.error_code ORDER BY count DESC
+      GROUP BY 1, o.error_code
     `);
-    const by_code: LlmErrorCodeCount[] = (((codeRes as any).rows ?? codeRes) as Array<{ error_code: string; count: number }>)
-      .map((r) => ({ error_code: r.error_code, count: num(r.count) }));
+    const rows = ((res as any).rows ?? res) as Array<{ start: string; error_code: string | null; n: number }>;
 
-    const total_calls = points.reduce((a, p) => a + p.call_count, 0);
-    const error_calls = points.reduce((a, p) => a + p.error_count, 0);
-    return c.json({ bucket, total_calls, error_calls, by_code, points } satisfies LlmErrorRate, 200);
+    const byBucket = new Map<string, { call_count: number; by_code: Record<string, number> }>();
+    const codeTotals = new Map<string, number>();
+    let total = 0;
+    let errors = 0;
+    for (const r of rows) {
+      const n = num(r.n);
+      total += n;
+      const b = byBucket.get(r.start) ?? { call_count: 0, by_code: {} };
+      b.call_count += n;
+      if (r.error_code != null) {
+        errors += n;
+        b.by_code[r.error_code] = (b.by_code[r.error_code] ?? 0) + n;
+        codeTotals.set(r.error_code, (codeTotals.get(r.error_code) ?? 0) + n);
+      }
+      byBucket.set(r.start, b);
+    }
+    const points = [...byBucket.entries()]
+      .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+      .map(([start, v]) => ({ start: new Date(start).toISOString(), call_count: v.call_count, by_code: v.by_code }));
+    const codes = [...codeTotals.entries()].sort((a, b) => b[1] - a[1]).map(([code]) => code);
+
+    return c.json({ bucket, total_calls: total, error_calls: errors, codes, points } satisfies LlmErrorRate, 200);
   }) as any);
 
   app.openapi(hitlStalls, (async (c: any) => {

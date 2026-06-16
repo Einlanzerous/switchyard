@@ -15037,14 +15037,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Top tickets by LLM cost (with an Ambient bucket) */
+        /** Top tickets or projects by LLM cost (with an Ambient bucket) */
         get: {
             parameters: {
                 query?: {
                     project?: string;
                     since?: string;
                     until?: string;
-                    bucket?: "day" | "week";
+                    group_by?: "ticket" | "project";
                 };
                 header?: never;
                 path?: never;
@@ -15059,6 +15059,8 @@ export interface paths {
                     };
                     content: {
                         "application/json": {
+                            /** @enum {string} */
+                            group_by: "ticket" | "project";
                             items: {
                                 ticket: {
                                     /** Format: uuid */
@@ -15156,6 +15158,15 @@ export interface paths {
                                     updated_at: string;
                                     /** Format: date-time */
                                     deleted_at: string | null;
+                                } | null;
+                                project: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    key: string;
+                                    name: string;
+                                    color: string | null;
+                                    /** Format: uri */
+                                    repo_url: string | null;
                                 } | null;
                                 cost_usd: number;
                                 call_count: number;
@@ -15509,15 +15520,14 @@ export interface paths {
                             bucket: "day" | "week";
                             total_calls: number;
                             error_calls: number;
-                            by_code: {
-                                error_code: string;
-                                count: number;
-                            }[];
+                            codes: string[];
                             points: {
                                 /** Format: date-time */
                                 start: string;
                                 call_count: number;
-                                error_count: number;
+                                by_code: {
+                                    [key: string]: number;
+                                };
                             }[];
                         };
                     };

@@ -48,7 +48,9 @@ export function useLlmTokenSpend(params: ComputedRef<LlmWindowParams>) {
   });
 }
 
-export function useLlmCostLeaderboard(params: ComputedRef<LlmWindowParams>) {
+export type LlmCostParams = LlmWindowParams & { group_by?: "ticket" | "project" };
+
+export function useLlmCostLeaderboard(params: ComputedRef<LlmCostParams>) {
   return useQuery({
     queryKey: computed(() => queryKeys.statsLlmCostLeaderboard(params.value)),
     staleTime: STALE_30S,

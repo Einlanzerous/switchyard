@@ -2,6 +2,7 @@ import { z } from "zod";
 import { Iso8601, Uuid } from "./common.js";
 import { StatsBucket } from "./stats.js";
 import { TicketSummary } from "./ticket.js";
+import { ProjectRef } from "./project.js";
 
 // Read-side schemas for the LLM Insights tab (Phase 5.1.2 / SWY-48). These power
 // the global /insights/llm view and the per-project /projects/:key/insights/llm
@@ -61,10 +62,24 @@ export const LlmTokenSpend = z.object({
 });
 export type LlmTokenSpend = z.infer<typeof LlmTokenSpend>;
 
-// ── cost-per-ticket leaderboard (raw + cost view) ────────────────────────────
+// ── cost leaderboard (raw + cost view), grouped by ticket or project ─────────
 
+export const LlmCostGroupBy = z.enum(["ticket", "project"]);
+export type LlmCostGroupBy = z.infer<typeof LlmCostGroupBy>;
+
+export const LlmCostLeaderboardQuery = z.object({
+  project: z.string().optional(),
+  since: Iso8601.optional(),
+  until: Iso8601.optional(),
+  group_by: LlmCostGroupBy.optional(), // default "ticket"
+});
+export type LlmCostLeaderboardQuery = z.infer<typeof LlmCostLeaderboardQuery>;
+
+// Exactly one of ticket/project is set per the requested group_by; both null =
+// the "Ambient" bucket (observations with no ticket / no project).
 export const LlmCostLeaderboardRow = z.object({
-  ticket: TicketSummary.nullable(), // null = the "Ambient" bucket (no ticket_id)
+  ticket: TicketSummary.nullable(),
+  project: ProjectRef.nullable(),
   cost_usd: z.number().nonnegative(),
   call_count: z.number().int().nonnegative(),
   avg_latency_ms: z.number().int().nonnegative(),
@@ -72,6 +87,7 @@ export const LlmCostLeaderboardRow = z.object({
 export type LlmCostLeaderboardRow = z.infer<typeof LlmCostLeaderboardRow>;
 
 export const LlmCostLeaderboard = z.object({
+  group_by: LlmCostGroupBy,
   items: z.array(LlmCostLeaderboardRow), // sorted by cost_usd desc
 });
 export type LlmCostLeaderboard = z.infer<typeof LlmCostLeaderboard>;
@@ -94,18 +110,15 @@ export const LlmLatency = z.object({
 });
 export type LlmLatency = z.infer<typeof LlmLatency>;
 
-// ── error rate (time-bucketed total from daily; by-code from raw) ─────────────
-
-export const LlmErrorCodeCount = z.object({
-  error_code: z.string(), // non-null codes only
-  count: z.number().int().nonnegative(),
-});
-export type LlmErrorCodeCount = z.infer<typeof LlmErrorCodeCount>;
+// ── error rate (per-bucket, broken down by error code — for a stacked bar) ────
+// Each point carries the bucket's total call count + a per-code error tally; the
+// UI stacks each code's share of calls (%) so one bar = the bucket's error rate
+// split by code. Computed from raw (the daily rollup doesn't keep the code).
 
 export const LlmErrorRatePoint = z.object({
   start: Iso8601,
   call_count: z.number().int().nonnegative(),
-  error_count: z.number().int().nonnegative(),
+  by_code: z.record(z.string(), z.number().int().nonnegative()), // code → count
 });
 export type LlmErrorRatePoint = z.infer<typeof LlmErrorRatePoint>;
 
@@ -113,7 +126,7 @@ export const LlmErrorRate = z.object({
   bucket: StatsBucket,
   total_calls: z.number().int().nonnegative(),
   error_calls: z.number().int().nonnegative(),
-  by_code: z.array(LlmErrorCodeCount), // sorted desc
+  codes: z.array(z.string()), // distinct error codes in window, most-frequent first
   points: z.array(LlmErrorRatePoint),
 });
 export type LlmErrorRate = z.infer<typeof LlmErrorRate>;

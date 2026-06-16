@@ -20,7 +20,7 @@
 //      the re-roll window so a tiny retention setting can never drop a row
 //      before it's been frozen into a finalized daily bucket.
 
-import { sql } from "drizzle-orm";
+import { sql, type SQL } from "drizzle-orm";
 import { db } from "../../db.js";
 
 // Both the production `db` and the test `testDb` are the same postgres-js
@@ -86,11 +86,12 @@ async function tick(client: Db = db): Promise<{ rolled: number; deleted: number 
   }
 }
 
-// Re-roll the sliding window: delete its daily rows, then re-aggregate from
-// raw. Wrapped in a txn so the table is never observed half-rebuilt.
-async function rollupWindow(client: Db): Promise<number> {
+// Re-roll a window: delete its daily rows, then re-aggregate from raw. Wrapped
+// in a txn so the table is never observed half-rebuilt. Defaults to the sliding
+// 2-day window (the hourly job); `backfillRollup` passes a wider cutoff.
+async function rollupWindow(client: Db, fromCutoff: SQL = windowStart): Promise<number> {
   return client.transaction(async (tx) => {
-    await tx.execute(sql`DELETE FROM llm_observations_daily WHERE bucket_date >= ${windowStart}`);
+    await tx.execute(sql`DELETE FROM llm_observations_daily WHERE bucket_date >= ${fromCutoff}`);
 
     const res = await tx.execute(sql`
       INSERT INTO llm_observations_daily (
@@ -117,11 +118,19 @@ async function rollupWindow(client: Db): Promise<number> {
         COALESCE(SUM(c.cost_usd), 0),
         COUNT(*) FILTER (WHERE c.error_code IS NOT NULL)::int
       FROM llm_observations_with_cost c
-      WHERE c.occurred_at >= ${windowStart}
+      WHERE c.occurred_at >= ${fromCutoff}
       GROUP BY 1, c.service, c.operation, c.model, c.provider, c.actor_id, c.ticket_id
     `);
     return rowCount(res);
   });
+}
+
+// One-off backfill over a wider window than the hourly job — used by the dev
+// sample seeder so historical observations populate the daily-backed tiles
+// (the 2-day sliding window can't reach them). Re-rolls every bucket from
+// `days` ago to now.
+export async function backfillRollup(client: Db = db, days = 30): Promise<number> {
+  return rollupWindow(client, sql`(now() - (${days} * INTERVAL '1 day'))`);
 }
 
 // Delete raw rows past retention, floored at the re-roll window so we never
