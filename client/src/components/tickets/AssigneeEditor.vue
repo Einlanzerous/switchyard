@@ -70,7 +70,7 @@ function pick(id: string | null) {
       <button
         type="button"
         :class="cn(
-          'inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 text-sm hover:bg-accent transition-colors',
+          'inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 min-h-6 text-sm hover:bg-accent transition-colors',
           mutation.isPending.value && 'opacity-60',
         )"
         :disabled="mutation.isPending.value || !canWrite"
