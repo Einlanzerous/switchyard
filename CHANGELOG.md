@@ -1,5 +1,23 @@
 # Changelog
 
+## [3.5.0](https://github.com/Einlanzerous/switchyard/compare/v3.4.1...v3.5.0) (2026-06-16)
+
+
+### Features
+
+* SWY-48 Phase 5.1.2 — LLM Insights tab (read API, UI, warn-list) ([#108](https://github.com/Einlanzerous/switchyard/issues/108)) ([ebc95fe](https://github.com/Einlanzerous/switchyard/commit/ebc95fe750ee8d1b6d05bd0c10ed0d7758b33457))
+
+
+### Bug Fixes
+
+* SWY-117 reserve height on inline editors so they don't flicker on save ([#107](https://github.com/Einlanzerous/switchyard/issues/107)) ([12b9bb7](https://github.com/Einlanzerous/switchyard/commit/12b9bb79574a92f970d1a3e7d2c185b349cf4c30))
+
+
+### Maintenance
+
+* update knowledge graph [skip ci] ([e5322f6](https://github.com/Einlanzerous/switchyard/commit/e5322f6e95f28f951437cc60f111d0c09a4f4cd3))
+* update knowledge graph [skip ci] ([75639dd](https://github.com/Einlanzerous/switchyard/commit/75639ddf3c5814b235274dd8df40587c059f4abc))
+
 ## [3.4.1](https://github.com/Einlanzerous/switchyard/compare/v3.4.0...v3.4.1) (2026-06-16)
 
 
