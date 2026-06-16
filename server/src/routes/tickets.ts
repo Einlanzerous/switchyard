@@ -258,6 +258,13 @@ export function mount(app: OpenAPIHono) {
       conds.push(or(
         ilike(schema.tickets.title, pattern),
         ilike(schema.tickets.description, pattern),
+        // Match the ticket's derived key (`<project.key>-<number>`, e.g.
+        // `SWY-114`). The key isn't a stored column — it's composed from the
+        // owning project's key and this ticket's number — so we reconstruct it
+        // in SQL and ILIKE the same `%term%` pattern. Without this, searching a
+        // ticket by its key returns nothing; bare `swy` also now surfaces every
+        // SWY ticket by key, matching user expectation.
+        sql`EXISTS (SELECT 1 FROM projects p WHERE p.id = ${schema.tickets.project_id} AND (p.key || '-' || ${schema.tickets.number}::text) ILIKE ${pattern})`,
       )!);
     }
 
