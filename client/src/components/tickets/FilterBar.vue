@@ -259,8 +259,12 @@ function assigneeLabel(idOrSentinel: string): string {
       </Badge>
     </div>
 
-    <!-- Row 2: status / type / priority chip groups + Clear pinned right. -->
-    <div class="px-4 py-2 flex flex-wrap items-center gap-x-4 gap-y-2">
+    <!-- Row 2: status / type / priority chip groups + Clear pinned right.
+         `min-h-12` reserves the full height of the (taller, h-8) Clear button
+         so the row doesn't grow by 8px the instant a filter is selected and
+         `isAnySet` flips the button into existence — toggling filters used to
+         bounce the whole list. -->
+    <div class="px-4 py-2 flex flex-wrap items-center gap-x-4 gap-y-2 min-h-12">
       <ChipGroup label="Status" :options="STATUS_OPTIONS" :selected="filters.status"
                  @toggle="(v) => toggle('status', v)" />
       <ChipGroup label="Type" :options="TYPE_OPTIONS" :selected="filters.type"
