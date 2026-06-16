@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.4.1](https://github.com/Einlanzerous/switchyard/compare/v3.4.0...v3.4.1) (2026-06-16)
+
+
+### Bug Fixes
+
+* SWY-115 match ticket key in free-text search ([#104](https://github.com/Einlanzerous/switchyard/issues/104)) ([28033be](https://github.com/Einlanzerous/switchyard/commit/28033beb424b1ac4446bf07273b91fdcc83d8f1b))
+* SWY-116 stop filter row bouncing when a filter is selected ([#106](https://github.com/Einlanzerous/switchyard/issues/106)) ([81a1e25](https://github.com/Einlanzerous/switchyard/commit/81a1e25e7cc53db80ab6296c8708744fe702c09e))
+
+
+### Maintenance
+
+* update knowledge graph [skip ci] ([59ca00d](https://github.com/Einlanzerous/switchyard/commit/59ca00dc1ed9d29024832dcfda2cd221d05d6fa1))
+* update knowledge graph [skip ci] ([3e22322](https://github.com/Einlanzerous/switchyard/commit/3e22322036de94cba8e68dd25498da4622a52dda))
+
 ## [3.4.0](https://github.com/Einlanzerous/switchyard/compare/v3.3.0...v3.4.0) (2026-06-14)
 
 
