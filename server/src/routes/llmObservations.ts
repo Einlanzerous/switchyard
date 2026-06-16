@@ -16,21 +16,24 @@
 // silently 422-ing because a model name shifted" failure mode.
 
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { sql } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import {
   LlmObservationBatchRequest,
   LlmObservationBatchResponse,
   LLM_OBSERVATIONS_MAX_BATCH,
+  LlmPendingValueList, LlmPendingValue, LlmPendingValueQuery,
   type LlmObservationInput,
   type PendingValueCaptured,
+  type LlmPendingResolution,
 } from "@switchyard/shared";
 import { db } from "../db.js";
 import * as schema from "../../drizzle/schema.js";
 import { requireAuth } from "../auth.js";
 import { idempotency } from "../lib/idempotency.js";
-import { errorResponses, okJson, checkScope, idempotencyHeader } from "./_helpers.js";
+import { errorResponses, okJson, checkScope, idempotencyHeader, z } from "./_helpers.js";
 import { resolveTicket } from "../lib/lookups.js";
-import { unprocessable } from "../errors.js";
+import { unprocessable, notFound } from "../errors.js";
+import { assertInstanceAdmin } from "../lib/authz.js";
 
 const tag = "LLM Observations";
 
@@ -55,9 +58,54 @@ const create = createRoute({
 const DIMENSIONS = ["service", "operation", "model", "provider"] as const;
 type Dimension = (typeof DIMENSIONS)[number];
 
+// ── warn-list admin (Admin → Observability) ──────────────────────────────────
+
+const adminTag = "LLM Observations (admin)";
+
+const listPending = createRoute({
+  method: "get",
+  path: "/v1/admin/llm-obs/pending-values",
+  tags: [adminTag],
+  summary: "List unknown dimension values pending review",
+  request: { query: LlmPendingValueQuery },
+  responses: { ...okJson(LlmPendingValueList), ...errorResponses },
+});
+
+const promotePending = createRoute({
+  method: "post",
+  path: "/v1/admin/llm-obs/pending-values/{id}/promote",
+  tags: [adminTag],
+  summary: "Mark a pending dimension value as known (resolve)",
+  request: { params: z.object({ id: z.string().uuid() }) },
+  responses: { ...okJson(LlmPendingValue), ...errorResponses },
+});
+
+const rejectPending = createRoute({
+  method: "post",
+  path: "/v1/admin/llm-obs/pending-values/{id}/reject",
+  tags: [adminTag],
+  summary: "Reject a pending dimension value (resolve)",
+  request: { params: z.object({ id: z.string().uuid() }) },
+  responses: { ...okJson(LlmPendingValue), ...errorResponses },
+});
+
+function mapPending(r: typeof schema.llmObsPendingValues.$inferSelect): LlmPendingValue {
+  return {
+    id: r.id,
+    dimension: r.dimension as LlmPendingValue["dimension"],
+    value: r.value,
+    observation_count: r.observation_count,
+    first_seen_at: r.first_seen_at,
+    last_seen_at: r.last_seen_at,
+    resolved_at: r.resolved_at,
+    resolution: r.resolution as LlmPendingValue["resolution"],
+  };
+}
+
 export function mount(app: OpenAPIHono) {
   app.use("/v1/llm-observations", requireAuth);
   app.use("/v1/llm-observations", idempotency);
+  app.use("/v1/admin/llm-obs/*", requireAuth);
 
   app.openapi(create, (async (c: any) => {
     checkScope(c, "llm-obs:write");
@@ -167,4 +215,39 @@ export function mount(app: OpenAPIHono) {
 
     return c.json({ accepted, deduplicated, pending_captured }, 200);
   }) as any);
+
+  // ── warn-list management (admin-only) ──────────────────────────────────────
+
+  app.openapi(listPending, (async (c: any) => {
+    checkScope(c, "admin");
+    assertInstanceAdmin(c.get("auth").user, "llm-obs pending values");
+    const q = c.req.valid("query");
+    const conds = [];
+    if (q.dimension) conds.push(eq(schema.llmObsPendingValues.dimension, q.dimension));
+    if (q.include_resolved !== "true") conds.push(isNull(schema.llmObsPendingValues.resolved_at));
+
+    const rows = await db
+      .select()
+      .from(schema.llmObsPendingValues)
+      .where(conds.length ? and(...conds) : undefined)
+      .orderBy(desc(schema.llmObsPendingValues.last_seen_at));
+    return c.json({ items: rows.map(mapPending) }, 200);
+  }) as any);
+
+  const resolvePending = (resolution: LlmPendingResolution) =>
+    (async (c: any) => {
+      checkScope(c, "admin");
+      assertInstanceAdmin(c.get("auth").user, "llm-obs pending values");
+      const { id } = c.req.valid("param");
+      const [row] = await db
+        .update(schema.llmObsPendingValues)
+        .set({ resolved_at: new Date().toISOString(), resolution })
+        .where(eq(schema.llmObsPendingValues.id, id))
+        .returning();
+      if (!row) throw notFound("pending value");
+      return c.json(mapPending(row), 200);
+    }) as any;
+
+  app.openapi(promotePending, resolvePending("promoted"));
+  app.openapi(rejectPending, resolvePending("rejected"));
 }

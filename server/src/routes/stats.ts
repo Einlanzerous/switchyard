@@ -134,7 +134,7 @@ async function resolveProjects(csv: string | undefined) {
 // a member with no visible projects gets an empty set. This replaces the old
 // `projectIds.length === 0` overload that conflated "all projects" with "named
 // but none matched" — for a zero-project member that branch leaked everything.
-async function resolveStatsScope(
+export async function resolveStatsScope(
   user: Parameters<typeof hasInstanceWideAccess>[0] & { id: string },
   csv: string | undefined,
 ): Promise<{ projectIds: string[]; unfiltered: boolean }> {
@@ -154,7 +154,7 @@ async function resolveStatsScope(
 // when unfiltered. Only ever called with a non-empty id list (callers early-
 // return on the `!unfiltered && empty` case first). ids are DB-issued UUIDs;
 // inline-quoting matches the existing throughput pattern.
-function projectInSql(projectIds: string[], unfiltered: boolean, col: string): SQL {
+export function projectInSql(projectIds: string[], unfiltered: boolean, col: string): SQL {
   if (unfiltered) return sql``;
   return sql.raw(`AND ${col} IN (${projectIds.map((id) => `'${id}'`).join(",")})`) as unknown as SQL;
 }

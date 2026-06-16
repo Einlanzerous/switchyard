@@ -18,6 +18,7 @@ import { generateApiToken, hashToken } from "./id.js";
 import {
   DEFAULT_STALE_IN_PROGRESS_DAYS, DEFAULT_BOARD_CLOSED_WINDOW_DAYS,
   DEFAULT_LLM_OBS_USD_PER_KWH, DEFAULT_LLM_OBS_RETENTION_DAYS,
+  DEFAULT_HITL_STALL_IN_PROGRESS_HOURS, DEFAULT_HITL_STALL_SILENT_HOURS,
 } from "@switchyard/shared";
 import { DEFAULT_BOARD_DELETED_KEY } from "./defaultBoard.js";
 import { PRICING_SEED, PRICING_EFFECTIVE_FROM } from "./llm-obs/pricing-seed.js";
@@ -181,6 +182,8 @@ async function ensureDefaultSettings(): Promise<void> {
     { key: "board_closed_window_days", value: DEFAULT_BOARD_CLOSED_WINDOW_DAYS },
     { key: "llm_obs_usd_per_kwh", value: DEFAULT_LLM_OBS_USD_PER_KWH },
     { key: "llm_obs_retention_days", value: DEFAULT_LLM_OBS_RETENTION_DAYS },
+    { key: "hitl_stall_in_progress_hours", value: DEFAULT_HITL_STALL_IN_PROGRESS_HOURS },
+    { key: "hitl_stall_silent_hours", value: DEFAULT_HITL_STALL_SILENT_HOURS },
   ];
   for (const d of defaults) {
     const [existing] = await db
