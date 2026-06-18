@@ -117,10 +117,25 @@ jobs:
           build-args: |
             VITE_APP_VERSION=${{ needs.release-please.outputs.version }}
 
+      # Mint a short-lived, least-privilege token for the cross-repo dispatch
+      # instead of a hand-managed PAT. The release bot App is already installed
+      # on construct-server (all-repos) with Contents: write — exactly what
+      # repository_dispatch needs — so this needs no extra secret to babysit.
+      # Scoped to construct-server only. Replaces CONSTRUCT_DISPATCH_TOKEN, whose
+      # PAT kept expiring and 401'ing the release ("Bad credentials").
+      - name: Mint construct-server dispatch token
+        id: dispatch-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.RELEASE_BOT_APP_ID }}
+          private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
+          owner: Einlanzerous
+          repositories: construct-server
+
       - name: Notify construct-server
         uses: peter-evans/repository-dispatch@v3
         with:
-          token: ${{ secrets.CONSTRUCT_DISPATCH_TOKEN }}
+          token: ${{ steps.dispatch-token.outputs.token }}
           repository: Einlanzerous/construct-server
           event-type: image-updated
           client-payload: '{"image": "switchyard", "version": "${{ needs.release-please.outputs.version }}"}'
