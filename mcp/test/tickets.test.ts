@@ -604,7 +604,11 @@ describe("error paths", () => {
     });
   });
 
-  test("formatApiError falls back when envelope is malformed", async () => {
+  test("formatApiError surfaces the raw body when the envelope is malformed", async () => {
+    // SWY-119: a body that doesn't match `{ error: { code, message } }` used to
+    // collapse to `unknown_error: (no message)`. Now we still flag it as
+    // unknown_error (no code/message to key off) but surface the raw shape so
+    // the caller has something to act on.
     const recorder = installFetchRecorder({
       status: 500,
       body: { unexpected: "shape" },
@@ -615,7 +619,9 @@ describe("error paths", () => {
       expect(res.isError).toBe(true);
       const text = (res.content as Array<{ type: string; text: string }>)[0]!.text;
       expect(text).toContain("switchyard error [unknown_error]");
-      expect(text).toContain("(no message)");
+      expect(text).not.toContain("(no message)");
+      expect(text).toContain("unexpected");
+      expect(text).toContain("shape");
     } finally {
       await close();
       recorder.restore();

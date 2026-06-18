@@ -16,7 +16,7 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { cors } from "hono/cors";
 import { env } from "./env.js";
 import { assertDatabaseReachable, shutdownDatabase } from "./db.js";
-import { installErrorHandler } from "./errors.js";
+import { installErrorHandler, validationHook } from "./errors.js";
 import { mountRoutes } from "./routes/index.js";
 import { startDispatcher, stopDispatcher } from "./lib/webhooks/dispatcher.js";
 import {
@@ -36,7 +36,10 @@ mark("db reachability check");
 await assertDatabaseReachable();
 
 mark("app wiring");
-const app = new OpenAPIHono();
+// defaultHook normalizes request-validation failures into our standard error
+// envelope (see validationHook). Without it, zod-openapi's native error shape
+// leaks through and callers see `unknown_error: (no message)`. (SWY-119)
+const app = new OpenAPIHono({ defaultHook: validationHook });
 
 app.use("*", accessLog);
 app.use("/v1/*", cors({ origin: "*", allowHeaders: ["Authorization", "Content-Type", "Idempotency-Key", "X-Request-ID"], exposeHeaders: ["X-Request-ID"], allowMethods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"] }));
