@@ -188,6 +188,76 @@ export function registerProjectTools(server: McpServer): void {
   );
 
   server.registerTool(
+    "update_project",
+    {
+      title: "Update project",
+      description:
+        "Update an existing project's mutable fields. The project `key` is " +
+        "**immutable** and cannot be changed here — it only identifies which " +
+        "project to update. Only the fields you pass are touched; omit a field to " +
+        "leave it unchanged. For the nullable fields (`repo_url`, " +
+        "`default_test_cmd`, `board_closed_window_days`) pass `null` to clear an " +
+        "existing value and fall back to defaults. Use this to backfill a project " +
+        "that was created with only a key + name, or to archive/unarchive it. " +
+        "Returns 404 if the key doesn't exist, 409 on a conflicting change.",
+      inputSchema: {
+        project_key: PROJECT_KEY.describe(
+          "Key of the project to update (immutable identifier, e.g. `ARGY`).",
+        ),
+        name: z
+          .string()
+          .min(1)
+          .max(200)
+          .optional()
+          .describe("New human-readable project name."),
+        description: z
+          .string()
+          .max(10_000)
+          .optional()
+          .describe("New markdown description."),
+        color: z
+          .string()
+          .regex(/^#[0-9a-fA-F]{6}$/)
+          .optional()
+          .describe("New hex accent color, e.g. `#3b82f6`."),
+        repo_url: z
+          .string()
+          .url()
+          .max(2048)
+          .nullable()
+          .optional()
+          .describe("New canonical repo URL. Pass `null` to clear the link."),
+        default_test_cmd: z
+          .string()
+          .max(2048)
+          .nullable()
+          .optional()
+          .describe("New default test command. Pass `null` to clear it."),
+        archived: z
+          .boolean()
+          .optional()
+          .describe("Set `true` to archive the project, `false` to unarchive."),
+      },
+    },
+    async ({ project_key, ...body }) => {
+      const client = getClient();
+      const { data, error } = await client.PATCH("/v1/projects/{key}", {
+        params: { path: { key: project_key } },
+        body,
+      });
+      if (error) {
+        return {
+          isError: true,
+          content: [{ type: "text", text: formatApiError(error) }],
+        };
+      }
+      return {
+        content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+      };
+    },
+  );
+
+  server.registerTool(
     "list_labels",
     {
       title: "List labels",

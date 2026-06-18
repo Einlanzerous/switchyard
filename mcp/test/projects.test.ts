@@ -149,6 +149,106 @@ describe("create_project", () => {
   });
 });
 
+describe("update_project", () => {
+  test("PATCHes /v1/projects/:key with only the supplied fields", async () => {
+    const recorder = installFetchRecorder({
+      body: {
+        id: "p1",
+        key: "ARGY",
+        name: "Argosy",
+        description: "Backfilled description",
+        color: "#14b8a6",
+        repo_url: "https://github.com/foo/argosy",
+        default_test_cmd: null,
+        archived_at: null,
+      },
+    });
+    const { client, close } = await connectTestClient();
+    try {
+      const res = await client.callTool({
+        name: "update_project",
+        arguments: {
+          project_key: "ARGY",
+          description: "Backfilled description",
+          color: "#14b8a6",
+          repo_url: "https://github.com/foo/argosy",
+        },
+      });
+      expect(res.isError).toBeFalsy();
+      const call = recorder.calls[0]!;
+      expect(call.method).toBe("PATCH");
+      expect(call.url).toContain("/v1/projects/ARGY");
+      const body = call.body as Record<string, unknown>;
+      // project_key is the path identifier — it must NOT leak into the body.
+      expect(body.project_key).toBeUndefined();
+      expect(body.key).toBeUndefined();
+      expect(body.description).toBe("Backfilled description");
+      expect(body.color).toBe("#14b8a6");
+      expect(body.repo_url).toBe("https://github.com/foo/argosy");
+      // Untouched fields stay absent so the server leaves them unchanged.
+      expect(body.name).toBeUndefined();
+    } finally {
+      await close();
+      recorder.restore();
+    }
+  });
+
+  test("forwards null to clear a nullable field", async () => {
+    const recorder = installFetchRecorder({
+      body: { id: "p1", key: "ARGY", name: "Argosy", repo_url: null },
+    });
+    const { client, close } = await connectTestClient();
+    try {
+      const res = await client.callTool({
+        name: "update_project",
+        arguments: { project_key: "ARGY", repo_url: null },
+      });
+      expect(res.isError).toBeFalsy();
+      const body = recorder.calls[0]!.body as Record<string, unknown>;
+      expect(body.repo_url).toBeNull();
+    } finally {
+      await close();
+      recorder.restore();
+    }
+  });
+
+  test("rejects a malformed key at the schema layer (no HTTP call)", async () => {
+    const recorder = installFetchRecorder({ body: {} });
+    const { client, close } = await connectTestClient();
+    try {
+      const res = await client.callTool({
+        name: "update_project",
+        arguments: { project_key: "sw y", name: "x" },
+      });
+      expect(res.isError).toBe(true);
+      expect(recorder.calls).toHaveLength(0);
+    } finally {
+      await close();
+      recorder.restore();
+    }
+  });
+
+  test("surfaces 404 not_found envelope for an unknown key", async () => {
+    const recorder = installFetchRecorder({
+      status: 404,
+      body: { error: { code: "not_found", message: "project NOPE not found" } },
+    });
+    const { client, close } = await connectTestClient();
+    try {
+      const res = await client.callTool({
+        name: "update_project",
+        arguments: { project_key: "NOPE", name: "x" },
+      });
+      expect(res.isError).toBe(true);
+      const text = (res.content as Array<{ type: string; text: string }>)[0]!.text;
+      expect(text).toContain("switchyard error [not_found]");
+    } finally {
+      await close();
+      recorder.restore();
+    }
+  });
+});
+
 describe("list_labels", () => {
   test("calls GET /v1/labels and unwraps items", async () => {
     const recorder = installFetchRecorder({
@@ -517,6 +617,31 @@ describe("error paths", () => {
       const text = (res.content as Array<{ type: string; text: string }>)[0]!.text;
       expect(text).toContain("switchyard error [unauthorized]");
       expect(text).toContain("missing or invalid token");
+    } finally {
+      await close();
+      recorder.restore();
+    }
+  });
+
+  test("non-standard error body falls back to the raw shape, not '(no message)'", async () => {
+    // Pre-SWY-119, a body that doesn't match `{ error: { code, message } }`
+    // (e.g. zod-openapi's native validation envelope) collapsed to
+    // `unknown_error: (no message)`. Now we surface whatever arrived.
+    const recorder = installFetchRecorder({
+      status: 400,
+      body: { success: false, error: { issues: [{ path: ["repo_url"], message: "Invalid url" }] } },
+    });
+    const { client, close } = await connectTestClient();
+    try {
+      const res = await client.callTool({
+        name: "create_project",
+        arguments: { key: "FLOW", name: "Flow" },
+      });
+      expect(res.isError).toBe(true);
+      const text = (res.content as Array<{ type: string; text: string }>)[0]!.text;
+      expect(text).not.toContain("(no message)");
+      expect(text).toContain("repo_url");
+      expect(text).toContain("Invalid url");
     } finally {
       await close();
       recorder.restore();

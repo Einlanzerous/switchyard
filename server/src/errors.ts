@@ -32,9 +32,34 @@ export async function catchUnique<T>(message: string, fn: () => Promise<T>): Pro
   try {
     return await fn();
   } catch (err: any) {
-    if (err?.code === "23505") throw conflict(message);
+    // Drizzle wraps the underlying pg error, so the 23505 SQLSTATE can live on
+    // the wrapper *or* on `.cause`. Check both so a unique violation always
+    // becomes a clean 409 instead of falling through to a generic 500.
+    if (err?.code === "23505" || err?.cause?.code === "23505") throw conflict(message);
     throw err;
   }
+}
+
+// OpenAPIHono `defaultHook` — runs after every request-validation pass. On
+// failure, zod-openapi would otherwise emit its own `{ success, error }` body,
+// which does NOT match our `{ error: { code, message } }` contract. Callers
+// that key off that contract (the MCP server's formatApiError) then surface it
+// as `unknown_error: (no message)`. Convert validation failures into the
+// standard 400 envelope, naming the first failing field and carrying the full
+// issue list in `details` so the caller knows exactly what to fix. (SWY-119)
+export function validationHook(
+  result: { success: boolean; error?: { issues?: Array<{ path?: Array<string | number>; message?: string }> } },
+  c: Context,
+) {
+  if (result.success) return;
+  const issues = result.error?.issues ?? [];
+  const first = issues[0];
+  const where = first?.path && first.path.length > 0 ? first.path.join(".") : "(body)";
+  const message = first?.message ? `${where}: ${first.message}` : "request validation failed";
+  return c.json(
+    { error: { code: "bad_request" as ErrorCode, message, details: { issues } } },
+    400,
+  );
 }
 
 function toEnvelope(err: unknown) {
