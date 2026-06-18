@@ -267,7 +267,7 @@ function onCreated(p: { key: string }) {
         v-for="p in visible"
         :key="p.id"
         type="button"
-        class="text-left rounded-lg border bg-card p-4 hover:bg-accent/40 hover:border-accent transition-colors flex flex-col gap-2 min-h-[7rem]"
+        class="text-left rounded-lg border bg-card p-4 hover:bg-accent/40 hover:border-accent transition-colors flex flex-col gap-2 h-[150px]"
         @click="open(p.key)"
       >
         <div class="flex items-center gap-2 min-w-0">
