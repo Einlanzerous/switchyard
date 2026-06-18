@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.5.1](https://github.com/Einlanzerous/switchyard/compare/v3.5.0...v3.5.1) (2026-06-18)
+
+
+### Bug Fixes
+
+* SWY-119 — standard error envelope for validation failures + update_project tool ([#111](https://github.com/Einlanzerous/switchyard/issues/111)) ([d41af61](https://github.com/Einlanzerous/switchyard/commit/d41af61477918ed96d40d0d39123d4bff062876c))
+* SWY-120 — uniform project card height in grid layout ([#110](https://github.com/Einlanzerous/switchyard/issues/110)) ([34f7ce8](https://github.com/Einlanzerous/switchyard/commit/34f7ce85eb3c215a31a895de013adfc7b82a5a47))
+
+
+### Maintenance
+
+* update knowledge graph [skip ci] ([49bd4a8](https://github.com/Einlanzerous/switchyard/commit/49bd4a87d4a9da440189acbbd4ac2f3d4224384b))
+* update knowledge graph [skip ci] ([60d8878](https://github.com/Einlanzerous/switchyard/commit/60d887817e8ae38479cd6ef59845f1ee625175e8))
+
 ## [3.5.0](https://github.com/Einlanzerous/switchyard/compare/v3.4.1...v3.5.0) (2026-06-16)
 
 
