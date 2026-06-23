@@ -13,7 +13,48 @@ REST API automatically.
 
 ## Status
 
-Stdio transport, in-memory test harness, fifteen tools registered:
+Stdio transport, in-memory test harness, **30 tools** registered across five
+domains.
+
+**Tickets**
+
+| Tool | Kind | Purpose |
+|---|---|---|
+| `list_tickets` | read | Search/filter; `status` accepts array, plus `open: true` shortcut |
+| `get_ticket` | read | Fetch one ticket by key or UUID (includes comments inline) |
+| `query_my_open` | read | Sugar for "what's on my plate" |
+| `create_ticket` | write | New ticket; omit `status_id` for project default |
+| `update_ticket` | write | PATCH; **never** changes status. `null` clears `assignee_id` / `parent_id` / `due_date` |
+| `transition_ticket` | write | Status change by explicit `status_id`; resolution required on close |
+| `transition_ticket_by_category` | write | Sugar: pick the unique status in a category (skips the lookup) |
+| `move_ticket` | write | Cross-project move (allocates new key, alias preserved) |
+
+**Comments**
+
+| Tool | Kind | Purpose |
+|---|---|---|
+| `get_ticket_comments` | read | Comments-only view, paginated (lighter than `get_ticket`) |
+| `comment_on_ticket` | write | Add a standalone comment |
+| `update_comment` | write | Edit an existing comment |
+| `delete_comment` | write | Soft-delete a comment |
+
+**Ticket links**
+
+| Tool | Kind | Purpose |
+|---|---|---|
+| `list_ticket_links` | read | All typed relations (`blocks` / `relates_to` / `duplicates`), cross-project included |
+| `create_ticket_link` | write | Create a typed link (cross-project allowed) |
+| `delete_ticket_link` | write | Remove a link by UUID |
+
+**External refs**
+
+| Tool | Kind | Purpose |
+|---|---|---|
+| `list_external_refs` | read | External refs on a ticket (`github_pr`, `github_issue`, …) |
+| `attach_external_ref` | write | Attach an external ref (e.g. a GitHub PR) |
+| `detach_external_ref` | write | Remove an external ref |
+
+**Projects, statuses & labels**
 
 | Tool | Kind | Purpose |
 |---|---|---|
@@ -21,21 +62,18 @@ Stdio transport, in-memory test harness, fifteen tools registered:
 | `get_project` | read | Fetch one project by key (idempotency check before `create_project`) |
 | `get_project_statuses` | read | Resolve status UUIDs before transitioning |
 | `list_labels` | read | Global label catalog (label UUIDs for ticket attach) |
-| `list_tickets` | read | Search/filter; `status` accepts array, plus `open: true` shortcut |
-| `get_ticket` | read | Fetch one ticket by key or UUID (includes comments inline) |
-| `get_ticket_comments` | read | Comments-only view, paginated (lighter than `get_ticket`) |
-| `query_my_open` | read | Sugar for "what's on my plate" |
 | `create_project` | write | New project; key is immutable; auto-seeded with 5 default statuses |
-| `create_ticket` | write | New ticket; omit `status_id` for project default |
-| `update_ticket` | write | PATCH; **never** changes status. `null` clears `assignee_id` / `parent_id` / `due_date` |
-| `transition_ticket` | write | Status change by explicit `status_id`; resolution required on close |
-| `transition_ticket_by_category` | write | Sugar: pick the unique status in a category (skips the lookup) |
-| `comment_on_ticket` | write | Standalone comment |
-| `move_ticket` | write | Cross-project move (allocates new key, alias preserved) |
+| `update_project` | write | Edit project metadata (key stays immutable) |
+| `create_status` | write | Add a status to a project |
+| `update_status` | write | Rename / recolor a status |
+| `delete_status` | write | Remove a status |
+| `create_label` | write | New global label |
+| `update_label` | write | Rename / recolor a label |
+| `delete_label` | write | Remove a label |
 
-Out of scope for this phase (deferred): attachments, webhook/rule
-subscriptions, resource-style ticket pages, label / status / transition
-CRUD.
+Out of scope (deferred): attachments, webhook/rule subscriptions, resource-style
+ticket pages, and status-transition-table CRUD (the allowed-transitions graph;
+the status _rows_ themselves are now managed by `create_status` et al.).
 
 ## What your token can see
 
@@ -125,15 +163,47 @@ is the path for both magos's desktop and any invited human (e.g. Arin).
 
 ### Wire into your MCP client
 
-**Claude Desktop / Claude Code** — add to
-`~/.config/Claude/claude_desktop_config.json` (or the equivalent Claude Code MCP
-config):
+> [!IMPORTANT]
+> **Claude Code and Claude Desktop read *different* config files. Mixing them up
+> is the #1 reason "MCP never worked."**
+>
+> | Client | Config file | Scope |
+> |---|---|---|
+> | **Claude Code** | `.mcp.json` at the repo root (already present in this repo) | per-project |
+> | **Claude Desktop** | `claude_desktop_config.json` (locations below) | global |
+>
+> Claude Desktop **never reads `.mcp.json`** — adding the server there does
+> nothing in Desktop. Conversely, Claude Code picks up `.mcp.json` automatically
+> when you open the repo, so there's usually nothing to wire by hand there.
+
+**Claude Desktop config file location:**
+
+| OS | Path |
+|---|---|
+| Windows | `%APPDATA%\Claude\claude_desktop_config.json` |
+| macOS | `~/Library/Application Support/Claude/claude_desktop_config.json` |
+
+Two things bite GUI launches specifically (neither affects Claude Code, which is
+launched from your shell):
+
+1. **Use absolute paths for both `command` and the script.** Claude Desktop is a
+   GUI app and does **not** inherit your shell `PATH`, so a bare
+   `"command": "bun"` fails to resolve; a relative script arg
+   (`"mcp/src/index.ts"`) fails because there's no repo cwd. Point at the
+   absolute bun binary (`which bun`) and the absolute script path.
+2. **Boot errors are invisible by default.** A missing token or wrong path looks
+   like "it just silently doesn't work." The server logs fatals to stderr, which
+   Desktop only surfaces in its MCP logs:
+   `%APPDATA%\Claude\logs\mcp*.log` (Windows) /
+   `~/Library/Logs/Claude/mcp*.log` (macOS).
+
+**Native launch (bun reachable by GUI apps):**
 
 ```json
 {
   "mcpServers": {
     "switchyard": {
-      "command": "bun",
+      "command": "/absolute/path/to/bun",
       "args": ["/absolute/path/to/switchyard/mcp/src/index.ts"],
       "env": {
         "SWITCHYARD_TOKEN": "sw_...",
@@ -144,12 +214,19 @@ config):
 }
 ```
 
-Use the `SWITCHYARD_URL` for your path: `http://localhost:4002` (Path A) or
-`http://imperial-construct:4002` / `http://100.112.250.4:4002` (Path B). Restart
-the client and the switchyard tools appear in its tool list.
+Set the `command` to the output of `which bun`, and `SWITCHYARD_URL` for your
+path: `http://localhost:4002` (Path A) or `http://imperial-construct:4002` /
+`http://100.112.250.4:4002` (Path B). Restart Claude Desktop and the switchyard
+tools appear in its tool list.
 
-**Cline** — same shape, configured under the gear icon → MCP Servers. The
-server appears once saved; no restart required (Cline hot-reloads MCP configs).
+> On **this homelab** (Claude Desktop on Windows, bun + repo in WSL2), don't use
+> the native form above — use the `wsl.exe` launcher in
+> [Windows + WSL2](#windows--wsl2). A ready-to-edit copy lives at
+> [`mcp/examples/claude_desktop_config.example.json`](../mcp/examples/claude_desktop_config.example.json).
+
+**Cline** — same shape as the Desktop JSON, configured under the gear icon → MCP
+Servers. The server appears once saved; no restart required (Cline hot-reloads
+MCP configs).
 
 ### Windows + WSL2
 
