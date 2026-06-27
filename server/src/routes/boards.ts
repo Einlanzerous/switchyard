@@ -235,6 +235,32 @@ export function mount(app: OpenAPIHono) {
 
     const refsByTicket = await fetchExternalRefsByTicket(rows.map((r) => r.t.id));
 
+    // Batch the direct-subtask rollup for every card on the board: one query
+    // grouped by parent, so the card can show the collapsed `N/M` glance and
+    // the disclosure caret without an N+1 per-card fetch (SWY-118).
+    const subtaskRows = ticketIds.length > 0
+      ? await db
+          .select({
+            parent_id: schema.tickets.parent_id,
+            category: schema.statuses.category,
+          })
+          .from(schema.tickets)
+          .innerJoin(schema.statuses, eq(schema.tickets.status_id, schema.statuses.id))
+          .where(and(
+            inArray(schema.tickets.parent_id, ticketIds),
+            eq(schema.tickets.type, "subtask"),
+            isNull(schema.tickets.deleted_at),
+          ))
+      : [];
+    const subtaskCountsByParent = new Map<string, { total: number; done: number }>();
+    for (const r of subtaskRows) {
+      if (!r.parent_id) continue;
+      const cur = subtaskCountsByParent.get(r.parent_id) ?? { total: 0, done: 0 };
+      cur.total++;
+      if (r.category === "closed") cur.done++;
+      subtaskCountsByParent.set(r.parent_id, cur);
+    }
+
     const summaries = rows.map((r) =>
       mapTicketSummary(r.t, {
         project: r.project,
@@ -245,6 +271,7 @@ export function mount(app: OpenAPIHono) {
         number: r.t.number,
         externalRefs: refsByTicket.get(r.t.id) ?? [],
         parent: r.t.parent_id ? parentsById.get(r.t.parent_id) ?? null : null,
+        subtaskCounts: subtaskCountsByParent.get(r.t.id) ?? null,
       })
     );
 

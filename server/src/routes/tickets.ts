@@ -37,6 +37,27 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const STATUS_CATEGORIES = new Set<string>(StatusCategory.options);
 const TICKET_TYPES = new Set<string>(TicketType.options);
 
+const SUBTASK_PARENT_TYPES = new Set(["task", "bug", "spike"]);
+
+// Validate a parent/child type pairing for the 3-level hierarchy
+// (epic → {task,bug,spike} → subtask). Throws a 400 with a clear message;
+// the enforce_ticket_hierarchy() DB trigger backstops the same rules.
+function assertParentType(childType: string, parentType: string): void {
+  if (childType === "epic") {
+    throw badRequest("epics cannot have a parent");
+  }
+  if (childType === "subtask") {
+    if (!SUBTASK_PARENT_TYPES.has(parentType)) {
+      throw badRequest("subtask parent must be a task, bug, or spike");
+    }
+    return;
+  }
+  // task / bug / spike
+  if (parentType !== "epic") {
+    throw badRequest("parent must be an epic");
+  }
+}
+
 // Priority ordinal — sortable integer expression for cursor pagination and
 // ORDER BY. Returns NULL when the row's priority is NULL so the SortKey's
 // nulls-last machinery does the right thing.
@@ -406,15 +427,17 @@ export function mount(app: OpenAPIHono) {
     const project = await getProjectByKey(body.project_key, { includeArchived: false });
     await assertProjectRole(auth.user, project.id, "write", "ticket");
 
-    // Validate parent (epic in same project, not deleted). Trigger backstops.
+    // Validate parent against the hierarchy rules (same project, not deleted).
+    // Trigger backstops.
     if (body.parent_id) {
       const [parent] = await db.select().from(schema.tickets)
         .where(and(eq(schema.tickets.id, body.parent_id), isNull(schema.tickets.deleted_at)))
         .limit(1);
       if (!parent) throw badRequest("parent ticket not found");
       if (parent.project_id !== project.id) throw badRequest("parent must be in the same project");
-      if (parent.type !== "epic") throw badRequest("parent must be an epic");
-      if (body.type === "epic") throw badRequest("epics cannot have a parent");
+      assertParentType(body.type, parent.type);
+    } else if (body.type === "subtask") {
+      throw badRequest("subtasks require a parent");
     }
 
     if (body.assignee_id) await getUserById(body.assignee_id);
@@ -518,8 +541,9 @@ export function mount(app: OpenAPIHono) {
         .limit(1);
       if (!parent) throw badRequest("parent ticket not found");
       if (parent.project_id !== existing.project_id) throw badRequest("parent must be in the same project");
-      if (parent.type !== "epic") throw badRequest("parent must be an epic");
-      if (existing.type === "epic") throw badRequest("epics cannot have a parent");
+      assertParentType(existing.type, parent.type);
+    } else if (body.parent_id === null && existing.type === "subtask") {
+      throw badRequest("subtasks require a parent");
     }
 
     if (body.assignee_id !== undefined && body.assignee_id !== null) {
@@ -830,9 +854,7 @@ export function mount(app: OpenAPIHono) {
         if (newParent.project_id !== toProject.id) {
           throw badRequest("parent_id must reference a ticket in the destination project");
         }
-        if (newParent.type !== "epic") {
-          throw badRequest("parent_id must reference an epic");
-        }
+        assertParentType(existing.type, newParent.type);
         nextParentId = newParent.id;
       }
     } else if (existing.parent_id) {
@@ -840,6 +862,12 @@ export function mount(app: OpenAPIHono) {
       nextParentId = oldParent.project_id === toProject.id ? oldParent.id : null;
     } else {
       nextParentId = null;
+    }
+
+    // A subtask can't survive a move that strips its parent — it would violate
+    // the hierarchy. Require an explicit in-destination parent instead.
+    if (existing.type === "subtask" && nextParentId === null) {
+      throw badRequest("cannot move a subtask without a parent in the destination project; pass parent_id");
     }
 
     // ─── apply the move ───────────────────────────────────────────────────

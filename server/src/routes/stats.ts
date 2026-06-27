@@ -455,6 +455,7 @@ export function mount(app: OpenAPIHono) {
       const tk = p.ticket?.key;
       const ty = p.ticket?.type;
       if (!tk || !ty) continue; // event was emitted before we started snapshotting; skip
+      if (ty === "subtask") continue; // subtasks are excluded from cycle-time (SWY-118)
       // First-write wins so a ticket re-closed twice in the window doesn't
       // double-count. (Re-open then re-close is rare but possible.)
       if (closed.has(e.ticket_id)) continue;

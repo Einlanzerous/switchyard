@@ -856,6 +856,7 @@ paths:
                                 - task
                                 - bug
                                 - epic
+                                - subtask
                             title:
                               type: string
                               minLength: 1
@@ -1069,6 +1070,17 @@ paths:
                               type: string
                               nullable: true
                               format: uuid
+                            subtasks:
+                              type: object
+                              nullable: true
+                              properties:
+                                total:
+                                  type: integer
+                                done:
+                                  type: integer
+                              required:
+                                - total
+                                - done
                             created_at:
                               type: string
                               format: date-time
@@ -1097,6 +1109,7 @@ paths:
                             - position
                             - external_refs
                             - template_id
+                            - subtasks
                             - created_at
                             - updated_at
                             - deleted_at
@@ -8267,6 +8280,17 @@ paths:
                           type: string
                           nullable: true
                           format: uuid
+                        subtasks:
+                          type: object
+                          nullable: true
+                          properties:
+                            total:
+                              type: integer
+                            done:
+                              type: integer
+                          required:
+                            - total
+                            - done
                         created_at:
                           type: string
                           format: date-time
@@ -8295,6 +8319,7 @@ paths:
                         - position
                         - external_refs
                         - template_id
+                        - subtasks
                         - created_at
                         - updated_at
                         - deleted_at
@@ -8779,6 +8804,17 @@ paths:
                     type: string
                     nullable: true
                     format: uuid
+                  subtasks:
+                    type: object
+                    nullable: true
+                    properties:
+                      total:
+                        type: integer
+                      done:
+                        type: integer
+                    required:
+                      - total
+                      - done
                   created_at:
                     type: string
                     format: date-time
@@ -9158,6 +9194,7 @@ paths:
                   - position
                   - external_refs
                   - template_id
+                  - subtasks
                   - created_at
                   - updated_at
                   - deleted_at
@@ -9587,6 +9624,17 @@ paths:
                     type: string
                     nullable: true
                     format: uuid
+                  subtasks:
+                    type: object
+                    nullable: true
+                    properties:
+                      total:
+                        type: integer
+                      done:
+                        type: integer
+                    required:
+                      - total
+                      - done
                   created_at:
                     type: string
                     format: date-time
@@ -9958,6 +10006,7 @@ paths:
                   - position
                   - external_refs
                   - template_id
+                  - subtasks
                   - created_at
                   - updated_at
                   - deleted_at
@@ -10432,6 +10481,17 @@ paths:
                     type: string
                     nullable: true
                     format: uuid
+                  subtasks:
+                    type: object
+                    nullable: true
+                    properties:
+                      total:
+                        type: integer
+                      done:
+                        type: integer
+                    required:
+                      - total
+                      - done
                   created_at:
                     type: string
                     format: date-time
@@ -10803,6 +10863,7 @@ paths:
                   - position
                   - external_refs
                   - template_id
+                  - subtasks
                   - created_at
                   - updated_at
                   - deleted_at
@@ -11440,6 +11501,17 @@ paths:
                     type: string
                     nullable: true
                     format: uuid
+                  subtasks:
+                    type: object
+                    nullable: true
+                    properties:
+                      total:
+                        type: integer
+                      done:
+                        type: integer
+                    required:
+                      - total
+                      - done
                   created_at:
                     type: string
                     format: date-time
@@ -11811,6 +11883,7 @@ paths:
                   - position
                   - external_refs
                   - template_id
+                  - subtasks
                   - created_at
                   - updated_at
                   - deleted_at
@@ -12266,6 +12339,17 @@ paths:
                     type: string
                     nullable: true
                     format: uuid
+                  subtasks:
+                    type: object
+                    nullable: true
+                    properties:
+                      total:
+                        type: integer
+                      done:
+                        type: integer
+                    required:
+                      - total
+                      - done
                   created_at:
                     type: string
                     format: date-time
@@ -12637,6 +12721,7 @@ paths:
                   - position
                   - external_refs
                   - template_id
+                  - subtasks
                   - created_at
                   - updated_at
                   - deleted_at
@@ -13142,6 +13227,17 @@ paths:
                               type: string
                               nullable: true
                               format: uuid
+                            subtasks:
+                              type: object
+                              nullable: true
+                              properties:
+                                total:
+                                  type: integer
+                                done:
+                                  type: integer
+                              required:
+                                - total
+                                - done
                             created_at:
                               type: string
                               format: date-time
@@ -13170,6 +13266,7 @@ paths:
                             - position
                             - external_refs
                             - template_id
+                            - subtasks
                             - created_at
                             - updated_at
                             - deleted_at
@@ -13697,6 +13794,17 @@ paths:
                           type: string
                           nullable: true
                           format: uuid
+                        subtasks:
+                          type: object
+                          nullable: true
+                          properties:
+                            total:
+                              type: integer
+                            done:
+                              type: integer
+                          required:
+                            - total
+                            - done
                         created_at:
                           type: string
                           format: date-time
@@ -13725,6 +13833,7 @@ paths:
                         - position
                         - external_refs
                         - template_id
+                        - subtasks
                         - created_at
                         - updated_at
                         - deleted_at
@@ -17734,6 +17843,17 @@ paths:
                                 type: string
                                 nullable: true
                                 format: uuid
+                              subtasks:
+                                type: object
+                                nullable: true
+                                properties:
+                                  total:
+                                    type: integer
+                                  done:
+                                    type: integer
+                                required:
+                                  - total
+                                  - done
                               created_at:
                                 type: string
                                 format: date-time
@@ -17762,6 +17882,7 @@ paths:
                               - position
                               - external_refs
                               - template_id
+                              - subtasks
                               - created_at
                               - updated_at
                               - deleted_at
@@ -20010,6 +20131,17 @@ paths:
                               type: string
                               nullable: true
                               format: uuid
+                            subtasks:
+                              type: object
+                              nullable: true
+                              properties:
+                                total:
+                                  type: integer
+                                done:
+                                  type: integer
+                              required:
+                                - total
+                                - done
                             created_at:
                               type: string
                               format: date-time
@@ -20038,6 +20170,7 @@ paths:
                             - position
                             - external_refs
                             - template_id
+                            - subtasks
                             - created_at
                             - updated_at
                             - deleted_at
@@ -22465,6 +22598,17 @@ paths:
                               type: string
                               nullable: true
                               format: uuid
+                            subtasks:
+                              type: object
+                              nullable: true
+                              properties:
+                                total:
+                                  type: integer
+                                done:
+                                  type: integer
+                              required:
+                                - total
+                                - done
                             created_at:
                               type: string
                               format: date-time
@@ -22493,6 +22637,7 @@ paths:
                             - position
                             - external_refs
                             - template_id
+                            - subtasks
                             - created_at
                             - updated_at
                             - deleted_at
@@ -23432,6 +23577,17 @@ paths:
                               type: string
                               nullable: true
                               format: uuid
+                            subtasks:
+                              type: object
+                              nullable: true
+                              properties:
+                                total:
+                                  type: integer
+                                done:
+                                  type: integer
+                              required:
+                                - total
+                                - done
                             created_at:
                               type: string
                               format: date-time
@@ -23460,6 +23616,7 @@ paths:
                             - position
                             - external_refs
                             - template_id
+                            - subtasks
                             - created_at
                             - updated_at
                             - deleted_at
@@ -24436,6 +24593,17 @@ paths:
                               type: string
                               nullable: true
                               format: uuid
+                            subtasks:
+                              type: object
+                              nullable: true
+                              properties:
+                                total:
+                                  type: integer
+                                done:
+                                  type: integer
+                              required:
+                                - total
+                                - done
                             created_at:
                               type: string
                               format: date-time
@@ -24464,6 +24632,7 @@ paths:
                             - position
                             - external_refs
                             - template_id
+                            - subtasks
                             - created_at
                             - updated_at
                             - deleted_at
@@ -35005,6 +35174,17 @@ paths:
                     type: string
                     nullable: true
                     format: uuid
+                  subtasks:
+                    type: object
+                    nullable: true
+                    properties:
+                      total:
+                        type: integer
+                      done:
+                        type: integer
+                    required:
+                      - total
+                      - done
                   created_at:
                     type: string
                     format: date-time
@@ -35033,6 +35213,7 @@ paths:
                   - position
                   - external_refs
                   - template_id
+                  - subtasks
                   - created_at
                   - updated_at
                   - deleted_at
@@ -35475,6 +35656,17 @@ paths:
                           type: string
                           nullable: true
                           format: uuid
+                        subtasks:
+                          type: object
+                          nullable: true
+                          properties:
+                            total:
+                              type: integer
+                            done:
+                              type: integer
+                          required:
+                            - total
+                            - done
                         created_at:
                           type: string
                           format: date-time
@@ -35503,6 +35695,7 @@ paths:
                         - position
                         - external_refs
                         - template_id
+                        - subtasks
                         - created_at
                         - updated_at
                         - deleted_at

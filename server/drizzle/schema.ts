@@ -36,7 +36,7 @@ export const statusCategory = pgEnum("status_category", [
   "closed",
 ]);
 export const resolution = pgEnum("resolution", ["done", "released", "cancelled"]);
-export const ticketType = pgEnum("ticket_type", ["spike", "task", "bug", "epic"]);
+export const ticketType = pgEnum("ticket_type", ["spike", "task", "bug", "epic", "subtask"]);
 export const priority = pgEnum("priority", ["low", "medium", "high", "critical"]);
 export const attachmentKind = pgEnum("attachment_kind", ["image", "audio", "text"]);
 export const boardLayout = pgEnum("board_layout", ["kanban", "list"]);

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { Bug, CheckSquare2, Mountain, Lightbulb } from "lucide-vue-next";
+import { Bug, CheckSquare2, Mountain, Lightbulb, ListTree } from "lucide-vue-next";
 import { cn } from "@/lib/utils";
 import type { TicketType } from "@switchyard/shared";
 
@@ -14,6 +14,7 @@ const meta: Record<TicketType, { icon: any; tone: string; label: string }> = {
   task: { icon: CheckSquare2, tone: "text-sky-500", label: "Task" },
   bug: { icon: Bug, tone: "text-red-500", label: "Bug" },
   epic: { icon: Mountain, tone: "text-amber-500", label: "Epic" },
+  subtask: { icon: ListTree, tone: "text-teal-500", label: "Subtask" },
 };
 
 const data = computed(() => meta[props.type]);

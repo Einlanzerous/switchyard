@@ -8,7 +8,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client.js";
 import { formatApiError } from "../errors.js";
 
-const TICKET_TYPE = z.enum(["spike", "task", "bug", "epic"]);
+const TICKET_TYPE = z.enum(["spike", "task", "bug", "epic", "subtask"]);
 const PRIORITY = z.enum(["low", "medium", "high", "critical"]);
 const RESOLUTION = z.enum(["done", "released", "cancelled"]);
 const STATUS_CATEGORY = z.enum([
@@ -66,7 +66,7 @@ export function registerTicketTools(server: McpServer): void {
         parent_id: z
           .string()
           .optional()
-          .describe("Parent ticket UUID; surfaces only that epic's children."),
+          .describe("Parent ticket UUID; surfaces only that ticket's direct children (an epic's tasks, or a task/bug/spike's subtasks)."),
         text: z
           .string()
           .optional()
@@ -185,8 +185,9 @@ export function registerTicketTools(server: McpServer): void {
         "If `status_id` is omitted, the project's default status applies (this is " +
         "the right choice 99% of the time — agents that try to land tickets directly " +
         "into `in_progress` usually shouldn't). To target a specific status, look it " +
-        "up first via `get_project_statuses`. `parent_id` must point at an `epic`-type " +
-        "ticket (epics-cannot-nest is a hard invariant). `metadata` is a free-form " +
+        "up first via `get_project_statuses`. `parent_id` follows the hierarchy " +
+        "epic → {task,bug,spike} → subtask: a task/bug/spike takes an epic parent, a " +
+        "subtask requires a task/bug/spike parent. `metadata` is a free-form " +
         "JSON object for custom fields (e.g. `{repo_url, mode, test_cmd}` for the " +
         "imperium-loop pipeline).",
       inputSchema: {
@@ -210,7 +211,11 @@ export function registerTicketTools(server: McpServer): void {
         parent_id: z
           .string()
           .optional()
-          .describe("Parent epic UUID. Only epics can have children (one level deep)."),
+          .describe(
+            "Parent ticket UUID. Hierarchy is epic → {task,bug,spike} → subtask: " +
+              "a task/bug/spike may have an epic parent; a subtask MUST have a " +
+              "task/bug/spike parent. Subtasks cannot be parents.",
+          ),
         assignee_id: z.string().optional().describe("Assignee user UUID."),
         due_date: z.string().optional().describe("ISO-8601 due date."),
         label_ids: z.array(z.string()).optional().describe("Label UUIDs to attach."),
@@ -267,8 +272,10 @@ export function registerTicketTools(server: McpServer): void {
           .nullable()
           .optional()
           .describe(
-            "New parent epic UUID. Pass `null` to detach; omit to leave unchanged. " +
-              "Parent must be an `epic`-type ticket in the same project.",
+            "New parent UUID. Pass `null` to detach; omit to leave unchanged. " +
+              "Must satisfy the hierarchy (epic parent for a task/bug/spike, or a " +
+              "task/bug/spike parent for a subtask) in the same project. A subtask " +
+              "cannot be detached to null.",
           ),
         due_date: z
           .string()
@@ -571,7 +578,8 @@ export function registerTicketTools(server: McpServer): void {
         "reorganization. Optional `status_id` lets you simultaneously land the ticket " +
         "in a specific destination status (must be a status in the *destination* " +
         "project — look up via `get_project_statuses` on the new project key). Optional " +
-        "`parent_id` rewires the epic parent; pass `null` to detach.",
+        "`parent_id` rewires the parent (epic for a task/bug/spike, task/bug/spike " +
+        "for a subtask); pass `null` to detach.",
       inputSchema: {
         id_or_key: z.string().describe("Ticket key (e.g. `SWY-47`) or UUID."),
         project_key: z.string().describe("Destination project key."),
@@ -586,7 +594,7 @@ export function registerTicketTools(server: McpServer): void {
           .string()
           .nullable()
           .optional()
-          .describe("New parent epic UUID, or `null` to detach."),
+          .describe("New parent UUID (epic, or task/bug/spike for a subtask), or `null` to detach."),
       },
     },
     async ({ id_or_key, ...body }) => {
