@@ -1,0 +1,16 @@
+{
+  "//": "Claude DESKTOP config — copy to %APPDATA%\\Claude\\claude_desktop_config.json (Windows)",
+  "//1": "or ~/Library/Application Support/Claude/claude_desktop_config.json (macOS).",
+  "//2": "This is NOT the same file as the repo-root .mcp.json (that one is Claude CODE).",
+  "//3": "Homelab default below: Claude Desktop on Windows, bun + repo in WSL2. Replace the",
+  "//4": "distro (-d), user (-u), absolute repo path, and SWITCHYARD_TOKEN before use.",
+  "mcpServers": {
+    "switchyard": {
+      "command": "wsl.exe",
+      "args": [
+        "-d", "Ubuntu", "-u", "magos", "-e", "bash", "-lc",
+        "SWITCHYARD_TOKEN=sw_REPLACE_ME SWITCHYARD_URL=http://100.112.250.4:4002 exec bun /home/magos/projects/switchyard/mcp/src/index.ts"
+      ]
+    }
+  }
+}
