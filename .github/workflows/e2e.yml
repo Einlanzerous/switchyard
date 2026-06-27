@@ -120,15 +120,30 @@ jobs:
           cat /tmp/e2e-backend.log || true
           exit 1
 
-      # Playwright manages its own browser binaries; cache them between
-      # runs to skip the ~200MB download.
+      # Cache key must be the *resolved* Playwright version, not
+      # client/package.json. The dep is a floating range (^1.59.1), so a
+      # 1.59→1.60 bump leaves package.json (and thus the old hash key)
+      # unchanged — the runner then restores a stale browser bundle and the
+      # `Install Playwright browsers` step skips re-download (its
+      # INSTALLATION_COMPLETE marker is present), so the newer Playwright
+      # validator trips on a file the old build lacks: every Firefox test
+      # dies at launch with `ENOENT .../firefox/lock`. See SWY-125.
+      - name: Resolve Playwright version
+        id: pw
+        working-directory: client
+        run: echo "version=$(bunx playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      # Playwright manages its own browser binaries; cache them between runs
+      # to skip the ~200MB download. NO broad `restore-keys` fallback on
+      # purpose: 1.59 and 1.60 share the same firefox revision dir with
+      # different build contents, so a partial hit from another version
+      # re-serves the stale same-revision bundle (the SWY-125 bug). Exact
+      # version match = fast hit; version bump = clean miss = fresh download.
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('client/package.json') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-
+          key: ${{ runner.os }}-playwright-${{ steps.pw.outputs.version }}
 
       # Browser binaries only — system dependencies (libnss3, libatk1.0-0,
       # etc.) are pre-installed on the self-hosted host. Matches the
