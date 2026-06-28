@@ -2,15 +2,24 @@
 -- These enforce cross-row invariants that Drizzle's CHECK constraints cannot express.
 -- The migrate.ts runner applies this file once after the generated drizzle migrations.
 
--- ─── Epic hierarchy guard ────────────────────────────────────────────────────
+-- ─── Ticket hierarchy guard ──────────────────────────────────────────────────
+-- Hierarchy is exactly 3 levels deep: epic → {task,bug,spike} → subtask.
 -- Rules:
---   - epics cannot have a parent (no epic-of-epic for now)
---   - non-epic tickets may have a parent only if that parent is type='epic' and not soft-deleted
+--   - epics cannot have a parent (no epic-of-epic)
+--   - a task/bug/spike may have a parent only if it is a non-deleted epic
+--   - a subtask MUST have a parent, and it must be a non-deleted task/bug/spike
+--   - a subtask can never be a parent (enforced implicitly: no child type
+--     accepts a subtask parent, so referencing one always raises)
 CREATE OR REPLACE FUNCTION enforce_ticket_hierarchy() RETURNS trigger AS $$
 DECLARE
   parent_type ticket_type;
   parent_deleted timestamptz;
 BEGIN
+  -- Subtasks are never free-floating.
+  IF NEW.type = 'subtask' AND NEW.parent_id IS NULL THEN
+    RAISE EXCEPTION 'subtasks must have a parent (parent_id is required when type=subtask)';
+  END IF;
+
   IF NEW.parent_id IS NULL THEN
     RETURN NEW;
   END IF;
@@ -26,12 +35,20 @@ BEGIN
     RAISE EXCEPTION 'parent ticket % does not exist', NEW.parent_id;
   END IF;
 
-  IF parent_type <> 'epic' THEN
-    RAISE EXCEPTION 'parent ticket must be type=epic, got %', parent_type;
-  END IF;
-
   IF parent_deleted IS NOT NULL THEN
     RAISE EXCEPTION 'parent ticket is soft-deleted';
+  END IF;
+
+  IF NEW.type = 'subtask' THEN
+    -- 3rd level: a subtask hangs off a task/bug/spike.
+    IF parent_type NOT IN ('task', 'bug', 'spike') THEN
+      RAISE EXCEPTION 'subtask parent must be a task, bug, or spike, got %', parent_type;
+    END IF;
+  ELSE
+    -- 2nd level: a task/bug/spike hangs off an epic (epic already rejected above).
+    IF parent_type <> 'epic' THEN
+      RAISE EXCEPTION 'parent ticket must be type=epic, got %', parent_type;
+    END IF;
   END IF;
 
   RETURN NEW;

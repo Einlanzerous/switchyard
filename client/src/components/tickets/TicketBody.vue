@@ -80,18 +80,19 @@ function goToTemplate() {
   router.push(`/projects/${ticket.value.project.key}/setup/recurring`);
 }
 
-// LinkedWork renders three sections (parent, children-if-epic, typed links).
-// Show it whenever any of those is meaningful: there's a parent, this is an
-// epic (children always rendered, even if empty), or any cross-ticket links
-// exist. Hide when the ticket has none of those AND no links — most lonely
-// tickets shouldn't see an empty section.
-const showLinkedWork = computed(() => {
-  if (!ticket.value) return false;
-  if (ticket.value.parent_id) return true;
-  if (ticket.value.type === "epic") return true;
-  if ((ticket.value.links?.length ?? 0) > 0) return true;
-  return true; // always render so users can add their first link
-});
+// LinkedWork renders three sections (parent, children, typed links). The
+// children section always renders for anything that can be a parent (epic →
+// tasks, task/bug/spike → subtasks); subtasks are leaves and never show it.
+const canHaveChildren = computed(() => !!ticket.value && ticket.value.type !== "subtask");
+
+// New child default: an epic's children are tasks; a task/bug/spike's children
+// are subtasks. Drives the "Add sub-ticket" dialog's preselected type.
+const childDefaultType = computed(() => (ticket.value?.type === "epic" ? "task" : "subtask"));
+
+// Show LinkedWork whenever any of its sections is meaningful: there's a parent,
+// this ticket can have children, or any cross-ticket links exist. We always
+// render so users can add their first link.
+const showLinkedWork = computed(() => !!ticket.value);
 
 // Newest-first: real use is "what's the latest?", then read back as needed.
 // Sort defensively here rather than relying on API order.
@@ -232,7 +233,8 @@ function onDeleteComment(id: string) {
 }
 
 // "Add sub-ticket" from the sub-tickets header opens CreateTicketDialog preset
-// with this ticket as the parent epic (see template binding below).
+// with this ticket as the parent (an epic gets a task child; a task/bug/spike
+// gets a subtask child — see childDefaultType + the template binding below).
 const createSubTicketOpen = ref(false);
 function openAddSubTicket() {
   createSubTicketOpen.value = true;
@@ -342,7 +344,8 @@ function openAddSubTicket() {
       :parent-loading="parentLoading"
       :children="children"
       :children-loading="childrenLoading"
-      :is-epic="ticket.type === 'epic'"
+      :can-have-children="canHaveChildren"
+      :parent-type="ticket.type"
       :links="ticket.links ?? []"
       :adding-link="addLinkMutation.isPending.value"
       :removing-link-id="removingLinkId"
@@ -359,6 +362,7 @@ function openAddSubTicket() {
       v-model:open="createSubTicketOpen"
       :default-project-key="ticket.project.key"
       :default-parent-id="ticket.id"
+      :default-type="childDefaultType"
     />
 
     <!-- External references (GitHub PR / issue / commit / Actions / generic) -->

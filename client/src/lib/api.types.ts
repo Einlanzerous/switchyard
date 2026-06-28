@@ -596,7 +596,7 @@ export interface paths {
                                         repo_url: string | null;
                                     };
                                     /** @enum {string} */
-                                    type: "spike" | "task" | "bug" | "epic";
+                                    type: "spike" | "task" | "bug" | "epic" | "subtask";
                                     title: string;
                                     status: {
                                         /** Format: uuid */
@@ -671,6 +671,10 @@ export interface paths {
                                     }[];
                                     /** Format: uuid */
                                     template_id: string | null;
+                                    subtasks: {
+                                        total: number;
+                                        done: number;
+                                    } | null;
                                     /** Format: date-time */
                                     created_at: string;
                                     /** Format: date-time */
@@ -5874,7 +5878,7 @@ export interface paths {
                                     repo_url: string | null;
                                 };
                                 /** @enum {string} */
-                                type: "spike" | "task" | "bug" | "epic";
+                                type: "spike" | "task" | "bug" | "epic" | "subtask";
                                 title: string;
                                 status: {
                                     /** Format: uuid */
@@ -5949,6 +5953,10 @@ export interface paths {
                                 }[];
                                 /** Format: uuid */
                                 template_id: string | null;
+                                subtasks: {
+                                    total: number;
+                                    done: number;
+                                } | null;
                                 /** Format: date-time */
                                 created_at: string;
                                 /** Format: date-time */
@@ -6107,7 +6115,7 @@ export interface paths {
                     "application/json": {
                         project_key: string;
                         /** @enum {string} */
-                        type: "spike" | "task" | "bug" | "epic";
+                        type: "spike" | "task" | "bug" | "epic" | "subtask";
                         title: string;
                         description?: string;
                         /** Format: uuid */
@@ -6149,7 +6157,7 @@ export interface paths {
                                 repo_url: string | null;
                             };
                             /** @enum {string} */
-                            type: "spike" | "task" | "bug" | "epic";
+                            type: "spike" | "task" | "bug" | "epic" | "subtask";
                             title: string;
                             status: {
                                 /** Format: uuid */
@@ -6224,6 +6232,10 @@ export interface paths {
                             }[];
                             /** Format: uuid */
                             template_id: string | null;
+                            subtasks: {
+                                total: number;
+                                done: number;
+                            } | null;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
@@ -6536,7 +6548,7 @@ export interface paths {
                                 repo_url: string | null;
                             };
                             /** @enum {string} */
-                            type: "spike" | "task" | "bug" | "epic";
+                            type: "spike" | "task" | "bug" | "epic" | "subtask";
                             title: string;
                             status: {
                                 /** Format: uuid */
@@ -6611,6 +6623,10 @@ export interface paths {
                             }[];
                             /** Format: uuid */
                             template_id: string | null;
+                            subtasks: {
+                                total: number;
+                                done: number;
+                            } | null;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
@@ -7083,7 +7099,7 @@ export interface paths {
                                 repo_url: string | null;
                             };
                             /** @enum {string} */
-                            type: "spike" | "task" | "bug" | "epic";
+                            type: "spike" | "task" | "bug" | "epic" | "subtask";
                             title: string;
                             status: {
                                 /** Format: uuid */
@@ -7158,6 +7174,10 @@ export interface paths {
                             }[];
                             /** Format: uuid */
                             template_id: string | null;
+                            subtasks: {
+                                total: number;
+                                done: number;
+                            } | null;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
@@ -7481,7 +7501,7 @@ export interface paths {
                                 repo_url: string | null;
                             };
                             /** @enum {string} */
-                            type: "spike" | "task" | "bug" | "epic";
+                            type: "spike" | "task" | "bug" | "epic" | "subtask";
                             title: string;
                             status: {
                                 /** Format: uuid */
@@ -7556,6 +7576,10 @@ export interface paths {
                             }[];
                             /** Format: uuid */
                             template_id: string | null;
+                            subtasks: {
+                                total: number;
+                                done: number;
+                            } | null;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
@@ -7882,7 +7906,7 @@ export interface paths {
                                 repo_url: string | null;
                             };
                             /** @enum {string} */
-                            type: "spike" | "task" | "bug" | "epic";
+                            type: "spike" | "task" | "bug" | "epic" | "subtask";
                             title: string;
                             status: {
                                 /** Format: uuid */
@@ -7957,6 +7981,10 @@ export interface paths {
                             }[];
                             /** Format: uuid */
                             template_id: string | null;
+                            subtasks: {
+                                total: number;
+                                done: number;
+                            } | null;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
@@ -8288,7 +8316,7 @@ export interface paths {
                                         repo_url: string | null;
                                     };
                                     /** @enum {string} */
-                                    type: "spike" | "task" | "bug" | "epic";
+                                    type: "spike" | "task" | "bug" | "epic" | "subtask";
                                     title: string;
                                     status: {
                                         /** Format: uuid */
@@ -8363,6 +8391,10 @@ export interface paths {
                                     }[];
                                     /** Format: uuid */
                                     template_id: string | null;
+                                    subtasks: {
+                                        total: number;
+                                        done: number;
+                                    } | null;
                                     /** Format: date-time */
                                     created_at: string;
                                     /** Format: date-time */
@@ -8586,7 +8618,7 @@ export interface paths {
                                     repo_url: string | null;
                                 };
                                 /** @enum {string} */
-                                type: "spike" | "task" | "bug" | "epic";
+                                type: "spike" | "task" | "bug" | "epic" | "subtask";
                                 title: string;
                                 status: {
                                     /** Format: uuid */
@@ -8661,6 +8693,10 @@ export interface paths {
                                 }[];
                                 /** Format: uuid */
                                 template_id: string | null;
+                                subtasks: {
+                                    total: number;
+                                    done: number;
+                                } | null;
                                 /** Format: date-time */
                                 created_at: string;
                                 /** Format: date-time */
@@ -10342,7 +10378,7 @@ export interface paths {
                                     repo_url: string | null;
                                 }[];
                                 filter: {
-                                    types?: ("spike" | "task" | "bug" | "epic")[];
+                                    types?: ("spike" | "task" | "bug" | "epic" | "subtask")[];
                                     priorities?: ("low" | "medium" | "high" | "critical")[];
                                     label_ids?: string[];
                                     assignee_ids?: string[];
@@ -10510,7 +10546,7 @@ export interface paths {
                         layout?: "kanban" | "list";
                         project_ids: string[];
                         filter?: {
-                            types?: ("spike" | "task" | "bug" | "epic")[];
+                            types?: ("spike" | "task" | "bug" | "epic" | "subtask")[];
                             priorities?: ("low" | "medium" | "high" | "critical")[];
                             label_ids?: string[];
                             assignee_ids?: string[];
@@ -10543,7 +10579,7 @@ export interface paths {
                                 repo_url: string | null;
                             }[];
                             filter: {
-                                types?: ("spike" | "task" | "bug" | "epic")[];
+                                types?: ("spike" | "task" | "bug" | "epic" | "subtask")[];
                                 priorities?: ("low" | "medium" | "high" | "critical")[];
                                 label_ids?: string[];
                                 assignee_ids?: string[];
@@ -10733,7 +10769,7 @@ export interface paths {
                                 repo_url: string | null;
                             }[];
                             filter: {
-                                types?: ("spike" | "task" | "bug" | "epic")[];
+                                types?: ("spike" | "task" | "bug" | "epic" | "subtask")[];
                                 priorities?: ("low" | "medium" | "high" | "critical")[];
                                 label_ids?: string[];
                                 assignee_ids?: string[];
@@ -11048,7 +11084,7 @@ export interface paths {
                         layout?: "kanban" | "list";
                         project_ids?: string[];
                         filter?: {
-                            types?: ("spike" | "task" | "bug" | "epic")[];
+                            types?: ("spike" | "task" | "bug" | "epic" | "subtask")[];
                             priorities?: ("low" | "medium" | "high" | "critical")[];
                             label_ids?: string[];
                             assignee_ids?: string[];
@@ -11081,7 +11117,7 @@ export interface paths {
                                 repo_url: string | null;
                             }[];
                             filter: {
-                                types?: ("spike" | "task" | "bug" | "epic")[];
+                                types?: ("spike" | "task" | "bug" | "epic" | "subtask")[];
                                 priorities?: ("low" | "medium" | "high" | "critical")[];
                                 label_ids?: string[];
                                 assignee_ids?: string[];
@@ -11268,7 +11304,7 @@ export interface paths {
                                     repo_url: string | null;
                                 }[];
                                 filter: {
-                                    types?: ("spike" | "task" | "bug" | "epic")[];
+                                    types?: ("spike" | "task" | "bug" | "epic" | "subtask")[];
                                     priorities?: ("low" | "medium" | "high" | "critical")[];
                                     label_ids?: string[];
                                     assignee_ids?: string[];
@@ -11299,7 +11335,7 @@ export interface paths {
                                         repo_url: string | null;
                                     };
                                     /** @enum {string} */
-                                    type: "spike" | "task" | "bug" | "epic";
+                                    type: "spike" | "task" | "bug" | "epic" | "subtask";
                                     title: string;
                                     status: {
                                         /** Format: uuid */
@@ -11374,6 +11410,10 @@ export interface paths {
                                     }[];
                                     /** Format: uuid */
                                     template_id: string | null;
+                                    subtasks: {
+                                        total: number;
+                                        done: number;
+                                    } | null;
                                     /** Format: date-time */
                                     created_at: string;
                                     /** Format: date-time */
@@ -12853,7 +12893,7 @@ export interface paths {
                                         repo_url: string | null;
                                     };
                                     /** @enum {string} */
-                                    type: "spike" | "task" | "bug" | "epic";
+                                    type: "spike" | "task" | "bug" | "epic" | "subtask";
                                     title: string;
                                     status: {
                                         /** Format: uuid */
@@ -12928,6 +12968,10 @@ export interface paths {
                                     }[];
                                     /** Format: uuid */
                                     template_id: string | null;
+                                    subtasks: {
+                                        total: number;
+                                        done: number;
+                                    } | null;
                                     /** Format: date-time */
                                     created_at: string;
                                     /** Format: date-time */
@@ -14078,7 +14122,7 @@ export interface paths {
                                 ticket_id: string;
                                 ticket_key: string;
                                 /** @enum {string} */
-                                type: "spike" | "task" | "bug" | "epic";
+                                type: "spike" | "task" | "bug" | "epic" | "subtask";
                                 duration_ms: number;
                                 /** Format: date-time */
                                 closed_at: string;
@@ -14453,7 +14497,7 @@ export interface paths {
                                         repo_url: string | null;
                                     };
                                     /** @enum {string} */
-                                    type: "spike" | "task" | "bug" | "epic";
+                                    type: "spike" | "task" | "bug" | "epic" | "subtask";
                                     title: string;
                                     status: {
                                         /** Format: uuid */
@@ -14528,6 +14572,10 @@ export interface paths {
                                     }[];
                                     /** Format: uuid */
                                     template_id: string | null;
+                                    subtasks: {
+                                        total: number;
+                                        done: number;
+                                    } | null;
                                     /** Format: date-time */
                                     created_at: string;
                                     /** Format: date-time */
@@ -15077,7 +15125,7 @@ export interface paths {
                                         repo_url: string | null;
                                     };
                                     /** @enum {string} */
-                                    type: "spike" | "task" | "bug" | "epic";
+                                    type: "spike" | "task" | "bug" | "epic" | "subtask";
                                     title: string;
                                     status: {
                                         /** Format: uuid */
@@ -15152,6 +15200,10 @@ export interface paths {
                                     }[];
                                     /** Format: uuid */
                                     template_id: string | null;
+                                    subtasks: {
+                                        total: number;
+                                        done: number;
+                                    } | null;
                                     /** Format: date-time */
                                     created_at: string;
                                     /** Format: date-time */
@@ -15714,7 +15766,7 @@ export interface paths {
                                         repo_url: string | null;
                                     };
                                     /** @enum {string} */
-                                    type: "spike" | "task" | "bug" | "epic";
+                                    type: "spike" | "task" | "bug" | "epic" | "subtask";
                                     title: string;
                                     status: {
                                         /** Format: uuid */
@@ -15789,6 +15841,10 @@ export interface paths {
                                     }[];
                                     /** Format: uuid */
                                     template_id: string | null;
+                                    subtasks: {
+                                        total: number;
+                                        done: number;
+                                    } | null;
                                     /** Format: date-time */
                                     created_at: string;
                                     /** Format: date-time */
@@ -21544,7 +21600,7 @@ export interface paths {
                                 title: string;
                                 description: string;
                                 /** @enum {string} */
-                                type: "spike" | "task" | "bug" | "epic";
+                                type: "spike" | "task" | "bug" | "epic" | "subtask";
                                 /** @enum {string|null} */
                                 priority: "low" | "medium" | "high" | "critical" | null;
                                 assignee: {
@@ -21735,7 +21791,7 @@ export interface paths {
                          * @default task
                          * @enum {string}
                          */
-                        type?: "spike" | "task" | "bug" | "epic";
+                        type?: "spike" | "task" | "bug" | "epic" | "subtask";
                         /** @enum {string|null} */
                         priority?: "low" | "medium" | "high" | "critical" | null;
                         /** Format: uuid */
@@ -21781,7 +21837,7 @@ export interface paths {
                             title: string;
                             description: string;
                             /** @enum {string} */
-                            type: "spike" | "task" | "bug" | "epic";
+                            type: "spike" | "task" | "bug" | "epic" | "subtask";
                             /** @enum {string|null} */
                             priority: "low" | "medium" | "high" | "critical" | null;
                             assignee: {
@@ -21992,7 +22048,7 @@ export interface paths {
                             title: string;
                             description: string;
                             /** @enum {string} */
-                            type: "spike" | "task" | "bug" | "epic";
+                            type: "spike" | "task" | "bug" | "epic" | "subtask";
                             /** @enum {string|null} */
                             priority: "low" | "medium" | "high" | "critical" | null;
                             assignee: {
@@ -22323,7 +22379,7 @@ export interface paths {
                         title?: string;
                         description?: string;
                         /** @enum {string} */
-                        type?: "spike" | "task" | "bug" | "epic";
+                        type?: "spike" | "task" | "bug" | "epic" | "subtask";
                         /** @enum {string|null} */
                         priority?: "low" | "medium" | "high" | "critical" | null;
                         /** Format: uuid */
@@ -22369,7 +22425,7 @@ export interface paths {
                             title: string;
                             description: string;
                             /** @enum {string} */
-                            type: "spike" | "task" | "bug" | "epic";
+                            type: "spike" | "task" | "bug" | "epic" | "subtask";
                             /** @enum {string|null} */
                             priority: "low" | "medium" | "high" | "critical" | null;
                             assignee: {
@@ -22579,7 +22635,7 @@ export interface paths {
                                 repo_url: string | null;
                             };
                             /** @enum {string} */
-                            type: "spike" | "task" | "bug" | "epic";
+                            type: "spike" | "task" | "bug" | "epic" | "subtask";
                             title: string;
                             status: {
                                 /** Format: uuid */
@@ -22654,6 +22710,10 @@ export interface paths {
                             }[];
                             /** Format: uuid */
                             template_id: string | null;
+                            subtasks: {
+                                total: number;
+                                done: number;
+                            } | null;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
@@ -22841,7 +22901,7 @@ export interface paths {
                                     repo_url: string | null;
                                 };
                                 /** @enum {string} */
-                                type: "spike" | "task" | "bug" | "epic";
+                                type: "spike" | "task" | "bug" | "epic" | "subtask";
                                 title: string;
                                 status: {
                                     /** Format: uuid */
@@ -22916,6 +22976,10 @@ export interface paths {
                                 }[];
                                 /** Format: uuid */
                                 template_id: string | null;
+                                subtasks: {
+                                    total: number;
+                                    done: number;
+                                } | null;
                                 /** Format: date-time */
                                 created_at: string;
                                 /** Format: date-time */

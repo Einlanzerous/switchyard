@@ -225,6 +225,9 @@ export type TicketSummaryDeps = {
   // these and feed them in per-ticket; single-ticket loads call
   // `loadTicketLinks`-style helpers. Empty when no refs are attached.
   externalRefs: ApiExternalRef[];
+  // Direct-subtask rollup, batch-computed by board/list endpoints. Omitted on
+  // single-ticket loads (defaults to null — no subtasks surfaced on the card).
+  subtaskCounts?: { total: number; done: number } | null;
 };
 
 export function mapTicketSummary(t: TicketRow, deps: TicketSummaryDeps): TicketSummary {
@@ -247,6 +250,7 @@ export function mapTicketSummary(t: TicketRow, deps: TicketSummaryDeps): TicketS
     position: t.position,
     external_refs: deps.externalRefs,
     template_id: t.template_id,
+    subtasks: deps.subtaskCounts ?? null,
     created_at: t.created_at,
     updated_at: t.updated_at,
     deleted_at: t.deleted_at,

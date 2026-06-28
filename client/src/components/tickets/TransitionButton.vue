@@ -14,7 +14,7 @@ import {
 import StatusBadge from "./StatusBadge.vue";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
-import type { Status, Ticket, Resolution, TicketSummary } from "@switchyard/shared";
+import type { Status, Ticket, Resolution, TicketSummary, TicketType } from "@switchyard/shared";
 
 const props = defineProps<{
   ticket: Ticket;
@@ -45,14 +45,14 @@ const transitionMutation = useMutation({
     qc.invalidateQueries({ queryKey: ["sw", "stats"] });
     toast.success("Status changed");
 
-    // Auto-close-epic prompt: if this transition just moved a child
-    // into a closed category AND the parent is now the only thing
-    // standing between this work and a closed epic, offer to close
-    // the parent too. Pure-frontend — we re-query the parent's
-    // children to confirm everyone else is also closed.
+    // Auto-close-parent prompt: if this transition just moved a child
+    // into a closed category AND every sibling is now closed too, offer to
+    // close the parent (an epic, or a task/bug/spike with subtasks). Pure-
+    // frontend — we re-query the parent's children to confirm. The agent/PR
+    // path is server-side and intentionally won't trigger this.
     const status = props.allowedStatuses.find((s) => s.id === vars.status_id);
     if (status?.category === "closed" && props.ticket.parent_id) {
-      await maybePromptCloseEpic(props.ticket.parent_id);
+      await maybePromptCloseParent(props.ticket.parent_id);
     }
   },
   onError: (err) => {
@@ -70,12 +70,27 @@ function pick(status: Status) {
 
 const submitting = computed(() => transitionMutation.isPending.value);
 
-// ─── auto-close-epic prompt ────────────────────────────────────────────────
+// ─── auto-close-parent prompt ──────────────────────────────────────────────
+// Fires for any parent that can hold children — an epic (children = tasks) or a
+// task/bug/spike (children = subtasks). The hard close-guard stays epic-only on
+// the server; this is the human-path nudge only, and its copy adapts to the
+// parent's type.
 
-const epicPrompt = ref<{ parentKey: string; parentId: string; closedStatus: Status } | null>(null);
-const closingEpic = ref(false);
+const parentPrompt = ref<{
+  parentKey: string; parentId: string; parentType: TicketType; closedStatus: Status;
+} | null>(null);
+const closingParent = ref(false);
 
-async function maybePromptCloseEpic(parentId: string) {
+// Wording table: an epic has "children", everything else has "subtasks".
+const promptCopy = computed(() => {
+  const isEpic = parentPrompt.value?.parentType === "epic";
+  return {
+    noun: isEpic ? "epic" : "parent",
+    children: isEpic ? "children" : "subtasks",
+  };
+});
+
+async function maybePromptCloseParent(parentId: string) {
   // Find a closed-category status to transition the parent into. Reuse
   // the same status the child just moved to when possible — that keeps
   // the project's "default closed" convention coherent.
@@ -90,31 +105,33 @@ async function maybePromptCloseEpic(parentId: string) {
   if (childrenRes.error || !childrenRes.data) return;
 
   const parent = parentRes.data;
-  // Don't prompt if the parent is already closed or isn't an epic.
-  if (parent.status.category === "closed" || parent.type !== "epic") return;
+  // Don't prompt if the parent is already closed, or can't hold children
+  // (a subtask is a leaf and never a parent — defensive).
+  if (parent.status.category === "closed" || parent.type === "subtask") return;
 
   const children: TicketSummary[] = childrenRes.data.items ?? [];
   const allClosed = children.length > 0 && children.every((c) => c.status.category === "closed");
   if (!allClosed) return;
 
-  epicPrompt.value = {
+  parentPrompt.value = {
     parentKey: parent.key,
     parentId: parent.id,
+    parentType: parent.type,
     closedStatus: closedTarget,
   };
 }
 
-async function confirmCloseEpic() {
-  const p = epicPrompt.value;
+async function confirmCloseParent() {
+  const p = parentPrompt.value;
   if (!p) return;
-  closingEpic.value = true;
+  closingParent.value = true;
   try {
     const { error } = await api.POST("/v1/tickets/{idOrKey}/transition", {
       params: { path: { idOrKey: p.parentId } },
       body: { status_id: p.closedStatus.id, resolution: "done" },
     });
     if (error) {
-      const msg = (error as { error?: { message?: string } })?.error?.message ?? "Failed to close epic";
+      const msg = (error as { error?: { message?: string } })?.error?.message ?? "Failed to close parent";
       toast.error(msg);
       return;
     }
@@ -123,8 +140,8 @@ async function confirmCloseEpic() {
     qc.invalidateQueries({ queryKey: ["sw", "boards"] });
     toast.success(`${p.parentKey} closed`);
   } finally {
-    closingEpic.value = false;
-    epicPrompt.value = null;
+    closingParent.value = false;
+    parentPrompt.value = null;
   }
 }
 </script>
@@ -168,23 +185,23 @@ async function confirmCloseEpic() {
     </DropdownMenu>
 
     <Dialog
-      :open="epicPrompt !== null"
-      @update:open="(v) => { if (!v) epicPrompt = null; }"
+      :open="parentPrompt !== null"
+      @update:open="(v) => { if (!v) parentPrompt = null; }"
     >
       <DialogContent class="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Close the epic too?</DialogTitle>
+          <DialogTitle>Close the {{ promptCopy.noun }} too?</DialogTitle>
           <DialogDescription>
-            All children of
-            <span class="font-mono">{{ epicPrompt?.parentKey }}</span>
-            are now closed. Close the epic with resolution "done"?
+            All {{ promptCopy.children }} of
+            <span class="font-mono">{{ parentPrompt?.parentKey }}</span>
+            are now closed. Close the {{ promptCopy.noun }} with resolution "done"?
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button variant="ghost" @click="epicPrompt = null">Leave open</Button>
-          <Button :disabled="closingEpic" @click="confirmCloseEpic">
-            <Loader2 v-if="closingEpic" class="h-3.5 w-3.5 mr-1.5 animate-spin" />
-            Close epic
+          <Button variant="ghost" @click="parentPrompt = null">Leave open</Button>
+          <Button :disabled="closingParent" @click="confirmCloseParent">
+            <Loader2 v-if="closingParent" class="h-3.5 w-3.5 mr-1.5 animate-spin" />
+            Close {{ promptCopy.noun }}
           </Button>
         </DialogFooter>
       </DialogContent>

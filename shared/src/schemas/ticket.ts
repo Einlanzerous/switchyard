@@ -9,7 +9,11 @@ import { Attachment } from "./attachment.js";
 import { TicketLink } from "./ticketLink.js";
 import { ExternalRef } from "./externalRef.js";
 
-export const TicketType = z.enum(["spike", "task", "bug", "epic"]);
+// Hierarchy: epic → {task, bug, spike} → subtask (exactly 3 levels deep).
+// A subtask is a trackable child of a task/bug/spike and cannot itself be a
+// parent. The depth bound and the per-type parent rules are enforced by the
+// `enforce_ticket_hierarchy()` trigger (server/drizzle/triggers.sql).
+export const TicketType = z.enum(["spike", "task", "bug", "epic", "subtask"]);
 export type TicketType = z.infer<typeof TicketType>;
 
 export const Priority = z.enum(["low", "medium", "high", "critical"]);
@@ -45,6 +49,12 @@ export const TicketSummary = z
     // Back-pointer to the ticket_template that materialized this ticket.
     // NULL = hand-created. Drawer surfaces a "Recurring" badge when set.
     template_id: Uuid.nullable(),
+    // Direct-subtask rollup: total count + how many are in a closed/done
+    // status. Powers the collapsed board-card glance (`N/M`) and whether to
+    // show the subtask disclosure, without an N+1 per-card fetch. NULL when the
+    // endpoint didn't compute it (single-ticket loads) or the ticket carries no
+    // subtasks. Only task/bug/spike ever have subtasks.
+    subtasks: z.object({ total: z.number().int(), done: z.number().int() }).nullable(),
   })
   .merge(SoftDeletable);
 export type TicketSummary = z.infer<typeof TicketSummary>;
@@ -67,7 +77,7 @@ export const CreateTicket = z.object({
   description: z.string().max(100_000).optional(),
   status_id: Uuid.optional(), // defaults to project's default status
   priority: Priority.optional(),
-  parent_id: Uuid.optional(), // must reference an epic in the same project; non-epic children only
+  parent_id: Uuid.optional(), // parent in the same project: an epic for a task/bug/spike, or a task/bug/spike for a subtask (required when type=subtask)
   assignee_id: Uuid.optional(),
   due_date: Iso8601.optional(),
   label_ids: z.array(Uuid).optional(),

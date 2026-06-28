@@ -76,15 +76,20 @@ function percentile(sortedMs: number[], p: number): number {
   return sortedMs[idx]!;
 }
 
+// Subtasks are excluded from cycle-time (decision SWY-118); the by_type
+// breakdown therefore covers only the top-level work types.
+type CycleTimeType = Exclude<TicketType, "subtask">;
+
 export function summarizeCycleTime(samples: CycleTimeSample[]): CycleTimeStats {
-  const byType: Record<TicketType, number[]> = { task: [], bug: [], spike: [], epic: [] };
+  const byType: Record<CycleTimeType, number[]> = { task: [], bug: [], spike: [], epic: [] };
   const all: number[] = [];
   for (const s of samples) {
+    if (s.type === "subtask") continue; // excluded from cycle-time
     all.push(s.duration_ms);
     byType[s.type].push(s.duration_ms);
   }
   all.sort((a, b) => a - b);
-  for (const k of Object.keys(byType) as TicketType[]) byType[k].sort((a, b) => a - b);
+  for (const k of Object.keys(byType) as CycleTimeType[]) byType[k].sort((a, b) => a - b);
 
   const median = percentile(all, 0.5);
   return {

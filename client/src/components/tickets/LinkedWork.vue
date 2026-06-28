@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type {
-  Ticket, TicketSummary, TicketLink, TicketLinkType, TicketLinkDirection,
+  Ticket, TicketSummary, TicketLink, TicketLinkType, TicketLinkDirection, TicketType,
 } from "@switchyard/shared";
 
 const props = defineProps<{
@@ -15,14 +15,19 @@ const props = defineProps<{
   parentLoading?: boolean;
   children: TicketSummary[];
   childrenLoading?: boolean;
-  // If this ticket is itself an epic, we always render the children section
-  // (even when empty) so the user knows where to add sub-tasks. For non-epics
-  // we only render this whole component if parent is set.
-  isEpic: boolean;
+  // When this ticket can have children (an epic, or a task/bug/spike) we always
+  // render the children section (even when empty) so the user knows where to add
+  // them. Subtasks are leaves and never show it.
+  canHaveChildren: boolean;
+  // This ticket's own type — drives the children-section wording (an epic holds
+  // "sub-tickets", a task/bug/spike holds "subtasks").
+  parentType: TicketType;
   links: TicketLink[];
   addingLink?: boolean;
   removingLinkId?: string | null;
 }>();
+
+const childrenNoun = computed(() => (props.parentType === "epic" ? "sub-tickets" : "subtasks"));
 
 const emit = defineEmits<{
   navigate: [key: string];
@@ -93,17 +98,17 @@ function reset() {
       <StatusBadge :category="parent.status.category" :display-name="parent.status.display_name" size="sm" />
     </button>
 
-    <!-- Children, only shown when this ticket is an epic -->
-    <template v-if="isEpic">
-      <div class="flex items-center gap-2 text-xs text-muted-foreground pt-1">
+    <!-- Children, shown when this ticket can have them (epic or task/bug/spike) -->
+    <template v-if="canHaveChildren">
+      <div class="flex items-center gap-2 text-xs text-muted-foreground pt-1 capitalize">
         <Layers class="h-3.5 w-3.5" />
-        <span>Sub-tickets ({{ children.length }})</span>
+        <span>{{ childrenNoun }} ({{ children.length }})</span>
         <button
           type="button"
-          class="inline-flex items-center gap-1 rounded-md border border-dashed px-1.5 h-5 text-[10px] text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors"
+          class="inline-flex items-center gap-1 rounded-md border border-dashed px-1.5 h-5 text-[10px] text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors normal-case"
           @click="$emit('add-sub-ticket')"
         >
-          <Plus class="h-2.5 w-2.5" /> Add sub-ticket
+          <Plus class="h-2.5 w-2.5" /> Add {{ parentType === "epic" ? "sub-ticket" : "subtask" }}
         </button>
       </div>
 
@@ -127,7 +132,7 @@ function reset() {
       </ul>
 
       <p v-else class="text-xs text-muted-foreground italic">
-        No sub-tickets yet. Use "Add sub-ticket" to create one under this epic.
+        No {{ childrenNoun }} yet. Use "Add {{ parentType === "epic" ? "sub-ticket" : "subtask" }}" to create one under this {{ parentType === "epic" ? "epic" : "ticket" }}.
       </p>
     </template>
 

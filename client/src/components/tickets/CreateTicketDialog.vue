@@ -2,7 +2,7 @@
 import { computed, ref, watch, useTemplateRef } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
-import { Loader2, Bug, CheckSquare2, Lightbulb, Mountain } from "lucide-vue-next";
+import { Loader2, Bug, CheckSquare2, Lightbulb, Mountain, ListTree } from "lucide-vue-next";
 import { toast } from "vue-sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,9 +25,12 @@ const props = defineProps<{
   // project filter or the project board's key) so users land on the right
   // project without having to pick it every time.
   defaultProjectKey?: string | null;
-  // Optional parent epic. Set when launched from an epic's "Add sub-ticket"
-  // button so the new ticket lands under that epic automatically.
+  // Optional parent. Set when launched from a ticket's "Add sub-ticket/subtask"
+  // button so the new ticket lands under that parent automatically.
   defaultParentId?: string | null;
+  // Optional preselected type. "Add sub-ticket" on an epic passes "task"; "Add
+  // subtask" on a task/bug/spike passes "subtask".
+  defaultType?: TicketType;
 }>();
 
 const emit = defineEmits<{ "update:open": [value: boolean] }>();
@@ -68,7 +71,7 @@ const mention = useMentionAutocomplete({
 watch(() => props.open, (v) => {
   if (!v) return;
   title.value = "";
-  type.value = "task";
+  type.value = props.defaultType ?? "task";
   priority.value = "__none__";
   parentId.value = props.defaultParentId ?? "__none__";
   description.value = "";
@@ -88,30 +91,37 @@ const projectsQuery = useQuery({
 });
 const projects = computed(() => projectsQuery.data.value?.items ?? []);
 
-// Epics in the selected project — candidate parents. Parents must be epics in
-// the SAME project (server-enforced), so the picker is scoped accordingly and
-// resets when the project changes.
-const epicsQuery = useQuery({
-  queryKey: computed(() => ["sw", "tickets", "epics", projectKey.value]),
-  enabled: computed(() => props.open && projectKey.value.length > 0),
+// Candidate parents in the selected project, scoped to the hierarchy: a
+// task/bug/spike parents under an epic, a subtask under a task/bug/spike.
+// (Epics take no parent — the picker is hidden for them.) Parents must be in
+// the SAME project (server-enforced), so the query is scoped accordingly.
+const parentTypeFilter = computed(() =>
+  type.value === "subtask" ? "task,bug,spike" : "epic",
+);
+const parentNoun = computed(() => (type.value === "subtask" ? "ticket" : "epic"));
+
+const parentsQuery = useQuery({
+  queryKey: computed(() => ["sw", "tickets", "parents", projectKey.value, parentTypeFilter.value]),
+  enabled: computed(() => props.open && projectKey.value.length > 0 && type.value !== "epic"),
   staleTime: 5 * 60 * 1000,
   queryFn: async () => {
     const { data, error } = await api.GET("/v1/tickets", {
-      params: { query: { project: projectKey.value, type: "epic", limit: 200 } },
+      params: { query: { project: projectKey.value, type: parentTypeFilter.value, limit: 200 } },
     });
     if (error) throw error;
     return data;
   },
 });
-const epics = computed(() => epicsQuery.data.value?.items ?? []);
+const parentCandidates = computed(() => parentsQuery.data.value?.items ?? []);
 
-// Changing the project invalidates a previously-picked parent (it belonged to
-// the old project). Only clear once the new project's epics have actually
-// loaded — otherwise an in-flight fetch would wrongly drop a valid preset.
-watch([projectKey, epics], () => {
+// Changing the project or the type invalidates a previously-picked parent (it
+// belonged to the old project, or is the wrong type now). Only clear once the
+// new candidate list has actually loaded — otherwise an in-flight fetch would
+// wrongly drop a valid preset.
+watch([projectKey, parentCandidates], () => {
   if (parentId.value === "__none__") return;
-  if (epicsQuery.isFetching.value) return;
-  if (!epics.value.some((e) => e.id === parentId.value)) {
+  if (parentsQuery.isFetching.value) return;
+  if (!parentCandidates.value.some((e) => e.id === parentId.value)) {
     parentId.value = "__none__";
   }
 });
@@ -133,10 +143,16 @@ const TYPE_OPTIONS: Array<{ value: TicketType; label: string; icon: any }> = [
   { value: "bug", label: "Bug", icon: Bug },
   { value: "spike", label: "Spike", icon: Lightbulb },
   { value: "epic", label: "Epic", icon: Mountain },
+  { value: "subtask", label: "Subtask", icon: ListTree },
 ];
 
+// A subtask is never free-floating — it must have a parent.
+const needsParent = computed(() => type.value === "subtask");
+
 const canSubmit = computed(() =>
-  title.value.trim().length > 0 && projectKey.value.length > 0
+  title.value.trim().length > 0 &&
+  projectKey.value.length > 0 &&
+  (!needsParent.value || parentId.value !== "__none__")
 );
 
 const createMutation = useMutation({
@@ -160,7 +176,7 @@ const createMutation = useMutation({
     qc.invalidateQueries({ queryKey: ["sw", "tickets"] });
     qc.invalidateQueries({ queryKey: ["sw", "projects", projectKey.value, "board"] });
     qc.invalidateQueries({ queryKey: ["sw", "boards"] });
-    // Refresh the parent epic's sub-ticket list + detail when this was a child.
+    // Refresh the parent's children list + detail when this was a child.
     if (parentId.value !== "__none__") {
       qc.invalidateQueries({ queryKey: queryKeys.ticketChildren(parentId.value) });
       qc.invalidateQueries({ queryKey: queryKeys.ticket(parentId.value) });
@@ -265,22 +281,27 @@ function onKeydown(e: KeyboardEvent) {
           </Select>
         </div>
 
-        <!-- Parent epic — only offered for non-epic types (epics can't nest)
-             and only when the project actually has epics to choose from. -->
-        <div v-if="type !== 'epic' && epics.length > 0" class="space-y-1.5">
-          <Label>Parent epic</Label>
+        <!-- Parent — offered for non-epic types (epics can't nest): an epic for
+             a task/bug/spike, a task/bug/spike for a subtask. Shown when there
+             are candidates, or always for a subtask (which requires one). -->
+        <div v-if="type !== 'epic' && (parentCandidates.length > 0 || needsParent)" class="space-y-1.5">
+          <Label>Parent {{ parentNoun }}<span v-if="needsParent" class="text-destructive"> *</span></Label>
           <Select v-model="parentId">
             <SelectTrigger class="w-full">
-              <SelectValue />
+              <SelectValue :placeholder="`Pick a parent ${parentNoun}`" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__none__">No parent</SelectItem>
-              <SelectItem v-for="e in epics" :key="e.id" :value="e.id">
+              <SelectItem v-if="!needsParent" value="__none__">No parent</SelectItem>
+              <SelectItem v-for="e in parentCandidates" :key="e.id" :value="e.id">
                 <span class="font-mono text-xs">{{ e.key }}</span>
                 <span class="ml-2">{{ e.title }}</span>
               </SelectItem>
             </SelectContent>
           </Select>
+          <p v-if="needsParent && parentCandidates.length === 0 && !parentsQuery.isFetching.value"
+             class="text-xs text-muted-foreground">
+            This project has no task, bug, or spike to attach a subtask to yet.
+          </p>
         </div>
 
         <div class="space-y-1.5">

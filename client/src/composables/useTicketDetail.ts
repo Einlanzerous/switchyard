@@ -59,7 +59,8 @@ export function useTicketDetail(idOrKey: ComputedRef<string | null>) {
 
   // Parent + children fetches power the LinkedWork section. Both are lazy:
   // parent only fires when ticket.parent_id is set; children only when this
-  // ticket is itself an epic.
+  // ticket can have children (anything but a subtask — an epic's tasks, or a
+  // task/bug/spike's subtasks).
   const parentId = computed(() => ticket.value?.parent_id ?? null);
   const parentQuery = useQuery({
     queryKey: computed(() => queryKeys.ticket(parentId.value ?? "__none__")),
@@ -77,7 +78,7 @@ export function useTicketDetail(idOrKey: ComputedRef<string | null>) {
 
   const childrenQuery = useQuery({
     queryKey: computed(() => queryKeys.ticketChildren(idOrKey.value ?? "__none__")),
-    enabled: computed(() => ticket.value?.type === "epic"),
+    enabled: computed(() => ticket.value != null && ticket.value.type !== "subtask"),
     queryFn: async () => {
       const v = idOrKey.value;
       if (!v) throw new Error("no idOrKey");
