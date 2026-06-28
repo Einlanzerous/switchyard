@@ -22,6 +22,15 @@ jobs:
       - name: Typecheck (shared + server + client)
         run: bun run typecheck
 
+      # The root typecheck above is plain `tsc -b`, which cannot see Vue SFC
+      # `<template>` type errors AND leaves a `.tsbuildinfo` that makes a plain
+      # `vue-tsc -b` skip the client project. `--force` ignores that build info
+      # and does a full check, so template errors (e.g. an exhaustive
+      # `Record<TicketType>` missing a key) fail the PR gate instead of slipping
+      # to main and breaking the release build. See SWY-126.
+      - name: Typecheck client templates (vue-tsc — SFC type-check tsc -b misses)
+        run: cd client && bun run type-check
+
       - name: Authz guard (Phase 6 — no unscoped project-table reads)
         run: cd server && bun scripts/authz-guard.ts
 
