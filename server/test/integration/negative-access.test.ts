@@ -1113,3 +1113,62 @@ describe("6.5 — agent service accounts (instance-wide, no membership rows)", (
     });
   }
 });
+
+// ─── 7.0 — plan reads (SWY-109) ──────────────────────────────────────────────
+// Plans inherit their ticket's project membership. The friend (viewer on PLEX
+// only) reads the PLEX plan but gets 404 on every SWY plan read — existence
+// stays hidden — and 403 when trying to submit on a project they can't write.
+describe("7.0 — plan reads + write isolation (HTTP, friend=viewer on PLEX)", () => {
+  async function seed() {
+    const ctx = await fixture();
+    const mkTicket = async (project: { id: string }, status: { id: string }, number: number) => {
+      const [t] = await testDb.insert(schema.tickets).values({
+        project_id: project.id, number, type: "task", title: `T-${number}`,
+        status_id: status.id, reporter_id: ctx.magos.id,
+      }).returning();
+      return t!;
+    };
+    await mkTicket(ctx.plex, ctx.plexBacklog, 1);
+    await mkTicket(ctx.swy, ctx.swyBacklog, 1);
+
+    const ownerToken = await mintToken(ctx.magos.id, ["admin"]);
+    const friendToken = await mintToken(ctx.friend.id, ["tickets:write"]);
+
+    // Owner (instance-wide) seeds a plan on a ticket in each project.
+    const submit = (key: string) =>
+      POST(`/v1/tickets/${key}/plan/revisions`, ownerToken, {
+        narrative_md: "plan", criteria: [{ text: "x" }],
+      });
+    expect((await submit("PLEX-1")).status).toBe(201);
+    expect((await submit("SWY-1")).status).toBe(201);
+    return { friendToken };
+  }
+
+  test("PLEX plan reads resolve; SWY plan reads 404 (not 403)", async () => {
+    const { friendToken } = await seed();
+    expect((await GET("/v1/tickets/PLEX-1/plan", friendToken)).status).toBe(200);
+    expect((await GET("/v1/tickets/PLEX-1/plan/revisions", friendToken)).status).toBe(200);
+    expect((await GET("/v1/tickets/PLEX-1/plan/revisions/1", friendToken)).status).toBe(200);
+
+    for (const path of ["/v1/tickets/SWY-1/plan", "/v1/tickets/SWY-1/plan/revisions", "/v1/tickets/SWY-1/plan/revisions/1"]) {
+      const res = await GET(path, friendToken);
+      expect(res.status).toBe(404);
+      expect((await res.json()).error.code).toBe("not_found");
+    }
+  });
+
+  test("viewer cannot submit/review on PLEX (403); non-member write on SWY (403)", async () => {
+    const { friendToken } = await seed();
+    // Viewer role on PLEX → 403 on writes despite a tickets:write token.
+    expect((await POST("/v1/tickets/PLEX-1/plan/revisions", friendToken, {
+      narrative_md: "n", criteria: [{ text: "x" }],
+    })).status).toBe(403);
+    expect((await POST("/v1/tickets/PLEX-1/plan/revisions/1/review", friendToken, {
+      verdict: "approved",
+    })).status).toBe(403);
+    // Non-member project write on SWY → 403 (the actor named the resource by key).
+    expect((await POST("/v1/tickets/SWY-1/plan/revisions", friendToken, {
+      narrative_md: "n", criteria: [{ text: "x" }],
+    })).status).toBe(403);
+  });
+});

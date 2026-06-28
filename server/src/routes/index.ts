@@ -6,6 +6,7 @@ import * as statuses from "./statuses.js";
 import * as labels from "./labels.js";
 import * as tickets from "./tickets.js";
 import * as comments from "./comments.js";
+import * as plans from "./plans.js";
 import * as attachments from "./attachments.js";
 import * as boards from "./boards.js";
 import * as webhooks from "./webhooks.js";
@@ -33,6 +34,9 @@ export function mountRoutes(app: OpenAPIHono) {
   labels.mount(app);
   tickets.mount(app);
   comments.mount(app);
+  // After tickets.mount so the `/v1/tickets/*` requireAuth + idempotency
+  // wildcards are registered first (plan routes live under /v1/tickets/*).
+  plans.mount(app);
   attachments.mount(app);
   boards.mount(app);
   webhooks.mount(app);

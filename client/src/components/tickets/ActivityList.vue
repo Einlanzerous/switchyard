@@ -3,7 +3,7 @@ import { computed } from "vue";
 import { formatDistanceToNow } from "date-fns";
 import {
   Plus, Pencil, ArrowRight, UserCheck, MessageSquare, Paperclip, X, CheckCircle2, Send, Trash2,
-  Link2, GitPullRequest, FolderInput,
+  Link2, GitPullRequest, FolderInput, ClipboardList, ClipboardCheck, Ban,
 } from "lucide-vue-next";
 import { Skeleton } from "@/components/ui/skeleton";
 import StatusBadge from "./StatusBadge.vue";
@@ -39,6 +39,11 @@ const META: Record<EventType, { icon: any; verb: string }> = {
   "project.created": { icon: Plus, verb: "created the project" },
   "project.updated": { icon: Pencil, verb: "updated the project" },
   "project.deleted": { icon: Trash2, verb: "deleted the project" },
+  "plan.submitted": { icon: ClipboardList, verb: "submitted a plan" },
+  "plan.revised": { icon: ClipboardList, verb: "revised the plan" },
+  "plan.approved": { icon: ClipboardCheck, verb: "approved the plan" },
+  "plan.changes_requested": { icon: Pencil, verb: "requested plan changes" },
+  "plan.rejected": { icon: Ban, verb: "rejected the plan" },
 };
 
 // Newest-first. Server already returns DESC; sort defensively here so

@@ -26,6 +26,13 @@ export const EventType = z.enum([
   "project.created",
   "project.updated",
   "project.deleted",
+  // Plan-as-PR (Phase 7). `plan.rejected` is distinct from `changes_requested`
+  // so policy/rules can route "wrong approach" differently from a nit-fix loop.
+  "plan.submitted",
+  "plan.revised",
+  "plan.approved",
+  "plan.changes_requested",
+  "plan.rejected",
 ]);
 export type EventType = z.infer<typeof EventType>;
 
