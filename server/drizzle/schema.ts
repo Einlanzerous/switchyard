@@ -458,12 +458,26 @@ export const comments = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
     body: text("body").notNull(),
+    // Plan threads (Phase 7). When set, the comment is anchored to a plan
+    // revision; `plan_anchor` pins it to a sub-target within that revision
+    // (`criterion:<id>` | `section:<name>` | `plan`). Both NULL = an ordinary
+    // ticket comment. FK cascades so deleting a revision drops its threads.
+    plan_revision_id: uuid("plan_revision_id").references(() => planRevisions.id, {
+      onDelete: "cascade",
+    }),
+    plan_anchor: text("plan_anchor"),
     created_at: createdAt(),
     updated_at: updatedAt(),
     deleted_at: deletedAt(),
   },
   (t) => ({
     ticketIdx: index("comments_ticket_idx").on(t.ticket_id, t.created_at),
+    planRevisionIdx: index("comments_plan_revision_idx").on(t.plan_revision_id),
+    // An anchor only means something attached to a revision.
+    planAnchorRequiresRevision: check(
+      "comments_plan_anchor_requires_revision",
+      sql`${t.plan_anchor} IS NULL OR ${t.plan_revision_id} IS NOT NULL`
+    ),
   })
 );
 
@@ -1168,4 +1182,124 @@ export const llmObsPendingValues = pgTable(
       .on(t.dimension, t.last_seen_at)
       .where(sql`${t.resolved_at} IS NULL`),
   }),
+);
+
+// ─── plans (Phase 7 — Plan-as-PR) ───────────────────────────────────────────
+// One plan per ticket, many versioned revisions. A revision carries the
+// narrative markdown + a checkable acceptance-criteria list; a review records
+// the reviewer's per-criterion + overall verdict. Modeled on the rules /
+// rule_firings family (parent entity + append-only child rows + a state
+// machine). The `updated_at` auto-bump trigger (triggers.sql) applies to
+// `plans` automatically; the child tables are append-or-verdict-mutated and
+// intentionally carry no updated_at.
+
+export const planStatus = pgEnum("plan_status", [
+  "draft",
+  "in_review",
+  "changes_requested",
+  "approved",
+  "superseded",
+]);
+// Per-revision lifecycle. A submitted revision is `in_review`; a review moves
+// it to approved / changes_requested / rejected. (`rejected` = reviewer judged
+// the approach wrong, not just nits — drives the distinct plan.rejected event.)
+export const planRevisionStatus = pgEnum("plan_revision_status", [
+  "in_review",
+  "changes_requested",
+  "approved",
+  "rejected",
+]);
+export const planCriterionVerdict = pgEnum("plan_criterion_verdict", [
+  "pending",
+  "approved",
+  "rejected",
+]);
+export const planReviewVerdict = pgEnum("plan_review_verdict", [
+  "approved",
+  "changes_requested",
+  "rejected",
+]);
+
+export const plans = pgTable(
+  "plans",
+  {
+    id: id(),
+    ticket_id: uuid("ticket_id")
+      .notNull()
+      .unique()
+      .references(() => tickets.id, { onDelete: "cascade" }),
+    status: planStatus("status").notNull().default("in_review"),
+    // Soft reference to plan_revisions.id (deliberately NO foreign key):
+    // plans <-> plan_revisions are mutually referential, so a hard FK would be
+    // circular. Set right after the first revision is inserted; repointed on
+    // each revise. Application code keeps it consistent.
+    current_revision_id: uuid("current_revision_id"),
+    revision_count: integer("revision_count").notNull().default(0),
+    created_at: createdAt(),
+    updated_at: updatedAt(),
+  },
+  (t) => ({
+    ticketIdx: index("plans_ticket_idx").on(t.ticket_id),
+  })
+);
+
+export const planRevisions = pgTable(
+  "plan_revisions",
+  {
+    id: id(),
+    plan_id: uuid("plan_id")
+      .notNull()
+      .references(() => plans.id, { onDelete: "cascade" }),
+    rev_number: integer("rev_number").notNull(),
+    narrative_md: text("narrative_md").notNull(),
+    status: planRevisionStatus("status").notNull().default("in_review"),
+    submitted_by: uuid("submitted_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    submitted_at: timestamp("submitted_at", { withTimezone: true, mode: "string" })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (t) => ({
+    planRevUnique: uniqueIndex("plan_revisions_plan_rev_unique").on(t.plan_id, t.rev_number),
+    planIdx: index("plan_revisions_plan_idx").on(t.plan_id, t.rev_number),
+  })
+);
+
+export const planCriteria = pgTable(
+  "plan_criteria",
+  {
+    id: id(),
+    revision_id: uuid("revision_id")
+      .notNull()
+      .references(() => planRevisions.id, { onDelete: "cascade" }),
+    // The full criteria list is re-inserted on each revision (no stable keys
+    // across revisions in v1; the diff is computed render-time from text).
+    position: integer("position").notNull(),
+    text: text("text").notNull(),
+    verdict: planCriterionVerdict("verdict").notNull().default("pending"),
+    reviewer_note: text("reviewer_note"),
+  },
+  (t) => ({
+    revisionIdx: index("plan_criteria_revision_idx").on(t.revision_id, t.position),
+  })
+);
+
+export const planReviews = pgTable(
+  "plan_reviews",
+  {
+    id: id(),
+    revision_id: uuid("revision_id")
+      .notNull()
+      .references(() => planRevisions.id, { onDelete: "cascade" }),
+    reviewer_id: uuid("reviewer_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    verdict: planReviewVerdict("verdict").notNull(),
+    note: text("note"),
+    created_at: createdAt(),
+  },
+  (t) => ({
+    revisionIdx: index("plan_reviews_revision_idx").on(t.revision_id, t.created_at),
+  })
 );

@@ -7,6 +7,7 @@ export * from "./schemas/transition.js";
 export * from "./schemas/ticket.js";
 export * from "./schemas/label.js";
 export * from "./schemas/comment.js";
+export * from "./schemas/plan.js";
 export * from "./schemas/attachment.js";
 export * from "./schemas/event.js";
 export * from "./schemas/board.js";

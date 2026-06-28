@@ -152,6 +152,9 @@ export function mapComment(c: CommentRow, author: UserRow, attachments: Attachme
     author: mapUserRef(author),
     body: deleted ? "[deleted]" : c.body,
     attachments: deleted ? [] : attachments,
+    // Plan-thread anchoring (Phase 7); null for ordinary ticket comments.
+    plan_revision_id: c.plan_revision_id ?? null,
+    plan_anchor: (c.plan_anchor as Comment["plan_anchor"]) ?? null,
     edited,
     deleted,
     created_at: c.created_at,
