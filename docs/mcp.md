@@ -13,7 +13,7 @@ REST API automatically.
 
 ## Status
 
-Stdio transport, in-memory test harness, **30 tools** registered across five
+Stdio transport, in-memory test harness, **37 tools** registered across six
 domains.
 
 **Tickets**
@@ -70,6 +70,25 @@ domains.
 | `create_label` | write | New global label |
 | `update_label` | write | Rename / recolor a label |
 | `delete_label` | write | Remove a label |
+
+**Users & API tokens** — admin-tier (`users:manage` + instance-admin)
+
+These automate teammate onboarding that previously needed raw `curl` (see the
+"Mint yourself a user + token" steps below). Because the token they run under can
+create/delete any user and mint admin tokens, prefer a **separate
+narrowly-scoped admin token** over granting `users:manage` to the default MCP
+token. Destructive tools require `confirm: true`; minted plaintext secrets are
+returned **once** and never logged.
+
+| Tool | Kind | Purpose |
+|---|---|---|
+| `list_users` | read | Instance user directory (humans + agents); paginated |
+| `list_user_tokens` | read | A user's token **metadata** (never the secret) |
+| `create_user` | write | New user (`type` agent/human, `instance_role` owner/member) |
+| `update_user` | write | Patch name/type/role; server blocks demoting the last owner |
+| `delete_user` | write | Soft-delete a user (`confirm: true` required) |
+| `create_user_token` | write | Mint a token; plaintext `token` returned **once** |
+| `revoke_user_token` | write | Revoke a token (`confirm: true` required) |
 
 Out of scope (deferred): attachments, webhook/rule subscriptions, resource-style
 ticket pages, and status-transition-table CRUD (the allowed-transitions graph;
