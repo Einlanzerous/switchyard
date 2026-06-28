@@ -12,7 +12,7 @@ import type { db as defaultDb } from "../db.js";
 import type {
   EventType, UserRef, TicketSummary, EventChanges, StatusChange,
 } from "@switchyard/shared";
-import { getRulesEngineUserId } from "./rules/dispatcher.js";
+import { getRulesEngineUserId } from "./rules/rules-context.js";
 
 // Drizzle's transaction type is awkward to import; this is the structurally
 // minimal subset we use. Pass either `db` or a `tx` from `db.transaction(async tx => {...})`.

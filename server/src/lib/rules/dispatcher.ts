@@ -18,8 +18,14 @@ import { loadTicketSummary } from "../tickets.js";
 import type { TicketSummary as ApiTicketSummary } from "@switchyard/shared";
 import { evaluate } from "./evaluator.js";
 import { runAction } from "./actions.js";
+import {
+  setRulesEngineContext,
+  getRulesEngineUserId,
+  getRulesEngineActor,
+  resetRulesEngineContext,
+} from "./rules-context.js";
 import type {
-  RuleAction, RuleConditions, UserRef,
+  RuleAction, RuleConditions,
 } from "@switchyard/shared";
 import type {
   RuleContext, FiringOutcome, ActionOutcome,
@@ -32,11 +38,9 @@ let running = false;
 let loopPromise: Promise<void> | null = null;
 let inflight = 0;
 
-// Resolved at start time. The rule dispatcher needs the rules-engine user
-// row to attribute actions; we cache it once at boot instead of looking it
-// up per firing.
-let rulesEngineUserId: string | null = null;
-let rulesEngineActor: UserRef | null = null;
+// The rules-engine identity (resolved once at boot) lives in ./rules-context.js
+// so lib/events.ts can read it without importing the dispatcher — see that
+// module's header for the cycle it breaks.
 
 export function startDispatcher(): void {
   if (running) return;
@@ -76,13 +80,7 @@ function dispatcherInflight(): number {
 export function _resetForTesting(): void {
   running = false;
   loopPromise = null;
-  rulesEngineUserId = null;
-  rulesEngineActor = null;
-}
-
-// Used by lib/events.ts to skip rule fan-out for rule-authored events.
-export function getRulesEngineUserId(): string | null {
-  return rulesEngineUserId;
+  resetRulesEngineContext();
 }
 
 async function bootstrap(): Promise<void> {
@@ -97,8 +95,7 @@ async function bootstrap(): Promise<void> {
   if (!user) {
     throw new Error("[rules-dispatcher] rules-engine user not found — run db:migrate");
   }
-  rulesEngineUserId = user.id;
-  rulesEngineActor = mapUserRef(user);
+  setRulesEngineContext(user.id, mapUserRef(user));
 }
 
 // ─── internals ──────────────────────────────────────────────────────────────
@@ -180,6 +177,8 @@ async function processOne(row: ClaimedRow): Promise<void> {
   inflight++;
   const newAttempts = row.attempts + 1;
   try {
+    const rulesEngineUserId = getRulesEngineUserId();
+    const rulesEngineActor = getRulesEngineActor();
     if (!rulesEngineUserId || !rulesEngineActor) {
       // Shouldn't happen post-bootstrap, but recover gracefully.
       await markFailed(row.firing_id, newAttempts, "dispatcher not bootstrapped", null);
