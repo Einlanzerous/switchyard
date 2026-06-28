@@ -10,6 +10,7 @@ import { registerTicketTools } from "./tools/tickets.js";
 import { registerTicketLinkTools } from "./tools/ticketLinks.js";
 import { registerExternalRefTools } from "./tools/externalRefs.js";
 import { registerQueryTools } from "./tools/query.js";
+import { registerUserTools } from "./tools/users.js";
 
 export function buildServer(): McpServer {
   const server = new McpServer(
@@ -31,6 +32,7 @@ export function buildServer(): McpServer {
   registerTicketLinkTools(server);
   registerExternalRefTools(server);
   registerQueryTools(server);
+  registerUserTools(server);
 
   return server;
 }
