@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host",
-    "build": "(cd ../shared && bun run build) && vue-tsc -b && vite build",
+    "type-check": "vue-tsc -b --force",
+    "build": "(cd ../shared && bun run build) && vue-tsc -b --force && vite build",
     "preview": "vite preview",
     "api:gen": "bunx openapi-typescript ../openapi.yaml -o ./src/lib/api.types.ts",
     "test:e2e": "playwright test",
