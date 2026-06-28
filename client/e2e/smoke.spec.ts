@@ -88,4 +88,23 @@ test.describe("smoke", () => {
     // The CommandDialog renders a search input as soon as it opens.
     await expect(page.getByPlaceholder(/Search tickets, projects, boards/i)).toBeVisible();
   });
+
+  test("sidebar collapse toggles and persists across reload", async ({ page }) => {
+    await page.goto("/");
+    // Default = expanded: the control offers to collapse.
+    const collapse = page.getByRole("button", { name: /collapse sidebar/i });
+    await expect(collapse).toBeVisible();
+    await collapse.click();
+    // Now collapsed: the control flips to "Expand sidebar".
+    const expand = page.getByRole("button", { name: /expand sidebar/i });
+    await expect(expand).toBeVisible();
+
+    // Preference persists (localStorage) across a reload.
+    await page.reload();
+    await expect(page.getByRole("button", { name: /expand sidebar/i })).toBeVisible();
+
+    // Re-expand to leave a clean state.
+    await page.getByRole("button", { name: /expand sidebar/i }).click();
+    await expect(page.getByRole("button", { name: /collapse sidebar/i })).toBeVisible();
+  });
 });
