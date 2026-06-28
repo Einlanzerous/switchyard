@@ -1,11 +1,19 @@
 <script setup lang="ts">
 import { RouterLink, useRoute } from "vue-router";
 import { computed } from "vue";
-import { Inbox, LayoutDashboard, KanbanSquare, FolderKanban, Settings, Zap, Activity, HeartPulse } from "lucide-vue-next";
+import { storeToRefs } from "pinia";
+import {
+  Inbox, LayoutDashboard, KanbanSquare, FolderKanban, Settings, Zap, Activity,
+  HeartPulse, ChevronLeft, ChevronRight,
+} from "lucide-vue-next";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
+} from "@/components/ui/tooltip";
 import SwitchyardLogo from "@/components/SwitchyardLogo.vue";
 import { APP_VERSION_DISPLAY } from "@/lib/version";
+import { useUiStore } from "@/stores/ui";
 
 type NavItem = { to: string; label: string; icon: any; group: "main" | "admin" };
 
@@ -24,6 +32,9 @@ const route = useRoute();
 const main = computed(() => items.filter((i) => i.group === "main"));
 const admin = computed(() => items.filter((i) => i.group === "admin"));
 
+const ui = useUiStore();
+const { sidebarCollapsed: collapsed } = storeToRefs(ui);
+
 // Active state needs to be the *most-specific* match, so when the user is on
 // `/automations/webhooks/:id/deliveries`, only "Automations" highlights and
 // "Settings" doesn't (despite both having a `/` prefix overlap with nothing).
@@ -41,53 +52,90 @@ const activeKey = computed(() => {
 function isActive(to: string) {
   return activeKey.value === to;
 }
+
+// Per-item classes. Collapsed → icon centered, no inline label; expanded →
+// icon + label with a gap. Active highlight spans the whole item either way.
+function itemClass(to: string) {
+  return [
+    "flex items-center rounded-md py-1.5 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors",
+    collapsed.value ? "justify-center px-0" : "gap-2 px-3",
+    isActive(to) && "bg-accent text-foreground",
+  ];
+}
 </script>
 
 <template>
-  <aside class="hidden md:flex md:w-60 md:flex-col border-r bg-sidebar">
-    <!-- TODO: replace wordmark with Commissioner (fonts.google.com/specimen/Commissioner)
+  <aside
+    class="hidden md:flex md:flex-col border-r bg-sidebar transition-[width] duration-200 ease-in-out"
+    :class="collapsed ? 'md:w-16' : 'md:w-60'"
+  >
+    <!-- Logo header — structurally separate from the nav, so collapsing the
+         menu below leaves the logo in place (overflow-hidden clips the wordmark
+         cleanly in the narrow rail rather than hiding/shifting it).
+         TODO: replace wordmark with Commissioner (fonts.google.com/specimen/Commissioner)
          once the logo SVG is cleaned up as a proper mark-only file -->
-    <div class="flex h-16 items-center px-4 border-b">
+    <div class="flex h-16 items-center px-4 border-b overflow-hidden">
       <RouterLink to="/">
         <SwitchyardLogo />
       </RouterLink>
     </div>
 
     <ScrollArea class="flex-1">
-      <nav class="flex flex-col gap-1 p-3 text-sm">
-        <RouterLink
-          v-for="item in main"
-          :key="item.to"
-          :to="item.to"
-          class="flex items-center gap-2 rounded-md px-3 py-1.5 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-          :class="isActive(item.to) && 'bg-accent text-foreground'"
-        >
-          <component :is="item.icon" class="h-4 w-4" />
-          {{ item.label }}
-        </RouterLink>
+      <TooltipProvider :delay-duration="200">
+        <nav class="flex flex-col gap-1 p-3 text-sm">
+          <Tooltip v-for="item in main" :key="item.to">
+            <TooltipTrigger as-child>
+              <RouterLink :to="item.to" :class="itemClass(item.to)" :aria-label="item.label">
+                <component :is="item.icon" class="h-4 w-4 shrink-0" />
+                <span v-if="!collapsed" class="truncate">{{ item.label }}</span>
+              </RouterLink>
+            </TooltipTrigger>
+            <TooltipContent v-if="collapsed" side="right">{{ item.label }}</TooltipContent>
+          </Tooltip>
 
-        <Separator class="my-3" />
-        <div class="px-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Admin
-        </div>
+          <Separator class="my-3" />
+          <!-- Section header collapses to a single-letter glyph in the rail. -->
+          <div
+            class="text-xs font-medium uppercase tracking-wider text-muted-foreground"
+            :class="collapsed ? 'text-center px-0' : 'px-3'"
+          >
+            {{ collapsed ? "A" : "Admin" }}
+          </div>
 
-        <RouterLink
-          v-for="item in admin"
-          :key="item.to"
-          :to="item.to"
-          class="flex items-center gap-2 rounded-md px-3 py-1.5 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-          :class="isActive(item.to) && 'bg-accent text-foreground'"
-        >
-          <component :is="item.icon" class="h-4 w-4" />
-          {{ item.label }}
-        </RouterLink>
-      </nav>
+          <Tooltip v-for="item in admin" :key="item.to">
+            <TooltipTrigger as-child>
+              <RouterLink :to="item.to" :class="itemClass(item.to)" :aria-label="item.label">
+                <component :is="item.icon" class="h-4 w-4 shrink-0" />
+                <span v-if="!collapsed" class="truncate">{{ item.label }}</span>
+              </RouterLink>
+            </TooltipTrigger>
+            <TooltipContent v-if="collapsed" side="right">{{ item.label }}</TooltipContent>
+          </Tooltip>
+        </nav>
+      </TooltipProvider>
     </ScrollArea>
 
+    <!-- Collapse/expand toggle. Lives in the menu footer (not the logo header).
+         Chevron points the way it affords: left to collapse, right to expand. -->
+    <div class="border-t p-2">
+      <button
+        type="button"
+        class="flex w-full items-center rounded-md px-3 py-1.5 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+        :class="collapsed ? 'justify-center' : 'justify-end'"
+        :aria-label="collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+        :title="collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+        @click="ui.toggleSidebar()"
+      >
+        <component :is="collapsed ? ChevronRight : ChevronLeft" class="h-4 w-4" />
+      </button>
+    </div>
+
     <!-- Version chip — release-please semver in CI builds, "dev" locally.
-         Sits in the sidebar footer so it doesn't add chrome to the main
-         content area. -->
-    <div class="px-4 py-2 border-t text-[10px] text-muted-foreground/70 font-mono">
+         Hidden in the rail (the string can't fit) so it doesn't wrap/overflow. -->
+    <div
+      v-if="!collapsed"
+      class="px-4 py-2 border-t text-[10px] text-muted-foreground/70 font-mono"
+    >
       {{ APP_VERSION_DISPLAY }}
     </div>
   </aside>

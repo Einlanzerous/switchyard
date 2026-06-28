@@ -5,11 +5,18 @@
 
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { useStorage } from "@vueuse/core";
 
 export const useUiStore = defineStore("ui", () => {
   const paletteOpen = ref(false);
   const shortcutsOpen = ref(false);
   const createTicketOpen = ref(false);
+
+  // Collapsed (icons-only) state for the left sidebar. Persisted to
+  // localStorage (same `switchyard.*` convention as theme/token) so the
+  // preference survives reloads.
+  const sidebarCollapsed = useStorage("switchyard.sidebarCollapsed", false);
+  function toggleSidebar() { sidebarCollapsed.value = !sidebarCollapsed.value; }
 
   // Carries optional context into the create-ticket dialog. The dialog itself
   // also falls back to the URL's `?project=` if this is null.
@@ -29,8 +36,10 @@ export const useUiStore = defineStore("ui", () => {
 
   return {
     paletteOpen, shortcutsOpen, createTicketOpen, createTicketDefaultProject,
+    sidebarCollapsed,
     openPalette, closePalette, togglePalette,
     openShortcuts, toggleShortcuts,
     openCreateTicket,
+    toggleSidebar,
   };
 });

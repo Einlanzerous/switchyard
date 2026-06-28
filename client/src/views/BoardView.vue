@@ -104,7 +104,7 @@ const swimlanes = computed<Swimlane[]>(() => {
       const b = ensure(id, label, sortKey);
       b.tickets.push(t);
     } else if (swimlaneBy.value === "type") {
-      const order: Record<TicketType, number> = { epic: 0, task: 1, bug: 2, spike: 3 };
+      const order: Record<TicketType, number> = { epic: 0, task: 1, bug: 2, spike: 3, subtask: 4 };
       const b = ensure(t.type, capitalize(t.type), String(order[t.type] ?? 9));
       b.tickets.push(t);
     }
