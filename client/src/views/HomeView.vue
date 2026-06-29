@@ -16,7 +16,7 @@
 
 import { computed } from "vue";
 import { useQuery } from "@tanstack/vue-query";
-import { Activity, Clock, BarChart2, PieChart } from "lucide-vue-next";
+import { Activity, Clock, BarChart2, PieChart, ClipboardCheck } from "lucide-vue-next";
 import { useAuthStore } from "@/stores/auth";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
@@ -25,6 +25,7 @@ import { formatDurationMs, formatDeltaPercent } from "@/lib/formatDuration";
 import KpiCard from "@/components/dashboard/KpiCard.vue";
 import DashboardWidget from "@/components/dashboard/DashboardWidget.vue";
 import ActivityFeed from "@/components/dashboard/widgets/ActivityFeed.vue";
+import PlansAwaitingReview from "@/components/dashboard/widgets/PlansAwaitingReview.vue";
 import StaleRollupWidget from "@/components/dashboard/widgets/StaleRollup.vue";
 import ThroughputChart from "@/components/dashboard/widgets/ThroughputChart.vue";
 import StatusDonut from "@/components/dashboard/widgets/StatusDonut.vue";
@@ -194,7 +195,15 @@ const cycleDelta = computed(() => {
       </DashboardWidget>
     </div>
 
-    <!-- Row 3: Recent activity (full width) ──────────────────────────────── -->
+    <!-- Row 3: Plans awaiting your review (full width review queue) ────────── -->
+    <DashboardWidget title="Plans awaiting your review" :padded="false">
+      <template #title-prefix>
+        <ClipboardCheck class="h-3.5 w-3.5 text-muted-foreground" />
+      </template>
+      <PlansAwaitingReview :limit="8" />
+    </DashboardWidget>
+
+    <!-- Row 4: Recent activity (full width) ──────────────────────────────── -->
     <DashboardWidget title="Recent activity" :padded="false">
       <template #title-prefix>
         <Activity class="h-3.5 w-3.5 text-muted-foreground" />
