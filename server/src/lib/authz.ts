@@ -107,6 +107,30 @@ export async function visibleProjectFilter(
   return inArray(projectIdCol, [...ids]);
 }
 
+// Like `visibleProjectFilter`, but for the WRITE capability: a WHERE predicate
+// restricting `projectIdCol` to projects where the user holds at least `editor`
+// (editor/admin role). Instance-wide actors → `null` (no filter; they can write
+// everywhere their token allows); a member with no writable project →  a `FALSE`
+// predicate. Used by the "awaiting my review" plan queue, which should only
+// surface plans the user could actually act on. (7.1; reused by 7.2 health.)
+export async function writableProjectFilter(
+  user: Pick<AuthUser, "id" | "type" | "instance_role">,
+  projectIdCol: Column,
+): Promise<SQL | null> {
+  if (hasInstanceWideAccess(user)) return null;
+  const rows = await db
+    .select({ id: schema.userProjects.project_id })
+    .from(schema.userProjects)
+    .where(
+      and(
+        eq(schema.userProjects.user_id, user.id),
+        inArray(schema.userProjects.role, ["editor", "admin"]),
+      ),
+    );
+  if (rows.length === 0) return sql`false`;
+  return inArray(projectIdCol, rows.map((r) => r.id));
+}
+
 // True when the user may read the given project. Instance-wide actors always
 // can; a `member` needs a `user_projects` row. Cheaper than `visibleProjectIds`
 // for single-resource reads — one targeted membership lookup, not a full scan.

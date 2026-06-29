@@ -255,3 +255,139 @@ describe("7.0 — authz (reuses Phase 6)", () => {
     expect((await GET(`/v1/tickets/${key}/plan`, editorTok)).status).toBe(404);
   });
 });
+
+// ─── 7.1 — plan-anchored comments ──────────────────────────────────────────────
+
+describe("7.1 — plan-anchored comments", () => {
+  // Seed + submit revision 1 + a token that can write comments.
+  async function seedWithPlan() {
+    const s = await seed();
+    const commentTok = await mintToken(s.editor.id, ["tickets:write", "comments:write"]);
+    const rev = await (await POST(`/v1/tickets/${s.key}/plan/revisions`, s.editorTok, {
+      narrative_md: "## Approach\nDo it.",
+      criteria: [{ text: "a" }, { text: "b" }],
+    })).json();
+    return { ...s, commentTok, rev };
+  }
+
+  test("anchored comments surface on the revision thread, hidden from the ticket thread", async () => {
+    const { key, commentTok, rev } = await seedWithPlan();
+    const criterionId = rev.criteria[0].id;
+
+    await POST(`/v1/tickets/${key}/comments`, commentTok, { body: "plain ticket comment" });
+    const a1 = await POST(`/v1/tickets/${key}/comments`, commentTok, {
+      body: "looks good overall", plan_revision_id: rev.id, plan_anchor: "plan",
+    });
+    expect(a1.status).toBe(201);
+    expect((await a1.json()).plan_revision_id).toBe(rev.id);
+
+    const a2 = await POST(`/v1/tickets/${key}/comments`, commentTok, {
+      body: "tighten this AC", plan_revision_id: rev.id, plan_anchor: `criterion:${criterionId}`,
+    });
+    expect(a2.status).toBe(201);
+    expect((await a2.json()).plan_anchor).toBe(`criterion:${criterionId}`);
+
+    // Ticket thread shows ONLY the plain comment.
+    const ticketThread = await (await GET(`/v1/tickets/${key}/comments`, commentTok)).json();
+    expect(ticketThread.items.map((c: any) => c.body)).toEqual(["plain ticket comment"]);
+
+    // Revision thread shows the two anchored comments.
+    const revThread = await (await GET(`/v1/tickets/${key}/comments?plan_revision_id=${rev.id}`, commentTok)).json();
+    expect(revThread.items).toHaveLength(2);
+    expect(revThread.items.every((c: any) => c.plan_revision_id === rev.id)).toBe(true);
+
+    // Narrowed to the criterion anchor.
+    const critThread = await (await GET(
+      `/v1/tickets/${key}/comments?plan_revision_id=${rev.id}&anchor=criterion:${criterionId}`, commentTok,
+    )).json();
+    expect(critThread.items).toHaveLength(1);
+    expect(critThread.items[0].body).toBe("tighten this AC");
+  });
+
+  test("plan_anchor without plan_revision_id → 400", async () => {
+    const { key, commentTok } = await seedWithPlan();
+    const res = await POST(`/v1/tickets/${key}/comments`, commentTok, { body: "oops", plan_anchor: "plan" });
+    expect(res.status).toBe(400);
+  });
+
+  test("criterion anchor referencing a non-existent criterion → 400", async () => {
+    const { key, commentTok, rev } = await seedWithPlan();
+    const res = await POST(`/v1/tickets/${key}/comments`, commentTok, {
+      body: "x", plan_revision_id: rev.id, plan_anchor: "criterion:00000000-0000-0000-0000-000000000000",
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test("anchoring to a revision rooted on another ticket → 400", async () => {
+    const { key, commentTok, rev, editor } = await seedWithPlan();
+    // A second ticket in the same project, with no plan of its own.
+    const [proj] = await testDb.select().from(schema.projects).where(eq(schema.projects.key, "SWY"));
+    const [status] = await testDb.select().from(schema.statuses).where(eq(schema.statuses.project_id, proj!.id));
+    await testDb.insert(schema.tickets).values({
+      project_id: proj!.id, number: 2, type: "task", title: "Other", status_id: status!.id, reporter_id: editor.id,
+    });
+    // SWY-1's revision can't anchor a comment on SWY-2.
+    const res = await POST(`/v1/tickets/SWY-2/comments`, commentTok, {
+      body: "cross-ticket", plan_revision_id: rev.id, plan_anchor: "plan",
+    });
+    expect(res.status).toBe(400);
+    expect(key).toBe("SWY-1"); // sanity: the revision really belongs to SWY-1
+  });
+});
+
+// ─── 7.1 — GET /v1/plans collection ────────────────────────────────────────────
+
+describe("7.1 — GET /v1/plans collection", () => {
+  test("lists readable plans; filters by status; awaiting_my_review scopes to in_review", async () => {
+    const { editorTok, key } = await seed();
+
+    // No plans yet → empty page.
+    expect((await (await GET(`/v1/plans`, editorTok)).json()).items).toEqual([]);
+
+    await POST(`/v1/tickets/${key}/plan/revisions`, editorTok, {
+      narrative_md: "n", criteria: [{ text: "a" }, { text: "b" }],
+    });
+
+    const list = await (await GET(`/v1/plans`, editorTok)).json();
+    expect(list.items).toHaveLength(1);
+    const item = list.items[0];
+    expect(item.ticket.key).toBe(key);
+    expect(item.status).toBe("in_review");
+    expect(item.current_revision.rev_number).toBe(1);
+    expect(item.current_revision.criteria_total).toBe(2);
+    expect(item.current_revision.criteria_pending).toBe(2);
+
+    // The editor's review queue surfaces the in_review plan.
+    expect((await (await GET(`/v1/plans?awaiting_my_review=true`, editorTok)).json()).items).toHaveLength(1);
+    // status=approved filters out an in_review plan.
+    expect((await (await GET(`/v1/plans?status=approved`, editorTok)).json()).items).toEqual([]);
+
+    // Approve it → drops out of the review queue, appears under status=approved.
+    await POST(`/v1/tickets/${key}/plan/revisions/1/review`, editorTok, {
+      verdict: "approved",
+      criteria_verdicts: [{ position: 0, verdict: "approved" }, { position: 1, verdict: "approved" }],
+    });
+    expect((await (await GET(`/v1/plans?awaiting_my_review=true`, editorTok)).json()).items).toEqual([]);
+    expect((await (await GET(`/v1/plans?status=approved`, editorTok)).json()).items).toHaveLength(1);
+  });
+
+  test("viewer reads the plan but their review queue is empty (no write role)", async () => {
+    const { editorTok, viewerTok, key } = await seed();
+    await POST(`/v1/tickets/${key}/plan/revisions`, editorTok, { narrative_md: "n", criteria: [{ text: "a" }] });
+    expect((await (await GET(`/v1/plans`, viewerTok)).json()).items).toHaveLength(1);
+    expect((await (await GET(`/v1/plans?awaiting_my_review=true`, viewerTok)).json()).items).toEqual([]);
+  });
+
+  test("non-member sees nothing (visibility scoping)", async () => {
+    const { editorTok, outsiderTok, key } = await seed();
+    await POST(`/v1/tickets/${key}/plan/revisions`, editorTok, { narrative_md: "n", criteria: [{ text: "a" }] });
+    expect((await (await GET(`/v1/plans`, outsiderTok)).json()).items).toEqual([]);
+  });
+
+  test("project filter scopes to that project key", async () => {
+    const { editorTok, key } = await seed();
+    await POST(`/v1/tickets/${key}/plan/revisions`, editorTok, { narrative_md: "n", criteria: [{ text: "a" }] });
+    expect((await (await GET(`/v1/plans?project=SWY`, editorTok)).json()).items).toHaveLength(1);
+    expect((await (await GET(`/v1/plans?project=NOPE`, editorTok)).json()).items).toEqual([]);
+  });
+});
