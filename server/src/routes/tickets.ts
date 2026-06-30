@@ -207,7 +207,16 @@ export function mount(app: OpenAPIHono) {
     const limit = q.limit;
 
     const conds: SQL[] = [];
-    if (!q.include_deleted) conds.push(isNull(schema.tickets.deleted_at));
+    if (!q.include_deleted) {
+      conds.push(isNull(schema.tickets.deleted_at));
+      // Defense-in-depth (SWY-127): never surface a ticket whose PROJECT was
+      // soft-deleted. The project-delete cascade prevents new orphans; this
+      // guards normal listings against any orphan from other sources / older
+      // data. Audit mode (include_deleted) intentionally still shows them.
+      conds.push(
+        sql`EXISTS (SELECT 1 FROM projects p WHERE p.id = ${schema.tickets.project_id} AND p.deleted_at IS NULL)`,
+      );
+    }
 
     // Phase 6.1.1 read scoping: restrict to the caller's visible projects at
     // the SQL layer so counts + cursor pagination stay correct. null for
