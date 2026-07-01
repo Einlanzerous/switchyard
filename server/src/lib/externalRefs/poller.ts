@@ -7,7 +7,7 @@
 // receiver; this loop stays active as the reconciliation backstop so a
 // missed webhook delivery doesn't leave a stale state forever.
 
-import { and, asc, eq, inArray, isNull, lt, or } from "drizzle-orm";
+import { and, eq, inArray, isNull, lt, ne, or, sql } from "drizzle-orm";
 import * as schema from "../../../drizzle/schema.js";
 import { db } from "../../db.js";
 import { env } from "../../env.js";
@@ -74,10 +74,35 @@ export function _resetForTesting(): void {
 async function tick(): Promise<number> {
   if (!env.GITHUB_TOKEN) return 0;
 
-  // Pick the oldest unpolled / stalest entries. `kind = 'generic'` is
-  // filtered out by the partial index this query targets.
-  const cutoff = new Date(Date.now() - env.EXTERNAL_REF_POLL_INTERVAL_MS).toISOString();
-  const rows = await db
+  const rows = await selectPollCandidates(db, Date.now());
+  if (rows.length === 0) return 0;
+
+  await Promise.all(rows.map(refreshOne));
+  return rows.length;
+}
+
+// Candidate selection for one poll tick. Exported as a test seam so the
+// ordering + exclusion rules can be asserted without stubbing GitHub.
+//
+// Two rules keep newly-attached refs from being starved (SWY-128):
+//   1. NULLS FIRST — never-polled refs (`polled_at IS NULL`) go to the FRONT,
+//      so a freshly-attached PR is resolved within a tick or two regardless
+//      of how large the recheck backlog is. (Plain `ASC` is NULLS LAST in
+//      Postgres, which buried them behind every timestamped ref.)
+//   2. Skip `merged` refs — a merged PR is irreversible, so re-polling it is
+//      pure waste. Excluding it stops the merged backlog from churning
+//      through every batch and crowding out never-polled + still-open refs.
+//      Only `merged` is treated as terminal: a `closed` PR can reopen then
+//      merge, and action `success`/`failed` conclusions can flip on re-run.
+//
+// `kind = 'generic'` is filtered out by the kind predicate (and the partial
+// index this query targets).
+export async function selectPollCandidates(
+  conn: typeof db,
+  nowMs: number,
+): Promise<Array<typeof schema.ticketExternalRefs.$inferSelect>> {
+  const cutoff = new Date(nowMs - env.EXTERNAL_REF_POLL_INTERVAL_MS).toISOString();
+  return conn
     .select()
     .from(schema.ticketExternalRefs)
     .where(and(
@@ -92,14 +117,14 @@ async function tick(): Promise<number> {
         isNull(schema.ticketExternalRefs.polled_at),
         lt(schema.ticketExternalRefs.polled_at, cutoff),
       ),
+      // never re-poll an irreversibly-terminal (merged) ref
+      or(
+        isNull(schema.ticketExternalRefs.state),
+        ne(schema.ticketExternalRefs.state, "merged"),
+      ),
     ))
-    .orderBy(asc(schema.ticketExternalRefs.polled_at))
+    .orderBy(sql`${schema.ticketExternalRefs.polled_at} asc nulls first`)
     .limit(env.EXTERNAL_REF_POLL_BATCH_SIZE);
-
-  if (rows.length === 0) return 0;
-
-  await Promise.all(rows.map(refreshOne));
-  return rows.length;
 }
 
 async function refreshOne(row: typeof schema.ticketExternalRefs.$inferSelect): Promise<void> {
