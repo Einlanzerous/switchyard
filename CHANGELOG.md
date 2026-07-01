@@ -1,5 +1,21 @@
 # Changelog
 
+## [3.6.1](https://github.com/Einlanzerous/switchyard/compare/v3.6.0...v3.6.1) (2026-07-01)
+
+
+### Bug Fixes
+
+* make the new-token Copy control work + clearer (inline field icon) ([1e51d89](https://github.com/Einlanzerous/switchyard/commit/1e51d89625392be1df852c4eef792af6e2c5899a))
+* SWY-127 — cascade ticket soft-delete on project delete + orphan guard ([#125](https://github.com/Einlanzerous/switchyard/issues/125)) ([ca0b453](https://github.com/Einlanzerous/switchyard/commit/ca0b453ec35a33e967fa8d2a118289d1180fa500))
+* SWY-128 — external-ref poller no longer starves never-polled refs ([#126](https://github.com/Einlanzerous/switchyard/issues/126)) ([d8099aa](https://github.com/Einlanzerous/switchyard/commit/d8099aa8521a4e68a4e5c4926e97663ebefed029))
+
+
+### Maintenance
+
+* update knowledge graph [skip ci] ([740e592](https://github.com/Einlanzerous/switchyard/commit/740e592b64fc696510e74fc0ee7cb171c7b111b2))
+* update knowledge graph [skip ci] ([1ecd0a5](https://github.com/Einlanzerous/switchyard/commit/1ecd0a5d920e0db282724f550b41f05241293a1e))
+* update knowledge graph [skip ci] ([aaf6fb4](https://github.com/Einlanzerous/switchyard/commit/aaf6fb4ccb3e0b13600a28bb61c5a601ba7fabfb))
+
 ## [3.6.0](https://github.com/Einlanzerous/switchyard/compare/v3.5.1...v3.6.0) (2026-06-28)
 
 
