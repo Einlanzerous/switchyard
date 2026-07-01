@@ -14,6 +14,7 @@ import InsightsTabs from "@/components/dashboard/InsightsTabs.vue";
 import SortMenu from "@/components/tickets/SortMenu.vue";
 import { compareTickets, SORT_MODES, type SortMode } from "@/lib/positions";
 import { useBoardDetail } from "@/composables/useBoards";
+import { providePlanReviewIndex } from "@/composables/usePlanReviewIndex";
 import { useUiStore } from "@/stores/ui";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
@@ -32,6 +33,9 @@ const boardId = computed(() => {
 });
 
 const { board, columns, statusLookup, isLoading, error } = useBoardDetail(boardId);
+
+// Provide the "plan in review" ticket-id set to the cards (7.1 board badge).
+providePlanReviewIndex();
 
 // Default to "no swimlanes" — boards mingle their projects' tickets into a
 // single grid. Users can opt into project / assignee / type rows from the

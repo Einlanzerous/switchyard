@@ -1,15 +1,19 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import {
+  Pagination,
   Plan,
+  PlanListItem,
   PlanRevision,
   PlanRevisionSummary,
+  PlanStatus,
   SubmitRevisionInput,
   SubmitReviewInput,
   paginated,
 } from "@switchyard/shared";
 import { db } from "../db.js";
 import * as schema from "../../drizzle/schema.js";
+import { requireAuth } from "../auth.js";
 import { errorResponses, okJson, createdJson, checkScope, z, idempotencyHeader } from "./_helpers.js";
 import { mapUserRef } from "../lib/mappers.js";
 import { resolveTicket } from "../lib/lookups.js";
@@ -17,6 +21,7 @@ import { loadTicketSummary } from "../lib/tickets.js";
 import { writeEvent } from "../lib/events.js";
 import { assertProjectReadable, assertProjectRole } from "../lib/authz.js";
 import {
+  listPlansApi,
   loadPlanForTicket,
   loadRevisionApi,
   mapPlan,
@@ -28,6 +33,22 @@ import { conflict, notFound } from "../errors.js";
 const tag = "Plans";
 const idOrKey = z.string().min(1);
 const revNumber = z.coerce.number().int().positive();
+
+// Cross-ticket plans collection (review queue + board badge index). Filters:
+// `status` (comma-separated PlanStatus list), `project` (key scope),
+// `awaiting_my_review` (in_review plans in projects the caller can write).
+const ListPlansQuery = Pagination.extend({
+  status: z.string().optional(),
+  project: z.string().optional(),
+  awaiting_my_review: z.coerce.boolean().optional(),
+});
+
+const listPlans = createRoute({
+  method: "get", path: "/v1/plans", tags: [tag],
+  summary: "List plans across tickets (review queue / board badge index)",
+  request: { query: ListPlansQuery },
+  responses: { ...okJson(paginated(PlanListItem)), ...errorResponses },
+});
 
 const getPlan = createRoute({
   method: "get", path: "/v1/tickets/{idOrKey}/plan", tags: [tag],
@@ -73,9 +94,31 @@ const reviewRevision = createRoute({
 });
 
 export function mount(app: OpenAPIHono) {
-  // Routes live under /v1/tickets/* — the requireAuth + idempotency wildcards
-  // registered by tickets.mount() already cover them (mounted after tickets in
-  // mountRoutes, so the middleware is registered first).
+  // The ticket-rooted routes live under /v1/tickets/* — the requireAuth +
+  // idempotency wildcards registered by tickets.mount() already cover them
+  // (mounted after tickets in mountRoutes, so the middleware is registered
+  // first). The top-level /v1/plans collection is outside that wildcard, so it
+  // needs its own auth gate (read-only GET → no idempotency).
+  app.use("/v1/plans", requireAuth);
+
+  // GET cross-ticket plans collection.
+  app.openapi(listPlans, (async (c: any) => {
+    const q = c.req.valid("query");
+    const auth = c.get("auth");
+    const statuses = q.status
+      ? (q.status.split(",").map((s: string) => s.trim()).filter((s: string) =>
+          (PlanStatus.options as readonly string[]).includes(s),
+        ) as PlanStatus[])
+      : undefined;
+    const page = await listPlansApi(auth.user, {
+      statuses,
+      projectKey: q.project,
+      awaitingMyReview: q.awaiting_my_review ?? false,
+      limit: q.limit,
+      cursor: q.cursor ?? null,
+    });
+    return c.json(page, 200);
+  }) as any);
 
   // GET plan + current revision.
   app.openapi(getPlan, (async (c: any) => {

@@ -13,14 +13,24 @@ import { writeEvent } from "../lib/events.js";
 import { loadTicketSummary } from "../lib/tickets.js";
 import { detectAndNotify, detectAndNotifyOnEdit } from "../lib/mentions.js";
 import { assertProjectReadable, assertProjectRole } from "../lib/authz.js";
+import { assertPlanAnchorForTicket } from "../lib/plans.js";
 import { badRequest, forbidden, notFound } from "../errors.js";
 
 const tag = "Comments";
 const idOrKey = z.string().min(1);
 
+// The ticket thread and the plan threads share the comments table. Without a
+// `plan_revision_id` filter the list returns ONLY ticket-level comments (plan
+// threads are hidden so they don't pollute the ticket conversation); with one,
+// it returns that revision's thread, optionally narrowed to a single `anchor`.
+const ListCommentsQuery = Pagination.extend({
+  plan_revision_id: Uuid.optional(),
+  anchor: z.string().optional(),
+});
+
 const list = createRoute({
   method: "get", path: "/v1/tickets/{idOrKey}/comments", tags: [tag], summary: "List comments on a ticket",
-  request: { params: z.object({ idOrKey }), query: Pagination },
+  request: { params: z.object({ idOrKey }), query: ListCommentsQuery },
   responses: { ...okJson(paginated(Comment)), ...errorResponses },
 });
 
@@ -68,6 +78,14 @@ export function mount(app: OpenAPIHono) {
     const conds: SQL[] = [
       eq(schema.comments.ticket_id, ticket.id),
     ];
+    // Plan threads vs. the ticket thread (7.1): scope to a revision when asked,
+    // otherwise hide all plan-anchored comments from the ticket conversation.
+    if (q.plan_revision_id) {
+      conds.push(eq(schema.comments.plan_revision_id, q.plan_revision_id));
+      if (q.anchor) conds.push(eq(schema.comments.plan_anchor, q.anchor));
+    } else {
+      conds.push(isNull(schema.comments.plan_revision_id));
+    }
     if (q.cursor) {
       const cur = decodeCursor(q.cursor);
       if (!cur) throw badRequest("invalid cursor");
@@ -124,11 +142,23 @@ export function mount(app: OpenAPIHono) {
     const ticket = await resolveTicket(param);
     await assertProjectRole(auth.user, ticket.project_id, "write", "comment");
 
+    // Plan-anchored comment (7.1): a `plan_anchor` requires a `plan_revision_id`
+    // (the DB CHECK enforces this too), and the revision/criterion must belong to
+    // this ticket — validated inside the tx below before the insert.
+    if (body.plan_anchor && !body.plan_revision_id) {
+      throw badRequest("plan_anchor requires plan_revision_id");
+    }
+
     const inserted = await db.transaction(async (tx) => {
+      if (body.plan_revision_id) {
+        await assertPlanAnchorForTicket(tx as any, ticket.id, body.plan_revision_id, body.plan_anchor ?? null);
+      }
       const [created] = await tx.insert(schema.comments).values({
         ticket_id: ticket.id,
         author_id: auth.user.id,
         body: body.body,
+        plan_revision_id: body.plan_revision_id ?? null,
+        plan_anchor: body.plan_anchor ?? null,
       }).returning();
       if (!created) throw new Error("comment insert returned nothing");
 

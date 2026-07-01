@@ -14,6 +14,7 @@ import ProjectHeaderLabel from "@/components/projects/ProjectHeaderLabel.vue";
 import ReadOnlyBanner from "@/components/projects/ReadOnlyBanner.vue";
 import SortMenu from "@/components/tickets/SortMenu.vue";
 import { useProjectPermissions } from "@/composables/useProjectPermissions";
+import { providePlanReviewIndex } from "@/composables/usePlanReviewIndex";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
 import { useUiStore } from "@/stores/ui";
@@ -31,6 +32,9 @@ const projectKey = computed(() => {
   const v = route.params.key;
   return typeof v === "string" ? v : null;
 });
+
+// Provide the "plan in review" ticket-id set to the cards (7.1 board badge).
+providePlanReviewIndex();
 
 // Board view toggle: hide epics by default (they rarely move column-to-
 // column and add visual noise). `?epics=1` opts in. Persisted via URL so
