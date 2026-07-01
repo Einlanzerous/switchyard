@@ -10,6 +10,7 @@ import { afterAll, beforeEach, describe, expect, test } from "bun:test";
 import { sql, eq } from "drizzle-orm";
 import { closeTestDb, schema, testDb } from "../db.js";
 import { detectKind, urlMatchesKind, parseGitHubUrl } from "../../src/lib/externalRefs/detectKind.js";
+import { selectPollCandidates } from "../../src/lib/externalRefs/poller.js";
 
 process.env.DATABASE_URL = process.env.DATABASE_URL_TEST!;
 
@@ -129,5 +130,86 @@ describe("4.5.2 ticket_external_refs — schema", () => {
     await testDb.delete(schema.tickets).where(eq(schema.tickets.id, t.id));
     const remaining = await testDb.select().from(schema.ticketExternalRefs);
     expect(remaining).toHaveLength(0);
+  });
+});
+
+// SWY-128: the poll queue starved never-polled refs behind a backlog of
+// terminal (merged) refs, so PR-merge auto-close silently stopped firing.
+// These lock in the two fixes: NULLS FIRST ordering + skipping merged refs.
+describe("SWY-128 poll candidate selection", () => {
+  const MIN = 60_000;
+
+  async function attach(
+    ctx: Awaited<ReturnType<typeof seedCtx>>,
+    t: typeof schema.tickets.$inferSelect,
+    url: string,
+    opts: { polled_at?: string | null; state?: "open" | "closed" | "merged" | "success" | "failed" | null } = {},
+  ): Promise<void> {
+    await testDb.insert(schema.ticketExternalRefs).values({
+      ticket_id: t.id, kind: "github_pr", url, created_by: ctx.magos.id,
+      polled_at: opts.polled_at ?? null,
+      state: opts.state ?? null,
+    });
+  }
+
+  test("never-polled refs are selected before stale ones (NULLS FIRST)", async () => {
+    const ctx = await seedCtx();
+    const t = await makeTicket(ctx);
+    const now = Date.now();
+    await attach(ctx, t, "https://github.com/foo/bar/pull/1", {
+      polled_at: new Date(now - 10 * MIN).toISOString(), state: "open",
+    });
+    await attach(ctx, t, "https://github.com/foo/bar/pull/2", { polled_at: null });
+
+    const rows = await selectPollCandidates(testDb, now);
+    expect(rows.map((r) => r.url)).toEqual([
+      "https://github.com/foo/bar/pull/2", // never-polled jumps the queue
+      "https://github.com/foo/bar/pull/1",
+    ]);
+  });
+
+  test("merged refs are never re-polled, even when stale", async () => {
+    const ctx = await seedCtx();
+    const t = await makeTicket(ctx);
+    const now = Date.now();
+    await attach(ctx, t, "https://github.com/foo/bar/pull/1", {
+      polled_at: new Date(now - 10 * MIN).toISOString(), state: "merged",
+    });
+    await attach(ctx, t, "https://github.com/foo/bar/pull/2", {
+      polled_at: new Date(now - 10 * MIN).toISOString(), state: "open",
+    });
+
+    const urls = (await selectPollCandidates(testDb, now)).map((r) => r.url);
+    expect(urls).toContain("https://github.com/foo/bar/pull/2");
+    expect(urls).not.toContain("https://github.com/foo/bar/pull/1");
+  });
+
+  test("recently-polled non-merged refs are not yet due", async () => {
+    const ctx = await seedCtx();
+    const t = await makeTicket(ctx);
+    const now = Date.now();
+    await attach(ctx, t, "https://github.com/foo/bar/pull/1", {
+      polled_at: new Date(now - 1 * MIN).toISOString(), state: "open",
+    });
+
+    expect(await selectPollCandidates(testDb, now)).toHaveLength(0);
+  });
+
+  test("a never-polled ref behind a >batch-size wall of stale merged refs is still selected", async () => {
+    const ctx = await seedCtx();
+    const t = await makeTicket(ctx);
+    const now = Date.now();
+    // 30 stale merged refs (> the batch limit of 20). Under the old
+    // NULLS-LAST + no-exclusion query these filled every batch forever.
+    for (let i = 0; i < 30; i++) {
+      await attach(ctx, t, `https://github.com/foo/bar/pull/${100 + i}`, {
+        polled_at: new Date(now - 10 * MIN).toISOString(), state: "merged",
+      });
+    }
+    await attach(ctx, t, "https://github.com/foo/bar/pull/1", { polled_at: null });
+
+    const rows = await selectPollCandidates(testDb, now);
+    expect(rows.map((r) => r.url)).toContain("https://github.com/foo/bar/pull/1");
+    expect(rows.every((r) => r.state !== "merged")).toBe(true);
   });
 });

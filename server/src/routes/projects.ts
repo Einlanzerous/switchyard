@@ -232,6 +232,15 @@ export function mount(app: OpenAPIHono) {
         project_id: existing.id,
       });
 
+      // Cascade-soft-delete the project's live tickets (SWY-127). A soft-deleted
+      // project vanishes from /v1/projects, but its tickets keep deleted_at NULL
+      // and orphan — leaking into ticket-derived views (e.g. drydock's
+      // by-project grouping). No per-ticket events: project.deleted is the
+      // signal, and a bulk fan-out would be noise.
+      await tx.update(schema.tickets)
+        .set({ deleted_at: new Date().toISOString() })
+        .where(and(eq(schema.tickets.project_id, existing.id), isNull(schema.tickets.deleted_at)));
+
       // Soft-delete doesn't fire FK cascade on board_projects, so prune
       // explicitly. (Hard-delete would cascade, but we don't hard-delete.)
       await removeProjectFromDefaultBoard(tx as any, existing.id);

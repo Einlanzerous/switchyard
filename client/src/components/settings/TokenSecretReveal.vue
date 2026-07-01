@@ -82,8 +82,19 @@ defineExpose({ copy: () => copyText(props.token, "Token") });
       <p v-if="message" class="text-[11px] text-muted-foreground">
         Or share the token / QR directly:
       </p>
-      <div class="rounded-md border bg-muted/40 p-3 font-mono text-xs break-all">
-        {{ token }}
+      <div class="flex items-center gap-2 rounded-md border bg-muted/40 pl-3 pr-1.5 py-1.5">
+        <code class="flex-1 min-w-0 font-mono text-xs break-all">{{ token }}</code>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          class="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+          aria-label="Copy token"
+          title="Copy token"
+          @click="copyText(token, 'Token')"
+        >
+          <Copy class="h-3.5 w-3.5" />
+        </Button>
       </div>
       <div v-if="qrCodeUrl" class="flex flex-col items-center gap-2">
         <div class="rounded-md bg-white p-2">
@@ -93,13 +104,6 @@ defineExpose({ copy: () => copyText(props.token, "Token") });
           Scan from <code class="font-mono">/login</code> on another device.
         </p>
       </div>
-      <button
-        type="button"
-        class="inline-flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors"
-        @click="copyText(token, 'Token')"
-      >
-        <Copy class="h-3.5 w-3.5 mr-1.5" /> Copy token
-      </button>
     </div>
   </div>
 </template>

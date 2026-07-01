@@ -1,5 +1,54 @@
 # Changelog
 
+## [3.6.1](https://github.com/Einlanzerous/switchyard/compare/v3.6.0...v3.6.1) (2026-07-01)
+
+
+### Bug Fixes
+
+* make the new-token Copy control work + clearer (inline field icon) ([1e51d89](https://github.com/Einlanzerous/switchyard/commit/1e51d89625392be1df852c4eef792af6e2c5899a))
+* SWY-127 — cascade ticket soft-delete on project delete + orphan guard ([#125](https://github.com/Einlanzerous/switchyard/issues/125)) ([ca0b453](https://github.com/Einlanzerous/switchyard/commit/ca0b453ec35a33e967fa8d2a118289d1180fa500))
+* SWY-128 — external-ref poller no longer starves never-polled refs ([#126](https://github.com/Einlanzerous/switchyard/issues/126)) ([d8099aa](https://github.com/Einlanzerous/switchyard/commit/d8099aa8521a4e68a4e5c4926e97663ebefed029))
+
+
+### Maintenance
+
+* update knowledge graph [skip ci] ([740e592](https://github.com/Einlanzerous/switchyard/commit/740e592b64fc696510e74fc0ee7cb171c7b111b2))
+* update knowledge graph [skip ci] ([1ecd0a5](https://github.com/Einlanzerous/switchyard/commit/1ecd0a5d920e0db282724f550b41f05241293a1e))
+* update knowledge graph [skip ci] ([aaf6fb4](https://github.com/Einlanzerous/switchyard/commit/aaf6fb4ccb3e0b13600a28bb61c5a601ba7fabfb))
+
+## [3.6.0](https://github.com/Einlanzerous/switchyard/compare/v3.5.1...v3.6.0) (2026-06-28)
+
+
+### Features
+
+* SWY-109 — Plan-as-PR data model + REST (Phase 7.0) ([#122](https://github.com/Einlanzerous/switchyard/issues/122)) ([73dacb9](https://github.com/Einlanzerous/switchyard/commit/73dacb9620b4f42a5adb0269f2f6832327077c4b))
+* SWY-118 — add subtask ticket type (epic → task → subtask) ([#118](https://github.com/Einlanzerous/switchyard/issues/118)) ([48014e2](https://github.com/Einlanzerous/switchyard/commit/48014e2903fd61e16597e1d10dab3e23e30d6294))
+* SWY-121 — collapsible left sidebar (icons-only mode) ([#120](https://github.com/Einlanzerous/switchyard/issues/120)) ([1428f1d](https://github.com/Einlanzerous/switchyard/commit/1428f1da8537c284a7f5c6d904480e435b29c85e))
+* SWY-122 — user + API-token management MCP tools ([#119](https://github.com/Einlanzerous/switchyard/issues/119)) ([d1565c0](https://github.com/Einlanzerous/switchyard/commit/d1565c0ce30cc66849c46513c564df9ee17ae879))
+
+
+### Bug Fixes
+
+* SWY-126 — make CI catch Vue SFC template type errors ([#121](https://github.com/Einlanzerous/switchyard/issues/121)) ([8266ce3](https://github.com/Einlanzerous/switchyard/commit/8266ce3b518466ab2b45943961cccc5a6940add0))
+
+
+### Code Refactoring
+
+* SWY-93 — break events→dispatcher rules import cycle ([#117](https://github.com/Einlanzerous/switchyard/issues/117)) ([c5668f9](https://github.com/Einlanzerous/switchyard/commit/c5668f9b25fd7f9e273c25051bdef5280f318588))
+
+
+### Maintenance
+
+* update knowledge graph [skip ci] ([3d06dde](https://github.com/Einlanzerous/switchyard/commit/3d06dde05768226d8e52c7f7b20c9d6fd4c526de))
+* update knowledge graph [skip ci] ([f6a29c0](https://github.com/Einlanzerous/switchyard/commit/f6a29c02984f5d8cb021804f815d5e1373253c16))
+* update knowledge graph [skip ci] ([5e83aa9](https://github.com/Einlanzerous/switchyard/commit/5e83aa96216fd70a86353baf9bd8a5d5cf4c4ab0))
+* update knowledge graph [skip ci] ([bb930e3](https://github.com/Einlanzerous/switchyard/commit/bb930e36f0d3fe1397feda03719d335bd8c139a6))
+* update knowledge graph [skip ci] ([ae0a60f](https://github.com/Einlanzerous/switchyard/commit/ae0a60f7bd5a637d9aefa1c98c720aefdef2c6bb))
+* update knowledge graph [skip ci] ([49d43fc](https://github.com/Einlanzerous/switchyard/commit/49d43fcf9217a6e79f586ab4bf596958cee41430))
+* update knowledge graph [skip ci] ([a2658f4](https://github.com/Einlanzerous/switchyard/commit/a2658f44ef92f25907e9c92ebef11dfbc136fd6f))
+* update knowledge graph [skip ci] ([0dd9b29](https://github.com/Einlanzerous/switchyard/commit/0dd9b2976b06f9cc6c6c1b2ecd301650bce21571))
+* update knowledge graph [skip ci] ([dbb8788](https://github.com/Einlanzerous/switchyard/commit/dbb8788aaad51a04643737112dde24ddfe1f2c69))
+
 ## [3.5.1](https://github.com/Einlanzerous/switchyard/compare/v3.5.0...v3.5.1) (2026-06-18)
 
 
