@@ -70,13 +70,13 @@ function itemClass(to: string) {
     :class="collapsed ? 'md:w-16' : 'md:w-60'"
   >
     <!-- Logo header — structurally separate from the nav, so collapsing the
-         menu below leaves the logo in place (overflow-hidden clips the wordmark
-         cleanly in the narrow rail rather than hiding/shifting it).
+         menu below leaves the logo in place. Collapsed → cube mark only,
+         centered in the rail; expanded → full mark + wordmark.
          TODO: replace wordmark with Commissioner (fonts.google.com/specimen/Commissioner)
          once the logo SVG is cleaned up as a proper mark-only file -->
-    <div class="flex h-16 items-center px-4 border-b overflow-hidden">
-      <RouterLink to="/">
-        <SwitchyardLogo />
+    <div class="flex h-16 items-center border-b px-3 overflow-hidden">
+      <RouterLink to="/" class="flex items-center" aria-label="Switchyard home">
+        <SwitchyardLogo :collapsed="collapsed" />
       </RouterLink>
     </div>
 
@@ -115,28 +115,27 @@ function itemClass(to: string) {
       </TooltipProvider>
     </ScrollArea>
 
-    <!-- Collapse/expand toggle. Lives in the menu footer (not the logo header).
-         Chevron points the way it affords: left to collapse, right to expand. -->
-    <div class="border-t p-2">
+    <!-- Footer: version chip + collapse toggle share one row so the toggle
+         keeps a constant vertical position across collapse/expand (the version
+         just hides in the rail — the string can't fit). Chevron points the way
+         it affords: left to collapse, right to expand. -->
+    <div class="flex items-center gap-2 border-t p-2">
+      <span
+        v-if="!collapsed"
+        class="min-w-0 flex-1 truncate px-2 text-[10px] text-muted-foreground/70 font-mono"
+      >
+        {{ APP_VERSION_DISPLAY }}
+      </span>
       <button
         type="button"
-        class="flex w-full items-center rounded-md px-3 py-1.5 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-        :class="collapsed ? 'justify-center' : 'justify-end'"
+        class="flex items-center rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+        :class="collapsed && 'mx-auto'"
         :aria-label="collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
         :title="collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
         @click="ui.toggleSidebar()"
       >
         <component :is="collapsed ? ChevronRight : ChevronLeft" class="h-4 w-4" />
       </button>
-    </div>
-
-    <!-- Version chip — release-please semver in CI builds, "dev" locally.
-         Hidden in the rail (the string can't fit) so it doesn't wrap/overflow. -->
-    <div
-      v-if="!collapsed"
-      class="px-4 py-2 border-t text-[10px] text-muted-foreground/70 font-mono"
-    >
-      {{ APP_VERSION_DISPLAY }}
     </div>
   </aside>
 </template>
