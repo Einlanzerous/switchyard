@@ -83,7 +83,8 @@ function onMoved(newKey: string) {
 </script>
 
 <template>
-  <div class="container max-w-3xl py-8">
+  <!-- v4: 920px centered reading column (was max-w-3xl / 768px). -->
+  <div class="container max-w-[920px] py-8">
     <div class="flex items-center justify-between mb-4">
       <Button variant="ghost" size="sm" class="-ml-2 text-muted-foreground" @click="back">
         <ArrowLeft class="h-3.5 w-3.5 mr-1.5" /> Back

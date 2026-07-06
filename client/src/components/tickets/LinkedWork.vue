@@ -25,6 +25,9 @@ const props = defineProps<{
   links: TicketLink[];
   addingLink?: boolean;
   removingLinkId?: string | null;
+  // For the v4 unified counts row (`Subtasks N · Links N · External refs N`).
+  // External refs live in their own section; only the count surfaces here.
+  externalRefsCount?: number;
 }>();
 
 const childrenNoun = computed(() => (props.parentType === "epic" ? "sub-tickets" : "subtasks"));
@@ -46,6 +49,12 @@ const VERBS: Record<TicketLinkType, Record<TicketLinkDirection, string>> = {
 };
 function verb(l: TicketLink): string {
   return VERBS[l.type][l.direction];
+}
+
+// v4: relationship verbs read in mono, with blocking edges called out in the
+// blocked hue (the mock's `.rel` treatment).
+function verbTone(l: TicketLink): string {
+  return l.type === "blocks" ? "text-st-blocked" : "text-ink-3";
 }
 
 // ─── add-link form (inline; not a dialog — fast to use repeatedly) ──────────
@@ -78,7 +87,19 @@ function reset() {
 
 <template>
   <section class="space-y-2">
-    <h3 class="text-xs uppercase tracking-wider text-muted-foreground">Linked work</h3>
+    <h3 class="eyebrow">Linked work</h3>
+
+    <!-- v4 unified counts row. Complements (not replaces) the per-section
+         headers below, which carry the add affordances. -->
+    <p class="text-[11.5px] text-ink-3">
+      <span v-if="canHaveChildren" class="capitalize">{{ childrenNoun }}
+        <span class="font-semibold text-ink-2 tabular-nums">{{ children.length }}</span>
+        <span class="text-ink-4"> · </span>
+      </span>
+      Links <span class="font-semibold text-ink-2 tabular-nums">{{ links.length }}</span>
+      <span class="text-ink-4"> · </span>
+      External refs <span class="font-semibold text-ink-2 tabular-nums">{{ externalRefsCount ?? 0 }}</span>
+    </p>
 
     <!-- Parent breadcrumb-style row -->
     <div v-if="parentLoading" class="flex items-center gap-2">
@@ -153,7 +174,7 @@ function reset() {
     <ul v-if="links.length > 0" class="space-y-1">
       <li v-for="l in links" :key="l.id" class="group">
         <div class="flex w-full items-center gap-2 rounded-md border bg-card px-2.5 py-1.5 text-sm">
-          <span class="text-xs text-muted-foreground capitalize shrink-0">{{ verb(l) }}</span>
+          <span :class="['font-mono text-[10.5px] shrink-0', verbTone(l)]">{{ verb(l) }}</span>
           <button
             type="button"
             class="flex flex-1 min-w-0 items-center gap-2 text-left hover:text-foreground transition-colors"

@@ -73,17 +73,19 @@ function openMoveDialog() { moveDialogOpen.value = true; }
 
 <template>
   <Sheet :open="isOpen" @update:open="isOpen = $event">
-    <SheetContent side="right" class="w-full sm:max-w-2xl flex flex-col gap-0 p-0">
+    <!-- v4: 860px drawer (deliberately wider than the old 672px — the
+         content is dense). -->
+    <SheetContent side="right" class="w-full sm:max-w-[860px] flex flex-col gap-0 p-0">
       <!-- The Sheet component already renders a close X in the top-right.
            We add a header row with the ticket key + title and the
            "open in full page" action; the close X stays where Sheet puts it. -->
       <div class="flex items-center gap-2 border-b pl-5 pr-12 py-3">
         <template v-if="titleTicket">
           <TypeIcon :type="titleTicket.type" class="shrink-0" />
-          <span class="font-mono text-base font-medium text-muted-foreground shrink-0">
+          <span class="font-mono text-[13px] font-medium text-ink-3 shrink-0">
             {{ titleTicket.key }}
           </span>
-          <SheetTitle class="text-base font-semibold tracking-tight truncate flex-1">
+          <SheetTitle class="text-[14.5px] font-bold tracking-tight truncate flex-1">
             {{ titleTicket.title }}
           </SheetTitle>
         </template>
