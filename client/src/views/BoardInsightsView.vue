@@ -184,7 +184,10 @@ const statusByProject = computed(() => {
     (r) => boardProjectIds.value.has(r.project.id)
   );
   return {
-    grid: { left: 56, right: 8, top: 24, bottom: 32 },
+    // bottom: 56 reserves separate rows for the value-axis labels and the
+    // bottom legend — at 32 the legend sat on top of the axis. Matches the
+    // CFD chart's reservation for the same arrangement.
+    grid: { left: 56, right: 8, top: 24, bottom: 56 },
     legend: { bottom: 0, type: "scroll", icon: "circle", itemHeight: 8 },
     tooltip: { trigger: "axis" },
     xAxis: { type: "value", minInterval: 1 },
