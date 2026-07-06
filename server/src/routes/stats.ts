@@ -13,7 +13,7 @@ import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { and, eq, gte, inArray, isNull, lte, sql, type SQL } from "drizzle-orm";
 import {
   ProjectStats, ProjectStatsList, ThroughputStats, CycleTimeStats,
-  CumulativeFlowStats, StaleRollup,
+  CumulativeFlowStats, StaleRollup, ClosedByActorStats,
   ProjectKey, StatsBucket, StatsWindowQuery,
   type StatusCategory, type TicketType, type Priority,
 } from "@switchyard/shared";
@@ -100,6 +100,21 @@ const staleRollup = createRoute({
   tags: [tag],
   summary: "Per-project rollup of stale in-progress tickets",
   responses: { ...okJson(StaleRollup), ...errorResponses },
+});
+
+const closedByActor = createRoute({
+  method: "get",
+  path: "/v1/stats/closed-by-actor",
+  tags: [tag],
+  summary: "Windowed 'who did the work' leaderboard (closures per closing actor)",
+  description:
+    "Counts ticket.closed events per closing ACTOR (the user who performed " +
+    "the close — not the assignee) in the window, scope-filtered like every " +
+    "stats endpoint. Closures whose actor row no longer exists (deleted " +
+    "user / system) are omitted here but still counted by /v1/stats/" +
+    "throughput totals. Sorted by count desc.",
+  request: { query: StatsWindowQuery },
+  responses: { ...okJson(ClosedByActorStats), ...errorResponses },
 });
 
 // ─── small helpers ─────────────────────────────────────────────────────────
@@ -383,16 +398,21 @@ export function mount(app: OpenAPIHono) {
     // Member with no visible projects (or named keys none of which they can see)
     // → empty series, never the all-projects fallback.
     if (!unfiltered && projectIds.length === 0) {
-      return c.json({ bucket, points: [], total: 0 }, 200);
+      return c.json({ bucket, points: [], total: 0, agent_total: 0, human_total: 0 }, 200);
     }
 
     const trunc = bucket === "day" ? sql`'day'` : sql`'week'`;
 
-    const rows = await db.execute<{ start: string; count: number }>(sql`
+    // Actor-type split (SWY-138): human = closures by a `type = human` user;
+    // agent = everything else (agent users AND system/null actors — machines
+    // for attribution). LEFT JOIN so a deleted actor still counts (as agent).
+    const rows = await db.execute<{ start: string; count: number; human_count: number }>(sql`
       SELECT
         date_trunc(${trunc}, e.created_at)::text AS start,
-        COUNT(*)::int AS count
+        COUNT(*)::int AS count,
+        COUNT(*) FILTER (WHERE u.type = 'human')::int AS human_count
       FROM events e
+      LEFT JOIN users u ON u.id = e.actor_id
       WHERE e.event_type = 'ticket.closed'
         AND e.created_at >= ${since.toISOString()}
         AND e.created_at <= ${until.toISOString()}
@@ -401,14 +421,58 @@ export function mount(app: OpenAPIHono) {
       ORDER BY 1 ASC
     `);
 
-    const tRows = ((rows as any).rows ?? rows) as Array<{ start: string; count: number }>;
+    const tRows = ((rows as any).rows ?? rows) as Array<{ start: string; count: number; human_count: number }>;
     const points = tRows.map((r) => ({
       // Postgres returns date_trunc as a timestamp string; force ISO with Z.
       start: new Date(r.start).toISOString(),
       count: r.count,
+      agent_count: r.count - r.human_count,
+      human_count: r.human_count,
     }));
     const total = points.reduce((a, b) => a + b.count, 0);
-    return c.json({ bucket, points, total }, 200);
+    const human_total = points.reduce((a, b) => a + b.human_count, 0);
+    return c.json(
+      { bucket, points, total, agent_total: total - human_total, human_total },
+      200
+    );
+  }) as any);
+
+  // ─── closed-by-actor leaderboard ("who did the work") ────────────────────
+
+  app.openapi(closedByActor, (async (c: any) => {
+    const q = c.req.valid("query");
+    const { since, until } = resolveWindow(q);
+    const { projectIds, unfiltered } = await resolveStatsScope(c.get("auth").user, q.project);
+    if (!unfiltered && projectIds.length === 0) {
+      return c.json({ items: [] }, 200);
+    }
+
+    const rows = await db.execute<{
+      id: string; name: string; icon: string | null; type: string; closed: number;
+    }>(sql`
+      SELECT u.id, u.name, u.icon, u.type, COUNT(*)::int AS closed
+      FROM events e
+      JOIN users u ON u.id = e.actor_id
+      WHERE e.event_type = 'ticket.closed'
+        AND e.created_at >= ${since.toISOString()}
+        AND e.created_at <= ${until.toISOString()}
+        ${projectInSql(projectIds, unfiltered, "e.project_id")}
+      GROUP BY u.id, u.name, u.icon, u.type
+      ORDER BY closed DESC, u.name ASC
+    `);
+
+    const lRows = ((rows as any).rows ?? rows) as Array<{
+      id: string; name: string; icon: string | null; type: string; closed: number;
+    }>;
+    return c.json(
+      {
+        items: lRows.map((r) => ({
+          user: { id: r.id, name: r.name, icon: r.icon, type: r.type },
+          closed: r.closed,
+        })),
+      },
+      200
+    );
   }) as any);
 
   // ─── cycle-time distribution ─────────────────────────────────────────────

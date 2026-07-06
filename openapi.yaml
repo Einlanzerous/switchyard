@@ -23431,16 +23431,278 @@ paths:
                         count:
                           type: integer
                           minimum: 0
+                        agent_count:
+                          type: integer
+                          minimum: 0
+                        human_count:
+                          type: integer
+                          minimum: 0
                       required:
                         - start
                         - count
+                        - agent_count
+                        - human_count
                   total:
+                    type: integer
+                    minimum: 0
+                  agent_total:
+                    type: integer
+                    minimum: 0
+                  human_total:
                     type: integer
                     minimum: 0
                 required:
                   - bucket
                   - points
                   - total
+                  - agent_total
+                  - human_total
+        "400":
+          description: bad request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "401":
+          description: unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "403":
+          description: forbidden
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "404":
+          description: not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "409":
+          description: conflict
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "422":
+          description: unprocessable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "500":
+          description: internal
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+  /v1/stats/closed-by-actor:
+    get:
+      tags:
+        - Stats
+      summary: Windowed 'who did the work' leaderboard (closures per closing actor)
+      description: Counts ticket.closed events per closing ACTOR (the user who
+        performed the close — not the assignee) in the window, scope-filtered
+        like every stats endpoint. Closures whose actor row no longer exists
+        (deleted user / system) are omitted here but still counted by
+        /v1/stats/throughput totals. Sorted by count desc.
+      parameters:
+        - schema:
+            type: string
+          required: false
+          name: project
+          in: query
+        - schema:
+            type: string
+            format: date-time
+          required: false
+          name: since
+          in: query
+        - schema:
+            type: string
+            format: date-time
+          required: false
+          name: until
+          in: query
+        - schema:
+            type: string
+            enum: *a24
+          required: false
+          name: bucket
+          in: query
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        user:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            name:
+                              type: string
+                              minLength: 1
+                              maxLength: 100
+                            icon:
+                              type: string
+                              nullable: true
+                              maxLength: 500
+                            type:
+                              type: string
+                              enum: *a2
+                          required:
+                            - id
+                            - name
+                            - icon
+                            - type
+                        closed:
+                          type: integer
+                          minimum: 0
+                          exclusiveMinimum: true
+                      required:
+                        - user
+                        - closed
+                required:
+                  - items
         "400":
           description: bad request
           content:

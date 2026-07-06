@@ -90,17 +90,46 @@ export type ProjectStatsList = z.infer<typeof ProjectStatsList>;
 export const StatsBucket = z.enum(["day", "week"]);
 export type StatsBucket = z.infer<typeof StatsBucket>;
 
+// Actor-type split (SWY-138): `human_count` counts closures whose actor is a
+// `type = human` user; `agent_count` is everything else — agent users AND
+// system/null actors, which are machines for attribution purposes. Invariant:
+// agent_count + human_count === count.
 export const ThroughputPoint = z.object({
   start: Iso8601,            // bucket-start timestamp (date_trunc)
   count: z.number().int().nonnegative(),
+  agent_count: z.number().int().nonnegative(),
+  human_count: z.number().int().nonnegative(),
 });
 
 export const ThroughputStats = z.object({
   bucket: StatsBucket,
   points: z.array(ThroughputPoint),
   total: z.number().int().nonnegative(),
+  // Window-wide split totals — the "agent share" aggregate. Clients derive
+  // the percentage (guard the zero-total window).
+  agent_total: z.number().int().nonnegative(),
+  human_total: z.number().int().nonnegative(),
 });
 export type ThroughputStats = z.infer<typeof ThroughputStats>;
+
+// ─── closed-by-actor leaderboard ("who did the work") ───────────────────────
+//
+// Windowed, cross-project (scope-filtered) count of ticket.closed events per
+// closing ACTOR — the user who performed the close, not the assignee. Powers
+// the v4 insights leaderboard + force-multiplier. Closures with no surviving
+// actor row (deleted user / system) are omitted from the per-user list but
+// still appear in the throughput totals above.
+
+export const ClosedByActorRow = z.object({
+  user: UserRef,
+  closed: z.number().int().positive(),
+});
+export type ClosedByActorRow = z.infer<typeof ClosedByActorRow>;
+
+export const ClosedByActorStats = z.object({
+  items: z.array(ClosedByActorRow),
+});
+export type ClosedByActorStats = z.infer<typeof ClosedByActorStats>;
 
 // ─── cycle time (in_progress duration distribution) ─────────────────────────
 //
