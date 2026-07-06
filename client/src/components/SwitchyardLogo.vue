@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import markUrl from "@/assets/sy_mark.svg";
 
-// v4 brand lockup: a 34px "brand tile" (subtle gradient well holding the
-// coral-plate mark) + a two-line uppercase text wordmark ("Switch / Yard").
-// The mark SVG carries its own fills (coral plate #e2623d + off-white Y),
-// so no dark:invert tricks are needed on the Elevated ink.
+// v4 brand lockup, per the handoff mocks' `.brand-mark`: the raw coral-plate
+// mark at 42×44 (the plate baked into the SVG IS the tile — no extra well
+// around it) + a two-line uppercase text wordmark ("Switch / Yard"). The SVG
+// carries its own fills, so no dark:invert tricks are needed.
 //
-// The tile stays a fixed size/position while the wordmark slides in and out
+// The mark stays a fixed size/position while the wordmark slides in and out
 // beside it (collapsed sidebar rail) — only the wordmark's clip box
 // animates, so the mark never resizes mid-animation (SWY-129 behavior).
 const props = defineProps<{ collapsed?: boolean }>();
@@ -14,12 +14,12 @@ const props = defineProps<{ collapsed?: boolean }>();
 
 <template>
   <div class="flex items-center gap-[11px] overflow-hidden">
-    <!-- Brand tile — constant geometry, never animates. -->
-    <div
-      class="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-[9px] border border-line bg-gradient-to-br from-[#17181c] to-[#0e0f12] shadow-[0_0_0_1px_rgba(0,0,0,0.4)]"
-    >
-      <img :src="markUrl" alt="Switchyard" class="h-[20px] w-auto" />
-    </div>
+    <!-- Mark — constant geometry, never animates. -->
+    <img
+      :src="markUrl"
+      alt="Switchyard"
+      class="h-[44px] w-[42px] shrink-0"
+    />
 
     <!-- Wordmark — the clip box animates its max-width (horizontal reveal)
          while the inner block eases + fades so it reads as sliding into the
