@@ -393,7 +393,7 @@ const errMessage = computed(() => {
             'inline-flex h-[22px] items-center gap-1.5 rounded-md border px-2 font-mono text-[11px] transition-colors',
             agentOnly
               ? 'border-agent/40 bg-agent-bg text-agent'
-              : 'border-border bg-surface-3 text-ink-2 hover:text-foreground',
+              : 'border-border bg-accent text-muted-foreground hover:text-foreground',
           ]"
           :aria-pressed="agentOnly"
           title="Show only agent-assigned or agent-reported tickets"
@@ -490,7 +490,7 @@ const errMessage = computed(() => {
             aria-hidden="true"
           />
           <span class="text-[12.5px] font-semibold">{{ CATEGORY_LABELS[cat] }}</span>
-          <span class="rounded-[9px] bg-surface-3 px-1.5 py-0.5 font-mono text-[10.5px] tabular-nums text-ink-3">
+          <span class="rounded-[9px] bg-accent px-1.5 py-0.5 font-mono text-[10.5px] tabular-nums text-muted-foreground">
             {{ categoryCounts.get(cat) ?? 0 }}
           </span>
           <button

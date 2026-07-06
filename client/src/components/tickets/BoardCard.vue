@@ -234,7 +234,7 @@ const closedAgo = computed(() =>
     <button
       v-if="blockedBy"
       type="button"
-      class="mt-2 inline-flex h-[19px] items-center gap-1 rounded-[5px] bg-surface-4 px-1.5 font-mono text-[10px] text-ink-2 hover:text-foreground transition-colors"
+      class="mt-2 inline-flex h-[19px] items-center gap-1 rounded-[5px] bg-muted px-1.5 font-mono text-[10px] text-muted-foreground hover:text-foreground transition-colors"
       :title="`Blocked by ${blockedBy.other_ticket.key} — ${blockedBy.other_ticket.title}`"
       @click.stop="emit('open', blockedBy.other_ticket.key)"
     >

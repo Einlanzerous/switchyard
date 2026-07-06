@@ -155,7 +155,7 @@ function onCardDrop(
       <span class="text-[12.5px] font-semibold text-foreground truncate">
         {{ column.displayName }}
       </span>
-      <span class="rounded-[9px] bg-surface-3 px-1.5 py-0.5 font-mono text-[10.5px] tabular-nums text-ink-3">
+      <span class="rounded-[9px] bg-accent px-1.5 py-0.5 font-mono text-[10.5px] tabular-nums text-muted-foreground">
         {{ column.tickets.length }}
       </span>
       <span v-if="hint" class="text-[10px] text-muted-foreground italic truncate">{{ hint }}</span>
