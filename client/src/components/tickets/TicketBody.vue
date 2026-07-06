@@ -273,10 +273,12 @@ function openAddSubTicket() {
           </button>
         </template>
       </div>
-      <h1 class="flex items-start gap-2 text-xl tracking-tight">
-        <TypeIcon :type="ticket.type" class="mt-1" />
-        <span class="font-mono text-muted-foreground">{{ ticket.key }}</span>
-        <span class="font-semibold flex-1 min-w-0">{{ ticket.title }}</span>
+      <!-- v4 full-page title: 26px/700 with a scaled-up type icon + 16px
+           mono key. -->
+      <h1 class="flex items-start gap-2.5 text-[26px] leading-tight tracking-[-0.01em]">
+        <TypeIcon :type="ticket.type" class="mt-1 h-[26px] w-[26px]" />
+        <span class="mt-1 font-mono text-base text-ink-3">{{ ticket.key }}</span>
+        <span class="font-bold flex-1 min-w-0">{{ ticket.title }}</span>
         <button
           v-if="ticket.template_id"
           type="button"
@@ -290,17 +292,22 @@ function openAddSubTicket() {
       </h1>
     </header>
 
-    <!-- Drawer-mode header: parent breadcrumb only when applicable. -->
-    <header v-else-if="parent" class="text-xs text-muted-foreground flex items-center gap-1.5">
-      <span class="text-muted-foreground/60">Parent:</span>
+    <!-- Drawer-mode header: the v4 bordered parent-row bar (epic icon +
+         key + title + status pill). -->
+    <header v-else-if="parent">
       <button
         type="button"
-        class="inline-flex items-center gap-1 hover:text-foreground transition-colors"
+        class="flex h-[38px] w-full items-center gap-2 rounded-md border bg-card px-2.5 text-left text-sm hover:bg-accent/40 transition-colors"
         @click="navigateToLinked(parent.key)"
       >
-        <TypeIcon :type="parent.type" class="h-3 w-3" />
-        <span class="font-mono">{{ parent.key }}</span>
-        <span class="truncate max-w-[14rem]">{{ parent.title }}</span>
+        <TypeIcon :type="parent.type" class="h-3.5 w-3.5 shrink-0" />
+        <span class="font-mono text-xs text-ink-3 shrink-0">{{ parent.key }}</span>
+        <span class="flex-1 min-w-0 truncate font-medium">{{ parent.title }}</span>
+        <StatusBadge
+          :category="parent.status.category"
+          :display-name="parent.status.display_name"
+          size="sm"
+        />
       </button>
     </header>
 
@@ -349,6 +356,7 @@ function openAddSubTicket() {
       :links="ticket.links ?? []"
       :adding-link="addLinkMutation.isPending.value"
       :removing-link-id="removingLinkId"
+      :external-refs-count="(ticket.external_refs ?? []).length"
       @navigate="navigateToLinked"
       @add-link="(p) => addLinkMutation.mutate(p)"
       @remove-link="(id) => removeLinkMutation.mutate(id)"
@@ -402,7 +410,7 @@ function openAddSubTicket() {
       <DescriptionEditor :ticket="ticket" />
 
       <section v-if="ticket.attachments.length > 0">
-        <h3 class="text-xs uppercase tracking-wider text-muted-foreground mb-2">
+        <h3 class="eyebrow mb-2">
           Files ({{ ticket.attachments.length }})
         </h3>
         <ul class="space-y-1.5">
@@ -413,7 +421,7 @@ function openAddSubTicket() {
       </section>
 
       <section class="border-t pt-6 mt-6">
-        <h3 class="text-xs uppercase tracking-wider text-muted-foreground mb-3">
+        <h3 class="eyebrow mb-3">
           Comments
         </h3>
 
