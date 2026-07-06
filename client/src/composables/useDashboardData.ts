@@ -24,6 +24,34 @@ export function useStaleRollup() {
   });
 }
 
+// Per-project activity pulse (SWY-136): last activity, 14d daily series,
+// recent actors. Unwindowed — the server owns the 14-day definition.
+export function useActivityPulse() {
+  return useQuery({
+    queryKey: queryKeys.statsActivityPulse(),
+    staleTime: STALE_60S,
+    queryFn: async () => {
+      const { data, error } = await api.GET("/v1/stats/activity-pulse");
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+// Epics in flight (SWY-137): open epics with child progress, driver, and the
+// stalled flag ("no agent activity in stall_after_days").
+export function useEpicsInFlight() {
+  return useQuery({
+    queryKey: queryKeys.statsEpics(),
+    staleTime: STALE_60S,
+    queryFn: async () => {
+      const { data, error } = await api.GET("/v1/stats/epics");
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
 export function useThroughput(params: ComputedRef<{
   project?: string;
   since?: string;
