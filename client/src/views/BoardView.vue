@@ -2,17 +2,21 @@
 import { computed, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useMutation, useQueryClient } from "@tanstack/vue-query";
-import { ArrowLeft, AlertCircle, Inbox, Loader2, Pencil, Plus } from "lucide-vue-next";
+import { ArrowLeft, AlertCircle, Check, Inbox, Loader2, MoreHorizontal, Pencil, Plus } from "lucide-vue-next";
 import { toast } from "vue-sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import BoardCell from "@/components/boards/BoardCell.vue";
 import SwimlaneSelector, { type SwimlaneBy } from "@/components/boards/SwimlaneSelector.vue";
 import EditBoardDialog from "@/components/boards/EditBoardDialog.vue";
 import InsightsTabs from "@/components/dashboard/InsightsTabs.vue";
-import SortMenu from "@/components/tickets/SortMenu.vue";
 import { compareTickets, SORT_MODES, type SortMode } from "@/lib/positions";
+import { STATUS_HEX } from "@/lib/statusColors";
 import { useBoardDetail } from "@/composables/useBoards";
 import { useUiStore } from "@/stores/ui";
 import { api } from "@/lib/api";
@@ -58,14 +62,50 @@ function setSortMode(next: SortMode) {
 // can pick another from the project select inside the dialog.
 const defaultProjectKey = computed(() => board.value?.projects[0]?.key ?? null);
 
+// Per-column "+" quick-add: same dialog, prefilled to the column's category.
+function quickAdd(cat: StatusCategory) {
+  ui.openCreateTicket(defaultProjectKey.value, cat);
+}
+
+// "agent-driven only" filter (v4): limits the board to tickets an agent is
+// assigned to or reported. Rides the URL like the sort mode.
+const agentOnly = computed(() => route.query.agents === "1");
+function toggleAgentOnly() {
+  const q = { ...route.query };
+  if (agentOnly.value) delete q.agents;
+  else q.agents = "1";
+  router.replace({ query: q });
+}
+
 // ─── flatten + group ───────────────────────────────────────────────────────
 //
 // Server returns columns grouped by category. We flatten into a single
 // array, then group by the chosen swimlane key. The result is a 2-D matrix
 // keyed by (swimlaneId, category) → tickets.
-const allTickets = computed<TicketSummary[]>(() =>
-  columns.value.flatMap((c) => c.tickets)
-);
+const allTickets = computed<TicketSummary[]>(() => {
+  const all = columns.value.flatMap((c) => c.tickets);
+  if (!agentOnly.value) return all;
+  return all.filter(
+    (t) => t.assignee?.type === "agent" || t.reporter?.type === "agent",
+  );
+});
+
+// Header count pills reflect what's actually rendered (post agent-filter).
+const CATEGORY_LABELS: Record<StatusCategory, string> = {
+  backlog: "Backlog",
+  planning: "Planning",
+  in_progress: "In Progress",
+  blocked: "Blocked",
+  closed: "Closed",
+};
+const categoryCounts = computed(() => {
+  const out = new Map<StatusCategory, number>();
+  for (const cat of CATEGORY_ORDER) out.set(cat, 0);
+  for (const t of allTickets.value) {
+    out.set(t.status.category, (out.get(t.status.category) ?? 0) + 1);
+  }
+  return out;
+});
 
 type Swimlane = {
   id: string;
@@ -327,35 +367,73 @@ const errMessage = computed(() => {
     <!-- Header. Single row: back · | · board name · | · tabs · (filler) · controls.
          Back returns to /boards; tabs swap body within the same shell so the
          surrounding chrome stays put on tab change. -->
-    <div class="border-b bg-background/95 backdrop-blur sticky top-0 z-10">
-      <div class="px-4 h-12 flex items-center gap-2">
-        <Button variant="ghost" size="sm" class="h-8 -ml-2" @click="router.push('/boards')">
+    <!-- v4 sub-nav (52px): crumb · tabs · (filler) · agent filter · Group ·
+         New ticket · overflow (Edit / Sort). -->
+    <div class="border-b dark:border-line-soft bg-background/95 backdrop-blur sticky top-0 z-10">
+      <div class="px-4 h-[52px] flex items-center gap-2">
+        <Button variant="ghost" size="sm" class="-ml-2 text-muted-foreground" @click="router.push('/boards')">
           <ArrowLeft class="h-3.5 w-3.5 mr-1" /> Back
         </Button>
-        <Separator orientation="vertical" class="h-5" />
-        <span class="text-sm font-medium truncate">{{ board?.name ?? "Board" }}</span>
-        <span v-if="board" class="text-[11px] text-muted-foreground whitespace-nowrap">
+        <Separator orientation="vertical" class="h-[18px]" />
+        <span class="text-[13.5px] font-semibold truncate">{{ board?.name ?? "Board" }}</span>
+        <span v-if="board" class="font-mono text-[11px] text-ink-3 whitespace-nowrap">
           · {{ board.projects.length }} project{{ board.projects.length === 1 ? "" : "s" }}
         </span>
-        <Separator orientation="vertical" class="h-5" />
+        <Separator orientation="vertical" class="h-[18px]" />
         <InsightsTabs
           :board-path="`/boards/${boardId}`"
           :insights-path="`/boards/${boardId}/insights`"
         />
         <div class="flex-1 min-w-0" />
+
+        <!-- agent-driven only: mono chip with a mini square-agent glyph. -->
+        <button
+          type="button"
+          :class="[
+            'inline-flex h-[22px] items-center gap-1.5 rounded-md border px-2 font-mono text-[11px] transition-colors',
+            agentOnly
+              ? 'border-agent/40 bg-agent-bg text-agent'
+              : 'border-border bg-surface-3 text-ink-2 hover:text-foreground',
+          ]"
+          :aria-pressed="agentOnly"
+          title="Show only agent-assigned or agent-reported tickets"
+          @click="toggleAgentOnly"
+        >
+          <span
+            class="grid h-3.5 w-3.5 place-items-center rounded-[4px] bg-agent-bg font-mono text-[8.5px] text-agent border border-agent/30"
+          >A</span>
+          agent-driven only
+        </button>
+
         <SwimlaneSelector v-model="swimlaneBy" />
-        <SortMenu
-          :model-value="sortMode"
-          :options="SORT_MODES"
-          label="Sort"
-          @update:model-value="setSortMode"
-        />
-        <Button variant="outline" size="sm" class="h-8" :disabled="!board" @click="showEdit = true">
-          <Pencil class="h-3.5 w-3.5 mr-1.5" /> Edit
-        </Button>
-        <Button size="sm" class="h-8" :disabled="!board" @click="ui.openCreateTicket(defaultProjectKey)">
+        <Button size="sm" :disabled="!board" @click="ui.openCreateTicket(defaultProjectKey)">
           <Plus class="h-3.5 w-3.5 mr-1.5" /> New ticket
         </Button>
+
+        <!-- Overflow: Edit board + sort modes (moved off the bar per v4). -->
+        <DropdownMenu>
+          <DropdownMenuTrigger as-child>
+            <Button variant="ghost" size="icon-sm" aria-label="Board options">
+              <MoreHorizontal class="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" class="w-44">
+            <DropdownMenuItem :disabled="!board" @click="showEdit = true">
+              <Pencil class="h-3.5 w-3.5 mr-2" /> Edit board
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel class="text-xs text-muted-foreground">Sort</DropdownMenuLabel>
+            <DropdownMenuItem
+              v-for="m in SORT_MODES"
+              :key="m.value"
+              @click="setSortMode(m.value)"
+            >
+              <Check :class="['h-3.5 w-3.5 mr-2', sortMode === m.value ? 'opacity-100' : 'opacity-0']" />
+              {{ m.label }}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
         <Loader2
           v-if="transitionMutation.isPending.value"
           class="h-4 w-4 text-muted-foreground animate-spin"
@@ -394,14 +472,31 @@ const errMessage = computed(() => {
           gridTemplateColumns: swimlaneBy === 'none' ? 'repeat(5, minmax(14rem, 1fr))' : 'minmax(8rem, auto) repeat(5, minmax(14rem, 1fr))',
         }"
       >
-        <!-- Column headers -->
-        <div v-if="swimlaneBy !== 'none'" class="sticky top-0 z-[1]"></div>
+        <!-- Column headers: status swatch + name + count pill + quick-add. -->
+        <div v-if="swimlaneBy !== 'none'" class="sticky top-0 z-[1] bg-background"></div>
         <div
           v-for="cat in CATEGORY_ORDER"
           :key="cat"
-          class="text-xs font-medium uppercase tracking-wider text-muted-foreground px-2 py-1.5 bg-muted/30 rounded-md sticky top-0 z-[1] capitalize"
+          class="flex items-center gap-2 px-1.5 py-1.5 sticky top-0 z-[1] bg-background"
         >
-          {{ cat.replace("_", " ") }}
+          <span
+            class="h-2 w-2 shrink-0 rounded-[2px]"
+            :style="{ backgroundColor: STATUS_HEX[cat] }"
+            aria-hidden="true"
+          />
+          <span class="text-[12.5px] font-semibold">{{ CATEGORY_LABELS[cat] }}</span>
+          <span class="rounded-[9px] bg-surface-3 px-1.5 py-0.5 font-mono text-[10.5px] tabular-nums text-ink-3">
+            {{ categoryCounts.get(cat) ?? 0 }}
+          </span>
+          <button
+            type="button"
+            class="ml-auto rounded p-0.5 text-ink-4 hover:text-foreground hover:bg-accent transition-colors"
+            :aria-label="`New ticket in ${CATEGORY_LABELS[cat]}`"
+            :title="`New ticket in ${CATEGORY_LABELS[cat]}`"
+            @click="quickAdd(cat)"
+          >
+            <Plus class="h-3.5 w-3.5" />
+          </button>
         </div>
 
         <!-- Swimlane rows -->

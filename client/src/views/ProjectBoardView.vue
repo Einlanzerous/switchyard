@@ -416,8 +416,10 @@ const errMessage = computed(() => {
           :dragging-ticket-id="inflightTicketId"
           :focused-ticket-id="idx === focusedColIdx ? focusedTicketId : null"
           :hint="col.category === 'closed' ? `last ${closedWindowDays} days` : undefined"
+          :can-quick-add="canWrite"
           @open="openTicket"
           @drop="handleDrop"
+          @quick-add="(cat) => ui.openCreateTicket(projectKey, cat)"
         />
       </div>
     </div>

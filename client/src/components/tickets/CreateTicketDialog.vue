@@ -17,7 +17,7 @@ import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
 import { useMentionAutocomplete } from "@/composables/useMentionAutocomplete";
 import MentionAutocomplete from "@/components/MentionAutocomplete.vue";
-import type { TicketType, Priority, UserRef } from "@switchyard/shared";
+import type { TicketType, Priority, StatusCategory, UserRef } from "@switchyard/shared";
 
 const props = defineProps<{
   open: boolean;
@@ -31,6 +31,10 @@ const props = defineProps<{
   // Optional preselected type. "Add sub-ticket" on an epic passes "task"; "Add
   // subtask" on a task/bug/spike passes "subtask".
   defaultType?: TicketType;
+  // Optional status-category prefill (board per-column quick-add). Resolved
+  // to the project's status for that category at create time; falls back to
+  // the project default status when the category doesn't exist there.
+  defaultCategory?: StatusCategory | null;
 }>();
 
 const emit = defineEmits<{ "update:open": [value: boolean] }>();
@@ -165,6 +169,17 @@ const createMutation = useMutation({
     if (description.value.trim()) body.description = description.value.trim();
     if (priority.value !== "__none__") body.priority = priority.value;
     if (parentId.value !== "__none__") body.parent_id = parentId.value;
+
+    // Column quick-add: resolve the requested category to this project's
+    // status id. Backlog is the server default anyway; a missing category
+    // just falls back to the default status rather than failing the create.
+    if (props.defaultCategory && props.defaultCategory !== "backlog") {
+      const { data: statuses } = await api.GET("/v1/projects/{key}/statuses", {
+        params: { path: { key: projectKey.value } },
+      });
+      const match = statuses?.items?.find((s) => s.category === props.defaultCategory);
+      if (match) body.status_id = match.id;
+    }
 
     const { data, error } = await api.POST("/v1/tickets", {
       body: body as never,

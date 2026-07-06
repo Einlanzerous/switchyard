@@ -8,6 +8,7 @@ import { useQuery } from "@tanstack/vue-query";
 import { ChevronLeft, ChevronDown, Circle, CheckCircle2, Loader2 } from "lucide-vue-next";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
+import { formatRelativeTime } from "@/lib/formatTime";
 import UserAvatar from "@/components/UserAvatar.vue";
 import { cn } from "@/lib/utils";
 import TypeIcon from "./TypeIcon.vue";
@@ -159,6 +160,37 @@ const subtasksQuery = useQuery({
   },
 });
 const subtasks = computed(() => subtasksQuery.data.value?.items ?? []);
+
+// ─── blocked-by chip (v4) ───────────────────────────────────────────────────
+// Cards in the Blocked column name their blocker. Scoped to blocked-category
+// tickets only (a handful per board at worst), so this stays a per-blocked-
+// card query rather than a whole-board N+1; a batched rollup can replace it
+// when ticket-activity signals land (SWY-147).
+const isBlockedCategory = computed(() => props.ticket.status.category === "blocked");
+const linksQuery = useQuery({
+  queryKey: computed(() => ["sw", "tickets", props.ticket.id, "links"]),
+  enabled: isBlockedCategory,
+  staleTime: 60 * 1000,
+  queryFn: async () => {
+    const { data, error } = await api.GET("/v1/tickets/{idOrKey}/links", {
+      params: { path: { idOrKey: props.ticket.id } },
+    });
+    if (error) throw error;
+    return data;
+  },
+});
+const blockedBy = computed(() => {
+  if (!isBlockedCategory.value) return null;
+  const links = linksQuery.data.value?.items ?? [];
+  return links.find((l) => l.type === "blocks" && l.direction === "incoming") ?? null;
+});
+
+// Closed cards trade chrome for a "how long ago" read.
+const closedAgo = computed(() =>
+  props.ticket.status.category === "closed"
+    ? formatRelativeTime(props.ticket.updated_at)
+    : null,
+);
 </script>
 
 <template>
@@ -198,9 +230,20 @@ const subtasks = computed(() => subtasksQuery.data.value?.items ?? []);
     <p class="text-[12.5px] font-medium leading-[1.42] line-clamp-3 text-foreground">
       {{ ticket.title }}
     </p>
+    <!-- Blocked column: name the blocker (click-through opens it). -->
+    <button
+      v-if="blockedBy"
+      type="button"
+      class="mt-2 inline-flex h-[19px] items-center gap-1 rounded-[5px] bg-surface-4 px-1.5 font-mono text-[10px] text-ink-2 hover:text-foreground transition-colors"
+      :title="`Blocked by ${blockedBy.other_ticket.key} — ${blockedBy.other_ticket.title}`"
+      @click.stop="emit('open', blockedBy.other_ticket.key)"
+    >
+      blocked by <span class="text-st-blocked">{{ blockedBy.other_ticket.key }}</span>
+    </button>
+
     <!-- tkt-foot: ≤2 label chips left, overdue badge, driver avatar right. -->
     <div
-      v-if="visibleLabels.length > 0 || ticket.assignee || isOverdue"
+      v-if="visibleLabels.length > 0 || ticket.assignee || isOverdue || closedAgo"
       class="flex items-center gap-1.5 mt-2.5"
     >
       <div class="flex flex-wrap gap-1.5 flex-1 min-w-0 items-center">
@@ -215,6 +258,9 @@ const subtasks = computed(() => subtasksQuery.data.value?.items ?? []);
           show-label
         />
       </div>
+      <span v-if="closedAgo" class="font-mono text-[10px] text-ink-4 whitespace-nowrap">
+        {{ closedAgo }}
+      </span>
       <UserAvatar v-if="ticket.assignee" :user="ticket.assignee" size="xs" class="shrink-0" />
     </div>
 
