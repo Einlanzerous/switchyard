@@ -15,6 +15,7 @@ import {
   ProjectStats, ProjectStatsList, ThroughputStats, CycleTimeStats,
   CumulativeFlowStats, StaleRollup, ClosedByActorStats,
   ActivityPulseStats, ACTIVITY_PULSE_DAYS,
+  EpicsInFlightStats, EPIC_STALL_AFTER_DAYS,
   ProjectKey, StatsBucket, StatsWindowQuery,
   type StatusCategory, type TicketType, type Priority,
 } from "@switchyard/shared";
@@ -115,6 +116,21 @@ const activityPulse = createRoute({
     "recent actors (most-recent first) from the same window. Constant query " +
     "count regardless of project count.",
   responses: { ...okJson(ActivityPulseStats), ...errorResponses },
+});
+
+const epicsInFlight = createRoute({
+  method: "get",
+  path: "/v1/stats/epics",
+  tags: [tag],
+  summary: "Open epics with child-completion progress, driver, and stall flag",
+  description:
+    "One row per open (non-closed) epic in scope. `progress_pct` = closed " +
+    "children / total children × 100 (0 when childless). `driver` = actor " +
+    "of the most recent event on the epic or any child. `stalled` = the " +
+    "epic is in_progress AND no agent-actor event touched the family within " +
+    "`stall_after_days` (the 'no LLM activity' signal); backlog/planning " +
+    "epics are never stalled. Constant query count regardless of epic count.",
+  responses: { ...okJson(EpicsInFlightStats), ...errorResponses },
 });
 
 const closedByActor = createRoute({
@@ -448,6 +464,134 @@ export function mount(app: OpenAPIHono) {
     const human_total = points.reduce((a, b) => a + b.human_count, 0);
     return c.json(
       { bucket, points, total, agent_total: total - human_total, human_total },
+      200
+    );
+  }) as any);
+
+  // ─── epics in flight ──────────────────────────────────────────────────────
+
+  app.openapi(epicsInFlight, (async (c: any) => {
+    const user = c.get("auth").user;
+    const visible = hasInstanceWideAccess(user) ? null : await visibleProjectIds(user);
+    if (visible && visible.size === 0) {
+      return c.json({ stall_after_days: EPIC_STALL_AFTER_DAYS, items: [] }, 200);
+    }
+    const epicFilter = visible ? projectInSql([...visible], false, "t.project_id") : sql``;
+
+    // Query 1: open epics + status + project ref.
+    const epicRows = await db.execute<{
+      id: string; key_num: number; title: string;
+      p_id: string; p_key: string; p_name: string; p_color: string | null; p_repo: string | null;
+      s_id: string; s_category: string; s_display: string;
+    }>(sql`
+      SELECT
+        t.id, t.number AS key_num, t.title,
+        p.id AS p_id, p.key AS p_key, p.name AS p_name, p.color AS p_color, p.repo_url AS p_repo,
+        s.id AS s_id, s.category AS s_category, s.display_name AS s_display
+      FROM tickets t
+      JOIN projects p ON p.id = t.project_id AND p.deleted_at IS NULL
+      JOIN statuses s ON s.id = t.status_id
+      WHERE t.type = 'epic'
+        AND t.deleted_at IS NULL
+        AND s.category <> 'closed'
+        ${epicFilter}
+      ORDER BY p.key, t.number
+    `);
+    const eRows = ((epicRows as any).rows ?? epicRows) as Array<{
+      id: string; key_num: number; title: string;
+      p_id: string; p_key: string; p_name: string; p_color: string | null; p_repo: string | null;
+      s_id: string; s_category: string; s_display: string;
+    }>;
+    if (eRows.length === 0) {
+      return c.json({ stall_after_days: EPIC_STALL_AFTER_DAYS, items: [] }, 200);
+    }
+    const epicIds = eRows.map((r) => r.id);
+
+    // Query 2: child-completion aggregate over parent_id (one GROUP BY, no
+    // per-epic fetch).
+    const childRows = await db.execute<{ parent_id: string; total: number; done: number }>(sql`
+      SELECT
+        t.parent_id,
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE s.category = 'closed')::int AS done
+      FROM tickets t
+      JOIN statuses s ON s.id = t.status_id
+      WHERE t.parent_id IN ${sql.raw(`(${epicIds.map((id) => `'${id}'`).join(",")})`)}
+        AND t.deleted_at IS NULL
+      GROUP BY t.parent_id
+    `);
+    const cRows = ((childRows as any).rows ?? childRows) as Array<{ parent_id: string; total: number; done: number }>;
+    const progress = new Map(cRows.map((r) => [r.parent_id, r]));
+
+    // Queries 3+4: latest event per epic family (epic itself or a child),
+    // once for any actor (driver + last activity) and once for agent actors
+    // only (stall detection). `epic_id` folds children onto their parent.
+    const idList = sql.raw(`(${epicIds.map((id) => `'${id}'`).join(",")})`);
+    const latestAny = await db.execute<{
+      epic_id: string; at: string;
+      u_id: string | null; u_name: string | null; u_icon: string | null; u_type: string | null;
+    }>(sql`
+      SELECT DISTINCT ON (fam.epic_id)
+        fam.epic_id, e.created_at::text AS at,
+        u.id AS u_id, u.name AS u_name, u.icon AS u_icon, u.type AS u_type
+      FROM events e
+      JOIN tickets t ON t.id = e.ticket_id
+      CROSS JOIN LATERAL (
+        SELECT CASE WHEN t.type = 'epic' THEN t.id ELSE t.parent_id END AS epic_id
+      ) fam
+      LEFT JOIN users u ON u.id = e.actor_id
+      WHERE fam.epic_id IN ${idList}
+      ORDER BY fam.epic_id, e.created_at DESC
+    `);
+    const latestAgent = await db.execute<{ epic_id: string; at: string }>(sql`
+      SELECT DISTINCT ON (fam.epic_id) fam.epic_id, e.created_at::text AS at
+      FROM events e
+      JOIN tickets t ON t.id = e.ticket_id
+      CROSS JOIN LATERAL (
+        SELECT CASE WHEN t.type = 'epic' THEN t.id ELSE t.parent_id END AS epic_id
+      ) fam
+      JOIN users u ON u.id = e.actor_id AND u.type = 'agent'
+      WHERE fam.epic_id IN ${idList}
+      ORDER BY fam.epic_id, e.created_at DESC
+    `);
+    const anyRows = ((latestAny as any).rows ?? latestAny) as Array<{
+      epic_id: string; at: string;
+      u_id: string | null; u_name: string | null; u_icon: string | null; u_type: string | null;
+    }>;
+    const agentRows = ((latestAgent as any).rows ?? latestAgent) as Array<{ epic_id: string; at: string }>;
+    const lastAny = new Map(anyRows.map((r) => [r.epic_id, r]));
+    const lastAgentAt = new Map(agentRows.map((r) => [r.epic_id, new Date(r.at).getTime()]));
+
+    const stallCutoff = Date.now() - EPIC_STALL_AFTER_DAYS * 86_400_000;
+
+    return c.json(
+      {
+        stall_after_days: EPIC_STALL_AFTER_DAYS,
+        items: eRows.map((r) => {
+          const prog = progress.get(r.id);
+          const total = prog?.total ?? 0;
+          const done = prog?.done ?? 0;
+          const last = lastAny.get(r.id);
+          const agentAt = lastAgentAt.get(r.id);
+          const stalled =
+            r.s_category === "in_progress" && (agentAt === undefined || agentAt < stallCutoff);
+          return {
+            id: r.id,
+            key: `${r.p_key}-${r.key_num}`,
+            title: r.title,
+            project: { id: r.p_id, key: r.p_key, name: r.p_name, color: r.p_color, repo_url: r.p_repo },
+            status: { id: r.s_id, category: r.s_category, display_name: r.s_display },
+            progress_pct: total === 0 ? 0 : Math.round((done / total) * 100),
+            children_total: total,
+            children_closed: done,
+            driver: last?.u_id
+              ? { id: last.u_id, name: last.u_name!, icon: last.u_icon, type: last.u_type! }
+              : null,
+            last_activity_at: last ? new Date(last.at).toISOString() : null,
+            stalled,
+          };
+        }),
+      },
       200
     );
   }) as any);

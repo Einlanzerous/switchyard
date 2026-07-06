@@ -4,7 +4,7 @@ import { ProjectRef } from "./project.js";
 import { UserRef } from "./user.js";
 import { TicketType, TicketSummary } from "./ticket.js";
 import { Priority } from "./ticket.js";
-import { StatusCategory } from "./status.js";
+import { StatusCategory, StatusRef } from "./status.js";
 
 // ─── per-project breakdown ──────────────────────────────────────────────────
 //
@@ -130,6 +130,40 @@ export const ClosedByActorStats = z.object({
   items: z.array(ClosedByActorRow),
 });
 export type ClosedByActorStats = z.infer<typeof ClosedByActorStats>;
+
+// ─── epics in flight (SWY-137) ───────────────────────────────────────────────
+//
+// Powers the dashboard "Epics in flight" card and the board's stalled
+// signals. One row per open (non-closed) epic, with child-completion
+// progress and a stall flag. `driver` is the actor of the most recent event
+// on the epic or any of its children (null when the family has no attributed
+// events). `stalled` means: category is in_progress AND no AGENT-actor event
+// on the epic/children within `stall_after_days` — the "no LLM activity Nd"
+// signal. Backlog/planning epics are never stalled (nothing was in motion).
+
+export const EPIC_STALL_AFTER_DAYS = 4;
+
+export const EpicInFlightRow = z.object({
+  id: Uuid,
+  key: TicketKey,
+  title: z.string(),
+  project: ProjectRef,
+  status: StatusRef,
+  // Closed children / total children × 100, rounded; 0 when childless.
+  progress_pct: z.number().int().min(0).max(100),
+  children_total: z.number().int().nonnegative(),
+  children_closed: z.number().int().nonnegative(),
+  driver: UserRef.nullable(),
+  last_activity_at: Iso8601.nullable(),
+  stalled: z.boolean(),
+});
+export type EpicInFlightRow = z.infer<typeof EpicInFlightRow>;
+
+export const EpicsInFlightStats = z.object({
+  stall_after_days: z.number().int().positive(),
+  items: z.array(EpicInFlightRow),
+});
+export type EpicsInFlightStats = z.infer<typeof EpicsInFlightStats>;
 
 // ─── per-project activity pulse (SWY-136) ────────────────────────────────────
 //
