@@ -4,30 +4,29 @@
 // chrome, etc.).
 //
 // - `STATUS_BADGE_TONE` is the Tailwind class string used by `StatusBadge`
-//   and anywhere else that wants a bg/text/border tint trio.
+//   and anywhere else that wants a bg/text tint pair.
 // - `STATUS_HEX` is the raw hex color used by ECharts, which wants strings
 //   on `itemStyle.color`, not Tailwind classes.
+//
+// v4 "Elevated" family (SWY-133): one tuned palette — consistent lightness/
+// chroma so the five categories read as a family. Tailwind `st-*` utilities
+// and the `--st-*` CSS vars carry the same values.
 
 import type { StatusCategory } from "@switchyard/shared";
 
 export const STATUS_BADGE_TONE: Record<StatusCategory, string> = {
-  backlog:
-    "bg-violet-500/15 text-violet-600 dark:text-violet-300 border-violet-500/30",
-  planning:
-    "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30",
-  in_progress:
-    "bg-blue-500/15 text-blue-600 dark:text-blue-300 border-blue-500/30",
-  blocked:
-    "bg-red-500/15 text-red-600 dark:text-red-300 border-red-500/30",
-  closed:
-    "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
+  backlog: "bg-st-backlog-bg text-st-backlog border-st-backlog/30",
+  planning: "bg-st-planning-bg text-st-planning border-st-planning/30",
+  in_progress: "bg-st-progress-bg text-st-progress border-st-progress/30",
+  blocked: "bg-st-blocked-bg text-st-blocked border-st-blocked/30",
+  closed: "bg-st-closed-bg text-st-closed border-st-closed/30",
 };
 
-// Tailwind 500-shade hex values, kept in sync with STATUS_BADGE_TONE above.
+// Kept in sync with STATUS_BADGE_TONE above (and tailwind.config.ts `st`).
 export const STATUS_HEX: Record<StatusCategory, string> = {
-  backlog: "#8b5cf6",
-  planning: "#f59e0b",
-  in_progress: "#3b82f6",
-  blocked: "#ef4444",
-  closed: "#10b981",
+  backlog: "#808289",
+  planning: "#c08cd8",
+  in_progress: "#64a0d6",
+  blocked: "#d76f6a",
+  closed: "#63b58c",
 };

@@ -5,6 +5,7 @@
 
 import { computed } from "vue";
 import { useCumulativeFlow } from "@/composables/useDashboardData";
+import { STATUS_HEX } from "@/lib/statusColors";
 import Chart from "@/components/charts/Chart.vue";
 
 const props = defineProps<{
@@ -52,7 +53,8 @@ const option = computed(() => {
       stack: "total",
       smooth: true,
       showSymbol: false,
-      areaStyle: { opacity: 0.85 },
+      itemStyle: { color: STATUS_HEX[c] },
+      areaStyle: { opacity: 0.85, color: STATUS_HEX[c] },
       lineStyle: { width: 0 },
       data: points.map((p) => p.by_category[c] ?? 0),
     })),

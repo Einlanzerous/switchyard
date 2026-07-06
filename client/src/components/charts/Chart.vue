@@ -52,15 +52,17 @@ function readCss(name: string, fallback = "#000"): string {
 // below increments it.
 const themeRev = ref(0);
 
+// v4 "Elevated" family — status hues + brand coral + agent steel, so multi-
+// series charts stay inside the design palette (no stock ECharts blue).
 const PALETTE = [
-  "#3b82f6", // blue 500
-  "#22c55e", // green
-  "#f59e0b", // amber
-  "#ef4444", // red
-  "#8b5cf6", // violet
-  "#06b6d4", // cyan
-  "#ec4899", // pink
-  "#84cc16", // lime
+  "#64a0d6", // progress blue
+  "#63b58c", // closed green
+  "#c08cd8", // planning purple
+  "#e2623d", // signal coral
+  "#8fa6bd", // agent steel
+  "#d76f6a", // blocked red
+  "#808289", // backlog gray
+  "#f0855f", // coral (light)
 ];
 
 const echartsTheme = computed(() => {

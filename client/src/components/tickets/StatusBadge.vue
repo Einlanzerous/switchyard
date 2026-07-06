@@ -17,8 +17,8 @@ const label = computed(() => props.displayName ?? props.category.replace("_", " 
 <template>
   <span
     :class="cn(
-      'inline-flex items-center rounded-md border font-medium capitalize whitespace-nowrap',
-      size === 'sm' ? 'h-5 px-1.5 text-[10px]' : 'h-6 px-2 text-xs',
+      'inline-flex items-center rounded-md font-semibold capitalize whitespace-nowrap',
+      size === 'sm' ? 'h-5 px-2 text-[10.5px]' : 'h-6 px-2.5 text-[11.5px]',
       tone,
     )"
   >
