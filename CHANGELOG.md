@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.6.2](https://github.com/Einlanzerous/switchyard/compare/v3.6.1...v3.6.2) (2026-07-02)
+
+
+### Bug Fixes
+
+* SWY-129 — smoother sidebar collapse (stable toggle + animated logo) ([#127](https://github.com/Einlanzerous/switchyard/issues/127)) ([1bd21b4](https://github.com/Einlanzerous/switchyard/commit/1bd21b47cfef6220cfcc71c05bd1496b5692fcbe))
+
+
+### Maintenance
+
+* update knowledge graph [skip ci] ([fa31604](https://github.com/Einlanzerous/switchyard/commit/fa31604f89e7fb626d019ed5f6067c38f108a20a))
+
 ## [3.6.1](https://github.com/Einlanzerous/switchyard/compare/v3.6.0...v3.6.1) (2026-07-01)
 
 
