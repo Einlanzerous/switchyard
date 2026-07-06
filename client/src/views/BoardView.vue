@@ -434,10 +434,15 @@ const errMessage = computed(() => {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <Loader2
-          v-if="transitionMutation.isPending.value"
-          class="h-4 w-4 text-muted-foreground animate-spin"
-        />
+        <!-- Fixed-width slot: the spinner toggling in and out must not
+             change the row's width, or the whole right-hand control
+             cluster shifts on every drag-transition ("bounce"). -->
+        <span class="w-4 h-4 shrink-0" aria-hidden="true">
+          <Loader2
+            v-if="transitionMutation.isPending.value"
+            class="h-4 w-4 text-muted-foreground animate-spin"
+          />
+        </span>
       </div>
     </div>
 

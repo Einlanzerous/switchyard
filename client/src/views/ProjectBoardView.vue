@@ -373,10 +373,14 @@ const errMessage = computed(() => {
         <Button v-if="canWrite" size="sm" class="h-8" @click="ui.openCreateTicket(projectKey)">
           <Plus class="h-3.5 w-3.5 mr-1.5" /> New ticket
         </Button>
-        <Loader2
-          v-if="transitionMutation.isPending.value"
-          class="h-4 w-4 text-muted-foreground animate-spin"
-        />
+        <!-- Fixed-width slot so the drag-transition spinner doesn't shift
+             the control cluster (same fix as BoardView). -->
+        <span class="w-4 h-4 shrink-0" aria-hidden="true">
+          <Loader2
+            v-if="transitionMutation.isPending.value"
+            class="h-4 w-4 text-muted-foreground animate-spin"
+          />
+        </span>
       </div>
     </div>
 
