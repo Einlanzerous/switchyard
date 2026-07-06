@@ -127,8 +127,19 @@ function onSelectClick(e: MouseEvent) {
         show-label
         class="hidden md:inline-flex"
       />
-      <PriorityBadge :priority="ticket.priority" class="hidden sm:inline-flex" />
-      <StatusBadge :category="ticket.status.category" :display-name="ticket.status.display_name" size="sm" />
+      <!-- Fixed-width slots for priority + status so they line up in the
+           same columns on every row (labels absorb the variable space). -->
+      <span class="hidden sm:flex w-5 shrink-0 justify-center">
+        <PriorityBadge :priority="ticket.priority" />
+      </span>
+      <span class="flex w-[92px] shrink-0">
+        <StatusBadge
+          :category="ticket.status.category"
+          :display-name="ticket.status.display_name"
+          size="sm"
+          class="max-w-full truncate"
+        />
+      </span>
 
       <UserAvatar
         v-if="ticket.assignee"
