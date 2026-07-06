@@ -29,6 +29,17 @@ export const queryKeys = {
   ticketEvents: (idOrKey: string) => ["sw", "ticket", idOrKey, "events"] as const,
   ticketChildren: (idOrKey: string) => ["sw", "ticket", idOrKey, "children"] as const,
 
+  // Plan-as-PR (Phase 7.1). The plan + its revisions hang off the ticket; the
+  // anchored comment thread is keyed by revision so each revision's discussion
+  // caches independently. `plans` is the cross-ticket review-queue / board index.
+  plan: (idOrKey: string) => ["sw", "ticket", idOrKey, "plan"] as const,
+  planRevisions: (idOrKey: string) => ["sw", "ticket", idOrKey, "plan", "revisions"] as const,
+  planRevision: (idOrKey: string, rev: number) =>
+    ["sw", "ticket", idOrKey, "plan", "revisions", rev] as const,
+  planThread: (idOrKey: string, revisionId: string) =>
+    ["sw", "ticket", idOrKey, "plan", "thread", revisionId] as const,
+  plans: (params?: Record<string, unknown>) => ["sw", "plans", params ?? {}] as const,
+
   events: (params?: Record<string, unknown>) => ["sw", "events", params ?? {}] as const,
 
   boards: () => ["sw", "boards"] as const,

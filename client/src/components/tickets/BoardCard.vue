@@ -5,9 +5,10 @@ import {
   attachClosestEdge, extractClosestEdge, type Edge,
 } from "@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge";
 import { useQuery } from "@tanstack/vue-query";
-import { ChevronLeft, ChevronDown, Circle, CheckCircle2, Loader2 } from "lucide-vue-next";
+import { ChevronLeft, ChevronDown, Circle, CheckCircle2, Loader2, ClipboardList } from "lucide-vue-next";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
+import { usePlanReviewIndex } from "@/composables/usePlanReviewIndex";
 import UserAvatar from "@/components/UserAvatar.vue";
 import { cn } from "@/lib/utils";
 import TypeIcon from "./TypeIcon.vue";
@@ -107,6 +108,11 @@ onBeforeUnmount(() => {
   cleanups = [];
 });
 
+// "Plan in review" badge (7.1): the board provides the set of ticket ids whose
+// plan is awaiting review, so kanban shows it without opening the ticket.
+const planReviewIds = usePlanReviewIndex();
+const planInReview = computed(() => planReviewIds.value.has(props.ticket.id));
+
 const visibleLabels = computed(() => props.ticket.labels.slice(0, 3));
 const extraLabelCount = computed(() => Math.max(0, props.ticket.labels.length - 3));
 // Cap visible badges so a ticket with many refs doesn't blow out the
@@ -171,14 +177,22 @@ const subtasks = computed(() => subtasksQuery.data.value?.items ?? []);
       <TypeIcon :type="ticket.type" class="h-3.5 w-3.5" />
       <span class="font-mono">{{ ticket.key }}</span>
       <EpicChip v-if="ticket.parent" :parent="ticket.parent" />
-      <span
-        v-if="visibleRefs.length > 0"
-        class="ml-auto flex items-center gap-1"
-      >
-        <ExternalRefBadge v-for="r in visibleRefs" :key="r.id" :value="r" size="xs" />
-        <span v-if="extraRefCount > 0" class="text-[10px]">+{{ extraRefCount }}</span>
+      <!-- Right cluster: plan badge · external refs · priority -->
+      <span class="ml-auto flex items-center gap-1.5">
+        <span
+          v-if="planInReview"
+          class="inline-flex items-center gap-0.5 rounded border border-amber-300/70 bg-amber-100 px-1 py-px text-[10px] font-medium text-amber-700 dark:border-amber-800/60 dark:bg-amber-950/50 dark:text-amber-300"
+          title="Plan in review"
+        >
+          <ClipboardList class="h-3 w-3" />
+          plan
+        </span>
+        <span v-if="visibleRefs.length > 0" class="flex items-center gap-1">
+          <ExternalRefBadge v-for="r in visibleRefs" :key="r.id" :value="r" size="xs" />
+          <span v-if="extraRefCount > 0" class="text-[10px]">+{{ extraRefCount }}</span>
+        </span>
+        <PriorityBadge :priority="ticket.priority" />
       </span>
-      <PriorityBadge :priority="ticket.priority" :class="visibleRefs.length > 0 ? 'ml-2' : 'ml-auto'" />
     </div>
     <p class="font-medium leading-snug line-clamp-3 text-foreground">
       {{ ticket.title }}

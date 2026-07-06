@@ -28,8 +28,20 @@ export type Comment = z.infer<typeof Comment>;
 
 export const CreateComment = z.object({
   body: z.string().min(1).max(50_000),
+  // Plan threads (Phase 7.1). Anchor a new comment to a plan revision, and
+  // optionally to a sub-target within it via `plan_anchor`. A `plan_anchor`
+  // requires `plan_revision_id` (mirrors the comments_plan_anchor_requires_revision
+  // CHECK); the create handler additionally validates the revision belongs to
+  // this ticket's plan and that a `criterion:<id>` anchor names a real criterion
+  // in that revision. Both absent → an ordinary ticket comment. The anchor is
+  // immutable after creation, so it is not editable via UpdateComment.
+  plan_revision_id: Uuid.optional(),
+  plan_anchor: PlanAnchor.optional(),
 });
 export type CreateComment = z.infer<typeof CreateComment>;
 
-export const UpdateComment = CreateComment.partial();
+// Edits only ever touch the body — a comment's plan anchor is fixed at creation.
+export const UpdateComment = z.object({
+  body: z.string().min(1).max(50_000).optional(),
+});
 export type UpdateComment = z.infer<typeof UpdateComment>;

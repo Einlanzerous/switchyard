@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useMutation, useQueryClient } from "@tanstack/vue-query";
 import { Repeat } from "lucide-vue-next";
 import { toast } from "vue-sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import StatusBadge from "./StatusBadge.vue";
+import PlanReviewSection from "./plan/PlanReviewSection.vue";
 import TypeIcon from "./TypeIcon.vue";
 import DescriptionEditor from "./DescriptionEditor.vue";
 import CommentItem from "./CommentItem.vue";
@@ -23,6 +24,7 @@ import LabelEditor from "./LabelEditor.vue";
 import CreateTicketDialog from "./CreateTicketDialog.vue";
 import { cn } from "@/lib/utils";
 import { useTicketDetail } from "@/composables/useTicketDetail";
+import { useTicketPlan } from "@/composables/useTicketPlan";
 import { useProjectPermissions, provideTicketCanWrite } from "@/composables/useProjectPermissions";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
@@ -44,6 +46,7 @@ const props = withDefaults(defineProps<{
 });
 
 const router = useRouter();
+const route = useRoute();
 
 const idOrKey = computed(() => props.idOrKey);
 const {
@@ -51,15 +54,31 @@ const {
   parent, parentLoading, children, childrenLoading,
 } = useTicketDetail(idOrKey);
 
+// Whether this ticket carries a plan (Phase 7.1). Drives the conditional Plan
+// tab; the query is shared (same key) with PlanReviewSection's own load.
+const { hasPlan } = useTicketPlan(idOrKey);
+
 // Write capability on this ticket's project, shared down to the inline editors
 // / transition / comment composer (6.5/6.6). A viewer sees the ticket but no
 // write affordances; the server enforces the same regardless.
 const { canWrite } = useProjectPermissions(() => ticket.value?.project.key ?? null);
 provideTicketCanWrite(canWrite);
 
-type Tab = "description" | "activity";
+type Tab = "description" | "plan" | "activity";
+// The Plan tab only exists when a plan does; it sits right after Description so
+// the review surface is one click from the ticket body.
+const tabs = computed<Tab[]>(() =>
+  hasPlan.value ? ["description", "plan", "activity"] : ["description", "activity"],
+);
 const activeTab = ref<Tab>("description");
-watch(idOrKey, () => { activeTab.value = "description"; });
+
+// Deep-link support: `?tab=plan` (used by the board badge + homepage review
+// widget) lands directly on the Plan tab once the plan has loaded.
+function wantsPlanTab(): boolean {
+  return route.query.tab === "plan" && hasPlan.value;
+}
+watch(idOrKey, () => { activeTab.value = wantsPlanTab() ? "plan" : "description"; });
+watch(hasPlan, () => { if (wantsPlanTab()) activeTab.value = "plan"; }, { immediate: true });
 
 const errMessage = computed(() => {
   const e = error.value;
@@ -378,7 +397,7 @@ function openAddSubTicket() {
     <div class="border-b">
       <nav class="flex gap-4 -mb-px">
         <button
-          v-for="t in (['description','activity'] as Tab[])"
+          v-for="t in tabs"
           :key="t"
           type="button"
           :class="cn(
@@ -437,6 +456,11 @@ function openAddSubTicket() {
         </ul>
         <p v-else class="text-sm text-muted-foreground italic">No comments yet.</p>
       </section>
+    </template>
+
+    <!-- Plan tab (Phase 7.1) — the intent diff -->
+    <template v-else-if="activeTab === 'plan'">
+      <PlanReviewSection :ticket-key="ticket.key" />
     </template>
 
     <!-- Activity tab -->

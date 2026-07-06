@@ -8875,6 +8875,8 @@ export interface paths {
                 query?: {
                     cursor?: string;
                     limit?: number;
+                    plan_revision_id?: string;
+                    anchor?: string;
                 };
                 header?: never;
                 path: {
@@ -9095,6 +9097,9 @@ export interface paths {
                 content: {
                     "application/json": {
                         body: string;
+                        /** Format: uuid */
+                        plan_revision_id?: string;
+                        plan_anchor?: string;
                     };
                 };
             };
@@ -9658,6 +9663,310 @@ export interface paths {
                 };
             };
         };
+        trace?: never;
+    };
+    "/v1/plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List plans across tickets (review queue / board badge index) */
+        get: {
+            parameters: {
+                query?: {
+                    cursor?: string;
+                    limit?: number;
+                    status?: string;
+                    project?: string;
+                    awaiting_my_review?: boolean | null;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description ok */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            items: {
+                                /** Format: uuid */
+                                id: string;
+                                ticket: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    key: string;
+                                    number: number;
+                                    project: {
+                                        /** Format: uuid */
+                                        id: string;
+                                        key: string;
+                                        name: string;
+                                        color: string | null;
+                                        /** Format: uri */
+                                        repo_url: string | null;
+                                    };
+                                    /** @enum {string} */
+                                    type: "spike" | "task" | "bug" | "epic" | "subtask";
+                                    title: string;
+                                    status: {
+                                        /** Format: uuid */
+                                        id: string;
+                                        /** @enum {string} */
+                                        category: "backlog" | "planning" | "in_progress" | "blocked" | "closed";
+                                        display_name: string;
+                                    };
+                                    /** @enum {string|null} */
+                                    resolution: "done" | "released" | "cancelled" | null;
+                                    /** @enum {string|null} */
+                                    priority: "low" | "medium" | "high" | "critical" | null;
+                                    /** Format: uuid */
+                                    parent_id: string | null;
+                                    parent?: {
+                                        /** Format: uuid */
+                                        id: string;
+                                        key: string;
+                                        title: string;
+                                    } | null;
+                                    assignee: {
+                                        /** Format: uuid */
+                                        id: string;
+                                        name: string;
+                                        icon: string | null;
+                                        /** @enum {string} */
+                                        type: "agent" | "human";
+                                    } | null;
+                                    reporter: {
+                                        /** Format: uuid */
+                                        id: string;
+                                        name: string;
+                                        icon: string | null;
+                                        /** @enum {string} */
+                                        type: "agent" | "human";
+                                    };
+                                    /** Format: date-time */
+                                    due_date: string | null;
+                                    labels: {
+                                        /** Format: uuid */
+                                        id: string;
+                                        name: string;
+                                        color: string;
+                                    }[];
+                                    position: number | null;
+                                    external_refs: {
+                                        /** Format: uuid */
+                                        id: string;
+                                        /** Format: uuid */
+                                        ticket_id: string;
+                                        /** @enum {string} */
+                                        kind: "github_pr" | "github_issue" | "github_commit" | "github_action" | "generic";
+                                        /** Format: uri */
+                                        url: string;
+                                        /** @enum {string|null} */
+                                        state: "open" | "closed" | "merged" | "success" | "failed" | null;
+                                        title: string | null;
+                                        /** Format: date-time */
+                                        polled_at: string | null;
+                                        /** Format: date-time */
+                                        polled_state_changed_at: string | null;
+                                        /** Format: date-time */
+                                        created_at: string;
+                                        created_by: {
+                                            /** Format: uuid */
+                                            id: string;
+                                            name: string;
+                                            icon: string | null;
+                                            /** @enum {string} */
+                                            type: "agent" | "human";
+                                        };
+                                    }[];
+                                    /** Format: uuid */
+                                    template_id: string | null;
+                                    subtasks: {
+                                        total: number;
+                                        done: number;
+                                    } | null;
+                                    /** Format: date-time */
+                                    created_at: string;
+                                    /** Format: date-time */
+                                    updated_at: string;
+                                    /** Format: date-time */
+                                    deleted_at: string | null;
+                                };
+                                /** @enum {string} */
+                                status: "draft" | "in_review" | "changes_requested" | "approved" | "superseded";
+                                revision_count: number;
+                                current_revision: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    rev_number: number;
+                                    /** @enum {string} */
+                                    status: "in_review" | "changes_requested" | "approved" | "rejected";
+                                    submitted_by: {
+                                        /** Format: uuid */
+                                        id: string;
+                                        name: string;
+                                        icon: string | null;
+                                        /** @enum {string} */
+                                        type: "agent" | "human";
+                                    };
+                                    /** Format: date-time */
+                                    submitted_at: string;
+                                    criteria_total: number;
+                                    criteria_pending: number;
+                                };
+                                /** Format: date-time */
+                                created_at: string;
+                                /** Format: date-time */
+                                updated_at: string;
+                            }[];
+                            page: {
+                                next_cursor: string | null;
+                                has_more: boolean;
+                            };
+                        };
+                    };
+                };
+                /** @description bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description unprocessable */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description internal */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/v1/tickets/{idOrKey}/plan": {
