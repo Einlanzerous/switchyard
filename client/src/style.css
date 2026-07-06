@@ -112,3 +112,27 @@
     text-rendering: optimizeLegibility;
   }
 }
+
+/* v4 type helpers — the design system's recurring text roles. Classes (not
+   components) so any view can compose them with layout utilities. */
+@layer components {
+  /* Mono uppercase micro-label above metrics/sections. */
+  .eyebrow {
+    @apply font-mono text-[10.5px] uppercase tracking-[0.16em] text-ink-3;
+  }
+  /* Big KPI numeral; tabular so columns of metrics align. */
+  .metric {
+    @apply text-[30px] font-bold leading-none tracking-[-0.02em] tabular-nums;
+  }
+  .metric-sm {
+    @apply text-[22px] font-bold leading-none tracking-[-0.01em] tabular-nums;
+  }
+  /* Signed delta next to a metric; pair with text-pos / text-neg. */
+  .delta {
+    @apply font-mono text-[11px] font-medium;
+  }
+  /* Keyboard hint chip (always Windows-style, e.g. "Ctrl+K"). */
+  .kbd-chip {
+    @apply rounded-[5px] border border-line bg-surface-3 px-1.5 py-0.5 font-mono text-[10.5px] text-ink-3;
+  }
+}
