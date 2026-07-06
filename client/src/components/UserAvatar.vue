@@ -56,18 +56,22 @@ const sizeClasses = computed(() => ({
 }[props.size ?? "sm"]));
 
 // Agent squares use a 6px corner (the design's .av.sq) — tighter than the
-// shadcn `square` variant's rounded-md, and scaled down for xs.
+// shadcn `square` variant's rounded-md, and scaled down for xs. The steel
+// ring is a real border on the ROOT so it follows the rounded corners — an
+// inset shadow on the (unrounded) fallback gets clipped square at the
+// corners and reads as "cut off".
 const shapeClasses = computed(() =>
-  isAgent.value ? (props.size === "xs" ? "rounded-[5px]" : "rounded-[6px]") : "",
+  isAgent.value
+    ? cn(
+        props.size === "xs" ? "rounded-[5px]" : "rounded-[6px]",
+        "border border-agent/30",
+      )
+    : "",
 );
 
 const fallbackStyle = computed(() =>
   isAgent.value
-    ? {
-        backgroundColor: "rgba(143,166,189,0.14)",
-        color: "#8fa6bd",
-        boxShadow: "inset 0 0 0 1px rgba(143,166,189,0.32)",
-      }
+    ? { backgroundColor: "rgba(143,166,189,0.14)", color: "#8fa6bd" }
     : { backgroundColor: color.value, color: "#fff" },
 );
 
