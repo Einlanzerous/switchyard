@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, useTemplateRef } from "vue";
 import { dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
+import { Plus } from "lucide-vue-next";
 import BoardCard from "./BoardCard.vue";
 import type { BoardColumn as Col } from "@/composables/useProjectBoard";
 import { positionBetween } from "@/lib/positions";
+import { STATUS_HEX } from "@/lib/statusColors";
 import { cn } from "@/lib/utils";
 
 const props = defineProps<{
@@ -18,6 +20,9 @@ const props = defineProps<{
   // Closed column uses this to show its visibility window
   // ("last 14 days") so the truncation is visible.
   hint?: string;
+  // Gates the per-column "+" quick-add (viewers must not see any
+  // new-ticket affordance — permissions e2e asserts on it).
+  canQuickAdd?: boolean;
 }>();
 
 // `drop` fires when the destination has been resolved. The parent gets
@@ -25,6 +30,9 @@ const props = defineProps<{
 // call (PATCH for same-column reorder, /transition for category change).
 const emit = defineEmits<{
   open: [key: string];
+  // v4 per-column "+" — parent opens the create dialog prefilled to this
+  // column's category.
+  quickAdd: [category: Col["category"]];
   drop: [payload: {
     ticketId: string;
     fromCategory: Col["category"];
@@ -137,16 +145,30 @@ function onCardDrop(
       isOver && 'border-primary bg-primary/5',
     )"
   >
-    <header class="flex items-center justify-between px-3 py-2 border-b sticky top-0 bg-muted/40 backdrop-blur rounded-t-lg z-10">
-      <span class="text-xs font-medium uppercase tracking-wider text-foreground">
+    <!-- v4 column header: status swatch + name + count pill + quick-add. -->
+    <header class="flex items-center gap-2 px-3 py-2 border-b dark:border-line-soft sticky top-0 bg-muted/40 backdrop-blur rounded-t-lg z-10">
+      <span
+        class="h-2 w-2 shrink-0 rounded-[2px]"
+        :style="{ backgroundColor: STATUS_HEX[column.category] }"
+        aria-hidden="true"
+      />
+      <span class="text-[12.5px] font-semibold text-foreground truncate">
         {{ column.displayName }}
       </span>
-      <span class="flex items-center gap-1.5">
-        <span v-if="hint" class="text-[10px] text-muted-foreground italic">{{ hint }}</span>
-        <span class="text-[11px] text-muted-foreground tabular-nums">
-          {{ column.tickets.length }}
-        </span>
+      <span class="rounded-[9px] bg-accent px-1.5 py-0.5 font-mono text-[10.5px] tabular-nums text-muted-foreground">
+        {{ column.tickets.length }}
       </span>
+      <span v-if="hint" class="text-[10px] text-muted-foreground italic truncate">{{ hint }}</span>
+      <button
+        v-if="canQuickAdd"
+        type="button"
+        class="ml-auto rounded p-0.5 text-ink-4 hover:text-foreground hover:bg-accent transition-colors"
+        :aria-label="`New ticket in ${column.displayName}`"
+        :title="`New ticket in ${column.displayName}`"
+        @click="emit('quickAdd', column.category)"
+      >
+        <Plus class="h-3.5 w-3.5" />
+      </button>
     </header>
     <div class="flex-1 overflow-y-auto p-2 space-y-2">
       <BoardCard
@@ -155,11 +177,18 @@ function onCardDrop(
         :ticket="t"
         :dragging="draggingTicketId === t.id"
         :focused="focusedTicketId === t.id"
+        :class="column.category === 'closed' && 'opacity-[0.82]'"
         @open="(k) => $emit('open', k)"
         @drop="(p) => onCardDrop(t.id, p)"
       />
       <p
-        v-if="column.tickets.length === 0"
+        v-if="column.tickets.length === 0 && column.category === 'blocked'"
+        class="rounded-[9px] border border-dashed border-line px-2 py-3 text-center text-[10.5px] text-muted-foreground/50"
+      >
+        Drop here to block
+      </p>
+      <p
+        v-else-if="column.tickets.length === 0"
         class="text-xs text-muted-foreground/60 italic text-center py-4"
       >
         Drop tickets here

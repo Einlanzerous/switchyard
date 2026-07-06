@@ -66,6 +66,7 @@ useShortcuts({
     <CreateTicketDialog
       v-model:open="ui.createTicketOpen"
       :default-project-key="ui.createTicketDefaultProject"
+      :default-category="ui.createTicketDefaultCategory"
     />
   </div>
 </template>

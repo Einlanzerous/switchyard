@@ -8,6 +8,7 @@ import { useQuery } from "@tanstack/vue-query";
 import { ChevronLeft, ChevronDown, Circle, CheckCircle2, Loader2 } from "lucide-vue-next";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
+import { formatRelativeTime } from "@/lib/formatTime";
 import UserAvatar from "@/components/UserAvatar.vue";
 import { cn } from "@/lib/utils";
 import TypeIcon from "./TypeIcon.vue";
@@ -25,6 +26,9 @@ const props = defineProps<{
   dragging?: boolean;
   // True when this card is the column's keyboard-focused card; we ring it.
   focused?: boolean;
+  // v4 live state: an agent is actively working this ticket — coral ring.
+  // Display-only here; the signal source lands with SWY-147.
+  live?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -107,8 +111,10 @@ onBeforeUnmount(() => {
   cleanups = [];
 });
 
-const visibleLabels = computed(() => props.ticket.labels.slice(0, 3));
-const extraLabelCount = computed(() => Math.max(0, props.ticket.labels.length - 3));
+// v4 density: cards show at most 2 label chips (+N overflow) — the mock's
+// tkt-foot never shows more.
+const visibleLabels = computed(() => props.ticket.labels.slice(0, 2));
+const extraLabelCount = computed(() => Math.max(0, props.ticket.labels.length - 2));
 // Cap visible badges so a ticket with many refs doesn't blow out the
 // card. Extras show as a count.
 const visibleRefs = computed(() => (props.ticket.external_refs ?? []).slice(0, 4));
@@ -121,6 +127,14 @@ const isOverdue = computed(() => {
   if (!props.ticket.due_date || !ticketOpen.value) return false;
   return new Date(props.ticket.due_date).getTime() < Date.now();
 });
+
+// v4 decision (SWY-144): the mock drops priority/due-date chrome from cards
+// in favor of live/agent signals. We keep the highest-value slices — the
+// priority badge only when it demands attention (high/critical) and the
+// due-date badge only when overdue. Full values remain on the ticket views.
+const showPriority = computed(
+  () => props.ticket.priority === "high" || props.ticket.priority === "critical",
+);
 
 // ─── subtask disclosure ─────────────────────────────────────────────────────
 // The batched `subtasks` rollup tells us the counts up front (no per-card
@@ -146,6 +160,37 @@ const subtasksQuery = useQuery({
   },
 });
 const subtasks = computed(() => subtasksQuery.data.value?.items ?? []);
+
+// ─── blocked-by chip (v4) ───────────────────────────────────────────────────
+// Cards in the Blocked column name their blocker. Scoped to blocked-category
+// tickets only (a handful per board at worst), so this stays a per-blocked-
+// card query rather than a whole-board N+1; a batched rollup can replace it
+// when ticket-activity signals land (SWY-147).
+const isBlockedCategory = computed(() => props.ticket.status.category === "blocked");
+const linksQuery = useQuery({
+  queryKey: computed(() => ["sw", "tickets", props.ticket.id, "links"]),
+  enabled: isBlockedCategory,
+  staleTime: 60 * 1000,
+  queryFn: async () => {
+    const { data, error } = await api.GET("/v1/tickets/{idOrKey}/links", {
+      params: { path: { idOrKey: props.ticket.id } },
+    });
+    if (error) throw error;
+    return data;
+  },
+});
+const blockedBy = computed(() => {
+  if (!isBlockedCategory.value) return null;
+  const links = linksQuery.data.value?.items ?? [];
+  return links.find((l) => l.type === "blocks" && l.direction === "incoming") ?? null;
+});
+
+// Closed cards trade chrome for a "how long ago" read.
+const closedAgo = computed(() =>
+  props.ticket.status.category === "closed"
+    ? formatRelativeTime(props.ticket.updated_at)
+    : null,
+);
 </script>
 
 <template>
@@ -155,11 +200,12 @@ const subtasks = computed(() => subtasksQuery.data.value?.items ?? []);
     tabindex="0"
     :class="cn(
       'relative cursor-grab active:cursor-grabbing select-none',
-      'rounded-md border bg-card p-2.5 text-sm shadow-sm',
-      'hover:border-primary/50 hover:shadow-md transition-shadow',
+      'rounded-[9px] border bg-card px-3 py-[11px] text-sm',
+      'hover:border-[#34353c] hover:bg-accent transition-colors',
+      live && 'border-signal-line ring-1 ring-signal-weak',
       dragging && 'opacity-40',
       focused && 'ring-2 ring-ring ring-offset-1',
-      isOverdue && 'border-l-2 border-l-red-400/70',
+      isOverdue && 'border-l-2 border-l-neg/70',
     )"
     @click="emit('open', ticket.key)"
     @keydown.enter="emit('open', ticket.key)"
@@ -167,38 +213,54 @@ const subtasks = computed(() => subtasksQuery.data.value?.items ?? []);
     <DropIndicator v-if="dropEdge === 'top'" edge="top" />
     <DropIndicator v-if="dropEdge === 'bottom'" edge="bottom" />
 
-    <div class="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+    <!-- tkt-top: hue-colored type icon + mono key, right-pushed slot (epic
+         chip / refs / attention-priority). -->
+    <div class="flex items-center gap-[7px] text-[10.5px] text-ink-3 mb-2">
       <TypeIcon :type="ticket.type" class="h-3.5 w-3.5" />
       <span class="font-mono">{{ ticket.key }}</span>
-      <EpicChip v-if="ticket.parent" :parent="ticket.parent" />
-      <span
-        v-if="visibleRefs.length > 0"
-        class="ml-auto flex items-center gap-1"
-      >
-        <ExternalRefBadge v-for="r in visibleRefs" :key="r.id" :value="r" size="xs" />
-        <span v-if="extraRefCount > 0" class="text-[10px]">+{{ extraRefCount }}</span>
+      <span class="ml-auto flex items-center gap-1.5">
+        <EpicChip v-if="ticket.parent" :parent="ticket.parent" />
+        <template v-if="visibleRefs.length > 0">
+          <ExternalRefBadge v-for="r in visibleRefs" :key="r.id" :value="r" size="xs" />
+          <span v-if="extraRefCount > 0" class="text-[10px]">+{{ extraRefCount }}</span>
+        </template>
+        <PriorityBadge v-if="showPriority" :priority="ticket.priority" />
       </span>
-      <PriorityBadge :priority="ticket.priority" :class="visibleRefs.length > 0 ? 'ml-2' : 'ml-auto'" />
     </div>
-    <p class="font-medium leading-snug line-clamp-3 text-foreground">
+    <p class="text-[12.5px] font-medium leading-[1.42] line-clamp-3 text-foreground">
       {{ ticket.title }}
     </p>
-    <div
-      v-if="visibleLabels.length > 0 || ticket.assignee || ticket.due_date"
-      class="flex items-center gap-1.5 mt-2"
+    <!-- Blocked column: name the blocker (click-through opens it). -->
+    <button
+      v-if="blockedBy"
+      type="button"
+      class="mt-2 inline-flex h-[19px] items-center gap-1 rounded-[5px] bg-muted px-1.5 font-mono text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+      :title="`Blocked by ${blockedBy.other_ticket.key} — ${blockedBy.other_ticket.title}`"
+      @click.stop="emit('open', blockedBy.other_ticket.key)"
     >
-      <div class="flex flex-wrap gap-1 flex-1 min-w-0 items-center">
+      blocked by <span class="text-st-blocked">{{ blockedBy.other_ticket.key }}</span>
+    </button>
+
+    <!-- tkt-foot: ≤2 label chips left, overdue badge, driver avatar right. -->
+    <div
+      v-if="visibleLabels.length > 0 || ticket.assignee || isOverdue || closedAgo"
+      class="flex items-center gap-1.5 mt-2.5"
+    >
+      <div class="flex flex-wrap gap-1.5 flex-1 min-w-0 items-center">
         <LabelChip v-for="lbl in visibleLabels" :key="lbl.id" :label="lbl" />
         <span v-if="extraLabelCount > 0" class="text-[10px] text-muted-foreground self-center">
           +{{ extraLabelCount }}
         </span>
         <DueDateBadge
-          v-if="ticket.due_date"
+          v-if="isOverdue"
           :due-date="ticket.due_date"
           :is-open="ticketOpen"
           show-label
         />
       </div>
+      <span v-if="closedAgo" class="font-mono text-[10px] text-ink-4 whitespace-nowrap">
+        {{ closedAgo }}
+      </span>
       <UserAvatar v-if="ticket.assignee" :user="ticket.assignee" size="xs" class="shrink-0" />
     </div>
 
@@ -236,7 +298,7 @@ const subtasks = computed(() => subtasksQuery.data.value?.items ?? []);
           <span class="flex-1 min-w-0 truncate">{{ s.title }}</span>
           <CheckCircle2
             v-if="s.status.category === 'closed'"
-            class="h-3.5 w-3.5 shrink-0 text-emerald-500"
+            class="h-3.5 w-3.5 shrink-0 text-st-closed"
             aria-label="Done"
           />
           <Circle

@@ -108,11 +108,20 @@ onBeforeUnmount(() => {
       :key="t.id"
       :ticket="t"
       :dragging="draggingTicketId === t.id"
+      :class="category === 'closed' && 'opacity-[0.82]'"
       @open="(k) => emit('open', k)"
       @drop="(p) => emitForCard(p.sourceTicketId, t.id, p.edge)"
     />
+    <!-- v4: an empty Blocked cell advertises the drop-to-block affordance
+         with a dashed placeholder instead of the bare em-dash. -->
     <p
-      v-if="tickets.length === 0 && (showEmptyHint ?? true)"
+      v-if="tickets.length === 0 && category === 'blocked'"
+      class="rounded-[9px] border border-dashed border-line px-2 py-3 text-center text-[10.5px] text-muted-foreground/50"
+    >
+      Drop here to block
+    </p>
+    <p
+      v-else-if="tickets.length === 0 && (showEmptyHint ?? true)"
       class="text-[10px] text-muted-foreground/40 italic text-center py-2"
     >
       —
