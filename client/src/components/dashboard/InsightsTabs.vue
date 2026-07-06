@@ -38,6 +38,15 @@ const tabs = computed(() => {
   return base;
 });
 
+// Tab targets are bare paths; carry the insights range param (SWY-149)
+// across so a Board detour doesn't strip it from the URL. The
+// useInsightsRange singleton would restore the selection anyway — this just
+// keeps the visible URL honest.
+function go(path: string) {
+  const range = route.query.range;
+  void router.push(typeof range === "string" ? { path, query: { range } } : path);
+}
+
 function isActive(p: string): boolean {
   // The Setup tab has sub-routes (/setup/recurring, /setup/automations,
   // etc.). Match any sub-path so the tab stays highlighted as the user
@@ -61,7 +70,7 @@ function isActive(p: string): boolean {
           ? 'border-primary text-foreground font-medium'
           : 'border-transparent text-muted-foreground hover:text-foreground'
       )"
-      @click="router.push(t.path)"
+      @click="go(t.path)"
     >
       <component :is="t.icon" class="h-3.5 w-3.5" />
       {{ t.label }}

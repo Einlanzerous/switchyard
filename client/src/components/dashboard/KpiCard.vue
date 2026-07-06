@@ -38,6 +38,9 @@ const props = defineProps<{
   // Y-values for the sparkline. Categories or x-values aren't needed; the
   // line is decorative, just shows shape.
   spark?: number[];
+  // Sparkline hue; defaults to the coral signal. Insights' "Closed this
+  // week" card retints to the closed-green (SWY-152).
+  sparkColor?: string;
   loading?: boolean;
   variant?: "default" | "accent";
   // Two-segment machine/human bar. `leftPct` is the steel (agent) share;
@@ -45,6 +48,9 @@ const props = defineProps<{
   splitBar?: { leftPct: number; leftLabel: string; rightLabel: string } | null;
   // When set the whole card navigates on click.
   to?: RouteLocationRaw;
+  // Native title attribute on the card — used to document derived metrics
+  // (e.g. the "since agents" baseline definition, SWY-152).
+  tooltip?: string;
 }>();
 
 // Coral signal accent (--signal). ECharts can't consume CSS vars, so the
@@ -53,6 +59,7 @@ const SIGNAL_HEX = "#e2623d";
 
 const sparkOption = computed(() => {
   const data = props.spark ?? [];
+  const hue = props.sparkColor ?? SIGNAL_HEX;
   return {
     grid: { left: 0, right: 0, top: 4, bottom: 4 },
     xAxis: { type: "category", show: false, data: data.map((_, i) => i) },
@@ -63,8 +70,8 @@ const sparkOption = computed(() => {
       data,
       smooth: true,
       showSymbol: false,
-      lineStyle: { width: 1.5, color: SIGNAL_HEX },
-      areaStyle: { opacity: 0.15, color: SIGNAL_HEX },
+      lineStyle: { width: 1.5, color: hue },
+      areaStyle: { opacity: 0.15, color: hue },
     }],
   };
 });
@@ -84,6 +91,7 @@ const isAccent = computed(() => props.variant === "accent");
   <component
     :is="to ? RouterLink : 'div'"
     :to="to"
+    :title="tooltip"
     :class="to ? 'block group cursor-pointer' : 'block'"
   >
     <Card

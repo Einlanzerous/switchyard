@@ -1,58 +1,109 @@
 <script setup lang="ts">
-// Bar chart of closed tickets per period over the configured window.
-// Reused on the Home dashboard, per-project Insights, and per-board Insights.
+// Stacked closed-per-period bars (SWY-150): agent closures (steel) as the
+// base with the human's (coral) capping each bar — the "throughput split by
+// agent vs you" headline chart on both Insights views. Buckets are
+// zero-filled client-side so quiet days/weeks render as gaps in the series,
+// not missing categories.
 
 import { computed } from "vue";
 import { useThroughput } from "@/composables/useDashboardData";
+import { fillThroughputBuckets } from "@/lib/statsBuckets";
 import Chart from "@/components/charts/Chart.vue";
+
+// Match the v4 tokens (--agent / --signal); ECharts can't read CSS vars.
+const AGENT_HEX = "#8fa6bd";
+const SIGNAL_HEX = "#e2623d";
 
 const props = defineProps<{
   project?: string;          // optional CSV of project keys; default = all projects
   bucket?: "day" | "week";
-  // 12 weeks weekly is what the homepage shows. Per-project might want shorter.
+  // Explicit window start (SWY-149 range control). Falls back to `weeks`.
+  since?: string;
   weeks?: number;
 }>();
 
 const params = computed(() => {
-  const since = new Date();
-  since.setUTCDate(since.getUTCDate() - (props.weeks ?? 12) * 7);
+  let since = props.since;
+  if (!since) {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() - (props.weeks ?? 12) * 7);
+    since = d.toISOString();
+  }
   return {
     project: props.project,
-    since: since.toISOString(),
+    since,
     bucket: props.bucket ?? "week",
   };
 });
 
 const q = useThroughput(params);
 
+const filled = computed(() =>
+  fillThroughputBuckets(
+    q.data.value?.points ?? [],
+    params.value.since,
+    params.value.bucket ?? "week",
+  ),
+);
+
 const option = computed(() => {
-  const points = q.data.value?.points ?? [];
+  const points = filled.value;
+  const bucket = params.value.bucket ?? "week";
   return {
     grid: { left: 32, right: 8, top: 12, bottom: 24 },
     xAxis: {
       type: "category",
-      data: points.map((p) => formatBucketLabel(p.start, params.value.bucket ?? "week")),
+      data: points.map((p) => formatBucketLabel(p.start)),
       axisTick: { show: false },
+      // 1Y = 52 weekly labels; let ECharts thin them instead of overlapping.
+      axisLabel: { hideOverlap: true },
     },
     yAxis: { type: "value", minInterval: 1 },
-    tooltip: { trigger: "axis" },
-    series: [{
-      name: "Closed",
-      type: "bar",
-      data: points.map((p) => p.count),
-      itemStyle: { borderRadius: [3, 3, 0, 0] },
-      barMaxWidth: 28,
-    }],
+    tooltip: {
+      trigger: "axis",
+      formatter: (ps: unknown) => {
+        const arr = Array.isArray(ps) ? ps : [ps];
+        const val = (name: string) =>
+          Number((arr as any[]).find((p) => p.seriesName === name)?.value ?? 0);
+        const agents = val("agents");
+        const you = val("you");
+        const label = (arr as any[])[0]?.name ?? "";
+        return `${label}<br/>agents&nbsp;${agents} · you&nbsp;${you}<br/>total&nbsp;${agents + you}`;
+      },
+    },
+    series: [
+      {
+        name: "agents",
+        type: "bar",
+        stack: "split",
+        barMaxWidth: 28,
+        data: points.map((p) => ({
+          value: p.agent_count,
+          // The agent segment only gets the rounded top when it IS the top
+          // (no human cap that bucket).
+          itemStyle: {
+            color: AGENT_HEX,
+            borderRadius: p.human_count === 0 ? [3, 3, 0, 0] : [0, 0, 0, 0],
+          },
+        })),
+      },
+      {
+        name: "you",
+        type: "bar",
+        stack: "split",
+        barMaxWidth: 28,
+        itemStyle: { color: SIGNAL_HEX, borderRadius: [3, 3, 0, 0] },
+        data: points.map((p) => p.human_count),
+      },
+    ],
   };
 });
 
-const isEmpty = computed(() => (q.data.value?.points ?? []).every((p) => p.count === 0));
+const isEmpty = computed(() => filled.value.every((p) => p.count === 0));
 
-function formatBucketLabel(iso: string, bucket: "day" | "week"): string {
-  const d = new Date(iso);
-  if (bucket === "day") return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-  // Show week-of label as the Monday's date.
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+function formatBucketLabel(iso: string): string {
+  // Weeks label as their Monday's date; days as the date itself.
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 defineExpose({ isEmpty });
