@@ -66,7 +66,8 @@ export const queryKeys = {
     ["sw", "stats", "cycle-time", params] as const,
   statsCumulativeFlow: (params: Record<string, unknown>) =>
     ["sw", "stats", "cumulative-flow", params] as const,
-  statsStale: () => ["sw", "stats", "stale"] as const,
+  statsActivityPulse: () => ["sw", "stats", "activity-pulse"] as const,
+  statsEpics: () => ["sw", "stats", "epics"] as const,
 
   // LLM Insights (SWY-48 / 5.1.2). Params (project scope + window) carried in
   // the key so the global and per-project tabs coexist in the cache.

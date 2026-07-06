@@ -1,16 +1,22 @@
 <script setup lang="ts">
 // Compact list of recent events. Click row → opens drawer. Used on the
 // Home dashboard. Future: per-project Insights might show a scoped feed.
+//
+// v4 enrichments (SWY-143): moved rows show "→ {status}" in the target
+// category's color, and external-ref events render a PR state chip built
+// from the event payload ("#412 merged").
 
 import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useQuery } from "@tanstack/vue-query";
 import { Activity } from "lucide-vue-next";
+import type { StatusCategory } from "@switchyard/shared";
 import UserAvatar from "@/components/UserAvatar.vue";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
 import { formatRelativeTime } from "@/lib/formatTime";
 import { collapseTransitionEvents } from "@/lib/activity";
+import { STATUS_HEX } from "@/lib/statusColors";
 
 const props = defineProps<{
   project?: string;     // CSV of project keys
@@ -50,6 +56,12 @@ function actionVerb(event: string): string {
     case "ticket.closed": return "closed";
     case "ticket.released": return "released";
     case "ticket.deleted": return "deleted";
+    case "ticket.moved": return "moved";
+    case "ticket.link_added": return "linked work to";
+    case "ticket.link_removed": return "unlinked work from";
+    case "ticket.external_ref_added": return "attached";
+    case "ticket.external_ref_removed": return "detached";
+    case "ticket.external_ref_state_changed": return "updated";
     case "comment.created": return "commented on";
     case "comment.updated": return "edited a comment on";
     case "comment.deleted": return "removed a comment on";
@@ -58,11 +70,49 @@ function actionVerb(event: string): string {
     case "project.created": return "created project";
     case "project.updated": return "updated project";
     case "project.deleted": return "deleted project";
+    case "plan.submitted": return "submitted a plan for";
+    case "plan.revised": return "revised the plan for";
+    case "plan.approved": return "approved the plan for";
+    case "plan.changes_requested": return "requested plan changes on";
+    case "plan.rejected": return "rejected the plan for";
     default: return event;
   }
 }
 
-function open(item: typeof items.value[number]) {
+type FeedItem = typeof items.value[number];
+
+// "→ In Progress" target for moved rows, painted in the category color.
+function movedTo(ev: FeedItem): { name: string; hex: string } | null {
+  if (ev.event !== "ticket.status_changed" && ev.event !== "ticket.moved") return null;
+  const to = ev.changes?.status?.to;
+  if (!to) return null;
+  return { name: to.display_name, hex: STATUS_HEX[to.category as StatusCategory] };
+}
+
+// PR chip for external-ref events, built from the writeEvent extras
+// ({ kind, url, new_state? }). "#412" comes from the PR/issue URL.
+const REF_STATE_HEX: Record<string, string> = {
+  merged: STATUS_HEX.closed,
+  success: STATUS_HEX.closed,
+  open: STATUS_HEX.in_progress,
+  closed: STATUS_HEX.blocked,
+  failed: STATUS_HEX.blocked,
+};
+
+function refChip(ev: FeedItem): { label: string; hex: string } | null {
+  if (!ev.event.startsWith("ticket.external_ref_")) return null;
+  const payload = (ev.payload ?? {}) as Record<string, unknown>;
+  const url = typeof payload.url === "string" ? payload.url : "";
+  const num = /\/(?:pull|issues)\/(\d+)/.exec(url)?.[1];
+  const state =
+    ev.event === "ticket.external_ref_state_changed" && typeof payload.new_state === "string"
+      ? payload.new_state
+      : null;
+  const label = [num ? `#${num}` : "PR", state].filter(Boolean).join(" ");
+  return { label, hex: (state && REF_STATE_HEX[state]) || STATUS_HEX.backlog };
+}
+
+function open(item: FeedItem) {
   if (!item.ticket?.key) return;
   router.replace({ query: { ...route.query, focus: item.ticket.key } });
 }
@@ -91,10 +141,20 @@ function open(item: typeof items.value[number]) {
       <span class="text-muted-foreground truncate flex-1 min-w-0">
         <span class="text-foreground font-medium">{{ ev.actor?.name ?? "system" }}</span>
         {{ " " }}{{ actionVerb(ev.event) }}{{ " " }}
+        <span
+          v-if="refChip(ev)"
+          class="mr-1 inline-flex items-center rounded bg-surface-4 px-1.5 py-px font-mono text-[10.5px] font-semibold align-[1px]"
+          :style="{ color: refChip(ev)!.hex }"
+        >{{ refChip(ev)!.label }}</span>
+        <template v-if="ev.event.startsWith('ticket.external_ref_')">{{ "on " }}</template>
         <template v-if="ev.ticket">
           <span class="font-mono text-xs text-muted-foreground">{{ ev.ticket.key }}</span>
           <span class="text-foreground">{{ " " }}{{ ev.ticket.title }}</span>
         </template>
+        <span v-if="movedTo(ev)" class="whitespace-nowrap">
+          {{ " → " }}
+          <span class="font-medium" :style="{ color: movedTo(ev)!.hex }">{{ movedTo(ev)!.name }}</span>
+        </span>
       </span>
       <span class="shrink-0 text-[11px] text-muted-foreground tabular-nums">
         {{ formatRelativeTime(ev.occurred_at) }}

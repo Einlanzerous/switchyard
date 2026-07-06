@@ -23,10 +23,10 @@ test.describe("smoke", () => {
 
   test("home renders the dashboard", async ({ page }) => {
     await page.goto("/");
-    // KPI strip is the most reliable home-page anchor — present whenever
-    // /v1/stats/projects responds.
-    await expect(page.getByText(/Open tickets/i).first()).toBeVisible();
-    await expect(page.getByText(/In progress/i).first()).toBeVisible();
+    // KPI strip is the most reliable home-page anchor — v4 labels
+    // (SWY-140), rendered even while the stats queries are loading.
+    await expect(page.getByText(/Epics in flight/i).first()).toBeVisible();
+    await expect(page.getByText(/Agent share/i).first()).toBeVisible();
   });
 
   test("tickets list renders", async ({ page }) => {
