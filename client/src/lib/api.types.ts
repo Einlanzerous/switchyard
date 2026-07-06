@@ -15193,6 +15193,196 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/stats/activity-pulse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Per-project activity pulse (last activity, 14d daily series, recent actors)
+         * @description One row per visible non-deleted project: all-time most-recent event timestamp, a fixed 14-day UTC-day-aligned daily event-count series (oldest → newest, last bucket = today, partial), and up to 3 distinct recent actors (most-recent first) from the same window. Constant query count regardless of project count.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description ok */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {number} */
+                            days: 14;
+                            items: {
+                                project: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    key: string;
+                                    name: string;
+                                    color: string | null;
+                                    /** Format: uri */
+                                    repo_url: string | null;
+                                };
+                                /** Format: date-time */
+                                last_activity_at: string | null;
+                                activity_series: number[];
+                                recent_actors: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    name: string;
+                                    icon: string | null;
+                                    /** @enum {string} */
+                                    type: "agent" | "human";
+                                }[];
+                            }[];
+                        };
+                    };
+                };
+                /** @description bad request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description unprocessable */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+                /** @description internal */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            error: {
+                                /** @enum {string} */
+                                code: "bad_request" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "unprocessable" | "rate_limited" | "internal" | "service_unavailable";
+                                message: string;
+                                details?: {
+                                    [key: string]: unknown;
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/stats/closed-by-actor": {
         parameters: {
             query?: never;
