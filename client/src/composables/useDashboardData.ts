@@ -12,18 +12,6 @@ import { queryKeys } from "@/lib/queryKeys";
 const STALE_60S = 60 * 1000;
 const STALE_30S = 30 * 1000;
 
-export function useStaleRollup() {
-  return useQuery({
-    queryKey: queryKeys.statsStale(),
-    staleTime: STALE_60S,
-    queryFn: async () => {
-      const { data, error } = await api.GET("/v1/stats/stale");
-      if (error) throw error;
-      return data;
-    },
-  });
-}
-
 // Per-project activity pulse (SWY-136): last activity, 14d daily series,
 // recent actors. Unwindowed — the server owns the 14-day definition.
 export function useActivityPulse() {

@@ -1,11 +1,11 @@
 <script setup lang="ts">
-// Personal at-a-glance landing page.
+// Personal at-a-glance landing page — v4 "Elevated" (SWY-140): home is
+// reframed around active work, not vanity KPIs.
 //
-// Layout (12-col grid, collapses to single column on small screens):
-//   row 1 — KPI strip (4 cards): open / in-progress / closed-this-week / cycle time
-//   row 2 — how are we doing: throughput (6) + status donut (6)
-//   row 3 — what's happening: recent activity (full width)
-//   row 4 — stale work (full width, only when there's something stale)
+// Layout:
+//   header — time-of-day greeting + traffic narrative + "New ticket"
+//   row 1  — KPI strip (4): epics in flight / closed 7d / agent share / needs you
+//   row 2+ — active-work cards (SWY-141/142/143)
 //
 // Per-user noise (my open tickets, @mentions) deliberately lives off the
 // dashboard: open tickets are one click away via the profile menu's
@@ -15,211 +15,152 @@
 // whole dashboard. Skeleton state is per-widget.
 
 import { computed } from "vue";
-import { useQuery } from "@tanstack/vue-query";
-import { Activity, Clock, BarChart2, PieChart } from "lucide-vue-next";
+import { Activity, Plus } from "lucide-vue-next";
 import { useAuthStore } from "@/stores/auth";
-import { api } from "@/lib/api";
-import { queryKeys } from "@/lib/queryKeys";
-import { useThroughput, useStaleRollup } from "@/composables/useDashboardData";
-import { formatDurationMs, formatDeltaPercent } from "@/lib/formatDuration";
+import { useUiStore } from "@/stores/ui";
+import { useThroughput, useActivityPulse, useEpicsInFlight } from "@/composables/useDashboardData";
+import { Button } from "@/components/ui/button";
+import UserAvatar from "@/components/UserAvatar.vue";
 import KpiCard from "@/components/dashboard/KpiCard.vue";
 import DashboardWidget from "@/components/dashboard/DashboardWidget.vue";
 import ActivityFeed from "@/components/dashboard/widgets/ActivityFeed.vue";
-import StaleRollupWidget from "@/components/dashboard/widgets/StaleRollup.vue";
-import ThroughputChart from "@/components/dashboard/widgets/ThroughputChart.vue";
-import StatusDonut from "@/components/dashboard/widgets/StatusDonut.vue";
 
 const auth = useAuthStore();
+const ui = useUiStore();
+
+// ─── Greeting ────────────────────────────────────────────────────────────────
+
+const daypart = computed(() => {
+  const h = new Date().getHours();
+  if (h < 12) return "morning";
+  if (h < 18) return "afternoon";
+  return "evening";
+});
+const firstName = computed(() => auth.me?.name?.trim().split(/\s+/)[0] ?? null);
 
 // ─── KPI feeds ───────────────────────────────────────────────────────────────
 
-// Aggregate totals/by_category across all projects via the bulk stats feed.
-const projectsStats = useQuery({
-  queryKey: queryKeys.statsProjects(),
-  staleTime: 60 * 1000,
-  queryFn: async () => {
-    const { data, error } = await api.GET("/v1/stats/projects");
-    if (error) throw error;
-    return data;
-  },
-});
-
-const totals = computed(() => {
-  const items = projectsStats.data.value?.items ?? [];
-  return items.reduce(
-    (acc, r) => ({
-      open: acc.open + r.totals.open,
-      closed: acc.closed + r.totals.closed,
-      total: acc.total + r.totals.total,
-      in_progress: acc.in_progress + r.by_category.in_progress,
-    }),
-    { open: 0, closed: 0, total: 0, in_progress: 0 }
-  );
-});
-
-// Stale count — pulled from the stale rollup widget's underlying query so
-// we don't double-fetch.
-const staleQ = useStaleRollup();
-const staleTotal = computed(() =>
-  (staleQ.data.value?.items ?? []).reduce((a, r) => a + r.stale_count, 0)
+// Activity pulse feeds both the narrative ("N projects carrying the
+// traffic") and, in SWY-141, the Active-projects card — same cache entry.
+const pulseQ = useActivityPulse();
+const activeProjectCount = computed(
+  () => (pulseQ.data.value?.items ?? []).filter((r) => r.activity_series.some((n) => n > 0)).length
 );
 
-// Throughput for the KPI sparkline + "closed this week" + delta. We pull
-// 24 weeks so we have a full prior-period window for the delta.
-const throughputParams = computed(() => {
+// 7-day daily throughput: "Closed · 7d" count + sparkline, the agent share
+// split, and the narrative's "agents cleared N" figure.
+const throughput7dParams = computed(() => {
   const since = new Date();
-  since.setUTCDate(since.getUTCDate() - 24 * 7);
-  return { since: since.toISOString(), bucket: "week" as const };
+  since.setUTCDate(since.getUTCDate() - 7);
+  return { since: since.toISOString(), bucket: "day" as const };
 });
-const throughput24w = useThroughput(throughputParams);
+const throughput7d = useThroughput(throughput7dParams);
 
-const closedThisWeek = computed(() => {
-  const points = throughput24w.data.value?.points ?? [];
-  return points.length > 0 ? points[points.length - 1]!.count : 0;
-});
-const closedPriorWeek = computed(() => {
-  const points = throughput24w.data.value?.points ?? [];
-  return points.length > 1 ? points[points.length - 2]!.count : 0;
-});
+const closed7d = computed(() => throughput7d.data.value?.total ?? 0);
+const closed7dByAgents = computed(() => throughput7d.data.value?.agent_total ?? 0);
 const closedSpark = computed(() =>
-  (throughput24w.data.value?.points ?? []).slice(-12).map((p) => p.count)
+  (throughput7d.data.value?.points ?? []).map((p) => p.count)
 );
 
-// Median cycle time + prior-period delta. Two queries: current 12 weeks,
-// prior 12 weeks.
-const cycleNowParams = computed(() => {
-  const until = new Date();
-  const since = new Date(until.getTime() - 12 * 7 * 24 * 60 * 60 * 1000);
-  return { since: since.toISOString(), until: until.toISOString() };
-});
-const cyclePriorParams = computed(() => {
-  const until = new Date(Date.now() - 12 * 7 * 24 * 60 * 60 * 1000);
-  const since = new Date(until.getTime() - 12 * 7 * 24 * 60 * 60 * 1000);
-  return { since: since.toISOString(), until: until.toISOString() };
+const agentSharePct = computed(() => {
+  const t = throughput7d.data.value;
+  if (!t || t.total === 0) return null;
+  return Math.round((t.agent_total / t.total) * 100);
 });
 
-const cycleNow = useQuery({
-  queryKey: computed(() => queryKeys.statsCycleTime({ ...cycleNowParams.value, scope: "now" })),
-  staleTime: 60 * 1000,
-  queryFn: async () => {
-    const { data, error } = await api.GET("/v1/stats/cycle-time", {
-      params: { query: cycleNowParams.value as never },
-    });
-    if (error) throw error;
-    return data;
-  },
-});
-const cyclePrior = useQuery({
-  queryKey: computed(() => queryKeys.statsCycleTime({ ...cyclePriorParams.value, scope: "prior" })),
-  staleTime: 60 * 1000,
-  queryFn: async () => {
-    const { data, error } = await api.GET("/v1/stats/cycle-time", {
-      params: { query: cyclePriorParams.value as never },
-    });
-    if (error) throw error;
-    return data;
-  },
-});
+const epicsQ = useEpicsInFlight();
+const epicsInFlight = computed(() => epicsQ.data.value?.items ?? []);
+const epicsProjectCount = computed(
+  () => new Set(epicsInFlight.value.map((e) => e.project.key)).size
+);
 
-const cycleDelta = computed(() => {
-  const now = cycleNow.data.value?.median_ms ?? 0;
-  const prev = cyclePrior.data.value?.median_ms ?? 0;
-  return formatDeltaPercent(now, prev);
-});
+// "Needs you" — interim source until the SWY-139 review-queue endpoint
+// lands: epics flagged stalled ("no LLM activity Nd") by /v1/stats/epics.
+// Click-through goes to open epics for the same reason; swap both to the
+// review queue with SWY-139.
+const needsYou = computed(() => epicsInFlight.value.filter((e) => e.stalled).length);
 
+const narrativeReady = computed(
+  () => !pulseQ.isLoading.value && !throughput7d.isLoading.value
+);
 </script>
 
 <template>
   <div class="px-6 py-6 max-w-7xl mx-auto space-y-4">
-    <header class="flex items-end justify-between">
+    <header class="flex items-end justify-between gap-4">
       <div>
-        <h1 class="text-2xl font-semibold tracking-tight">
-          Welcome{{ auth.me?.name ? `, ${auth.me.name}` : "" }}
+        <h1 class="text-[23px] font-bold tracking-tight leading-tight">
+          Good {{ daypart }}{{ firstName ? `, ${firstName}` : "" }}
         </h1>
-        <p class="mt-1 text-sm text-muted-foreground">
-          What's happening across switchyard at a glance.
+        <p class="mt-1 text-[13.5px] text-ink-2">
+          <template v-if="narrativeReady && closed7d > 0">
+            <span class="font-semibold text-ink">{{ activeProjectCount }}</span>
+            {{ activeProjectCount === 1 ? "project" : "projects" }} carrying the traffic ·
+            agents cleared
+            <span class="font-semibold text-ink">{{ closed7dByAgents }}</span>
+            {{ closed7dByAgents === 1 ? "ticket" : "tickets" }} for you this week.
+          </template>
+          <template v-else-if="narrativeReady">
+            Quiet week so far — nothing closed in the last 7 days.
+          </template>
+          <template v-else>
+            What's happening across switchyard at a glance.
+          </template>
         </p>
       </div>
+      <Button class="shrink-0" @click="ui.openCreateTicket(null)">
+        <Plus class="h-4 w-4 mr-1.5" />
+        New ticket
+      </Button>
     </header>
 
     <!-- Row 1: KPI strip ──────────────────────────────────────────────────── -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
       <KpiCard
-        label="Open tickets"
-        :value="totals.open"
-        :loading="projectsStats.isLoading.value"
-        :subline="totals.total ? `${totals.closed} closed of ${totals.total}` : undefined"
+        label="Epics in flight"
+        :value="epicsInFlight.length"
+        :loading="epicsQ.isLoading.value"
+        :subline="epicsProjectCount > 0 ? `across ${epicsProjectCount} active ${epicsProjectCount === 1 ? 'project' : 'projects'}` : undefined"
       />
       <KpiCard
-        label="In progress"
-        :value="totals.in_progress"
-        :loading="projectsStats.isLoading.value"
-        :warning="staleTotal > 0 ? `${staleTotal} stale` : null"
-      />
-      <KpiCard
-        label="Closed this week"
-        :value="closedThisWeek"
-        :loading="throughput24w.isLoading.value"
+        label="Closed · 7d"
+        :value="closed7d"
+        :loading="throughput7d.isLoading.value"
         :spark="closedSpark"
-        :delta-percent="formatDeltaPercent(closedThisWeek, closedPriorWeek)"
-        delta-good-when="up"
+      >
+        <template #subline>
+          <div class="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <UserAvatar :user="{ name: 'agents', type: 'agent' }" size="xs" class="h-3.5 w-3.5 text-[7px]" />
+            <span><span class="font-semibold text-ink tabular-nums">{{ closed7dByAgents }}</span> by agents</span>
+          </div>
+        </template>
+      </KpiCard>
+      <KpiCard
+        label="Agent share"
+        :value="agentSharePct != null ? `${agentSharePct}%` : '—'"
+        :loading="throughput7d.isLoading.value"
+        :split-bar="agentSharePct != null
+          ? { leftPct: agentSharePct, leftLabel: 'agents', rightLabel: `you ${100 - agentSharePct}%` }
+          : null"
+        :subline="agentSharePct == null ? 'no closures this week' : undefined"
       />
       <KpiCard
-        label="Median cycle time"
-        :value="formatDurationMs(cycleNow.data.value?.median_ms ?? 0)"
-        :loading="cycleNow.isLoading.value"
-        :delta-percent="cycleDelta"
-        delta-good-when="down"
-        :subline="cycleNow.data.value?.count ? `${cycleNow.data.value.count} closed` : undefined"
+        label="Needs you"
+        variant="accent"
+        :value="needsYou"
+        :loading="epicsQ.isLoading.value"
+        subline="agents stalled, waiting on review"
+        :to="{ path: '/tickets', query: { type: 'epic', status: 'in_progress' } }"
       />
     </div>
 
-    <!-- Row 2: How are we doing ──────────────────────────────────────────── -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
-      <DashboardWidget title="Throughput" class="lg:col-span-6">
-        <template #title-prefix>
-          <BarChart2 class="h-3.5 w-3.5 text-muted-foreground" />
-        </template>
-        <template #title-suffix>
-          <span class="ml-1 text-[10px] text-muted-foreground">closed/week, last 12</span>
-        </template>
-        <ThroughputChart :weeks="12" />
-      </DashboardWidget>
-
-      <DashboardWidget title="Status distribution" class="lg:col-span-6">
-        <template #title-prefix>
-          <PieChart class="h-3.5 w-3.5 text-muted-foreground" />
-        </template>
-        <StatusDonut />
-      </DashboardWidget>
-    </div>
-
-    <!-- Row 3: Recent activity (full width) ──────────────────────────────── -->
+    <!-- Recent activity (interim full-width slot — SWY-143 moves this into
+         the second 1.9fr/1fr row beside "Up next") ─────────────────────────── -->
     <DashboardWidget title="Recent activity" :padded="false">
       <template #title-prefix>
         <Activity class="h-3.5 w-3.5 text-muted-foreground" />
       </template>
       <ActivityFeed :limit="20" />
-    </DashboardWidget>
-
-    <!-- Row 4 (conditional): stale work, only when there's something to see.
-         Full-width row at the bottom rather than a tall column upstairs.
-         The widget itself still reads from useStaleRollup so the data is
-         already in cache; we just gate the wrapper. -->
-    <DashboardWidget
-      v-if="staleTotal > 0"
-      title="Stale work"
-      :padded="false"
-    >
-      <template #title-prefix>
-        <Clock class="h-3.5 w-3.5 text-muted-foreground" />
-      </template>
-      <template #title-suffix>
-        <span class="ml-1 text-[10px] font-medium tabular-nums text-rose-600 dark:text-rose-500">
-          {{ staleTotal }}
-        </span>
-      </template>
-      <StaleRollupWidget />
     </DashboardWidget>
   </div>
 </template>
