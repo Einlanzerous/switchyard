@@ -157,15 +157,18 @@ const narrativeReady = computed(
       />
     </div>
 
-    <!-- Row 2: active projects (1.9fr) + epics in flight (1fr) ─────────────── -->
-    <div class="grid grid-cols-1 lg:grid-cols-[1.9fr_1fr] gap-4 items-start">
-      <ActiveProjectsCard />
-      <EpicsInFlightCard />
+    <!-- Row 2: active projects (1.9fr) + epics in flight (1fr). No items-start:
+         the cards stretch to the row height so the pair reads as one band.
+         min-w-0 keeps a wide row's min-content from forcing the column past
+         its fr share (the "card sticks out on resize" failure mode). ──────── -->
+    <div class="grid grid-cols-1 lg:grid-cols-[1.9fr_1fr] gap-4">
+      <ActiveProjectsCard class="min-w-0" />
+      <EpicsInFlightCard class="min-w-0" />
     </div>
 
     <!-- Row 3: recent activity (1.9fr) + up next (1fr) ──────────────────────── -->
-    <div class="grid grid-cols-1 lg:grid-cols-[1.9fr_1fr] gap-4 items-start">
-      <DashboardWidget title="Recent activity" :padded="false">
+    <div class="grid grid-cols-1 lg:grid-cols-[1.9fr_1fr] gap-4">
+      <DashboardWidget title="Recent activity" :padded="false" class="min-w-0">
         <template #title-prefix>
           <Activity class="h-3.5 w-3.5 text-muted-foreground" />
         </template>
@@ -179,7 +182,7 @@ const narrativeReady = computed(
         <ActivityFeed :limit="7" />
       </DashboardWidget>
 
-      <UpNextCard />
+      <UpNextCard class="min-w-0" />
     </div>
   </div>
 </template>

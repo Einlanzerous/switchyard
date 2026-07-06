@@ -181,7 +181,9 @@ function open(key: string) {
               class="shrink-0 rounded bg-signal-weak px-1.5 py-px font-mono text-[9px] uppercase tracking-wider text-signal-2"
             >stalled</span>
           </div>
-          <div v-if="r.description" class="text-[11px] text-ink-3 truncate">
+          <!-- Wraps to a second line rather than running the row wide;
+               anything longer clamps. -->
+          <div v-if="r.description" class="text-[11px] leading-snug text-ink-3 line-clamp-2">
             {{ r.description }}
           </div>
         </div>
@@ -242,9 +244,11 @@ function open(key: string) {
           class="w-12 shrink-0 font-mono text-[11.5px] font-semibold"
           :style="{ color: r.project.color ?? undefined }"
         >{{ r.project.key }}</span>
-        <div class="flex-1 min-w-0">
-          <span class="text-[13px] font-medium truncate">{{ r.project.name }}</span>
-          <span v-if="r.description" class="ml-2 text-[11px] text-ink-3 truncate">{{ r.description }}</span>
+        <!-- Both spans must be block-level for truncate to clip; inline spans
+             overflow the row instead and push the card past its column. -->
+        <div class="flex flex-1 min-w-0 items-baseline gap-2">
+          <span class="shrink-0 text-[13px] font-medium">{{ r.project.name }}</span>
+          <span v-if="r.description" class="min-w-0 truncate text-[11px] text-ink-3">{{ r.description }}</span>
         </div>
         <span class="shrink-0 rounded bg-surface-4 px-1.5 py-px font-mono text-[9.5px] text-ink-3">
           {{ quietFor(r.lastActivityAt) }}
