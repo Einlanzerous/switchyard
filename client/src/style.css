@@ -131,8 +131,9 @@
   .delta {
     @apply font-mono text-[11px] font-medium;
   }
-  /* Keyboard hint chip (always Windows-style, e.g. "Ctrl+K"). */
+  /* Keyboard hint chip (always Windows-style, e.g. "Ctrl+K"). Theme slots
+     (accent/border == surface-3/line in dark) keep it light-mode safe. */
   .kbd-chip {
-    @apply rounded-[5px] border border-line bg-surface-3 px-1.5 py-0.5 font-mono text-[10.5px] text-ink-3;
+    @apply rounded-[5px] border border-border bg-accent px-1.5 py-0.5 font-mono text-[10.5px] text-muted-foreground;
   }
 }
