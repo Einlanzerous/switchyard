@@ -59,6 +59,28 @@ export function useThroughput(params: ComputedRef<{
   });
 }
 
+// "Who did the work" leaderboard (SWY-151). `attribute: "assignee"` credits
+// the ticket's assignee (closing-actor fallback when unassigned) so
+// automations that merely execute closes don't absorb agent credit.
+export function useClosedByActor(params: ComputedRef<{
+  project?: string;
+  since?: string;
+  until?: string;
+  attribute?: "actor" | "assignee";
+}>) {
+  return useQuery({
+    queryKey: computed(() => queryKeys.statsClosedByActor(params.value)),
+    staleTime: STALE_30S,
+    queryFn: async () => {
+      const { data, error } = await api.GET("/v1/stats/closed-by-actor", {
+        params: { query: params.value as never },
+      });
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
 export function useCycleTime(params: ComputedRef<{
   project?: string;
   since?: string;

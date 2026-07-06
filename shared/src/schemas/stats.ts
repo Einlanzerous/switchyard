@@ -57,6 +57,10 @@ export const ProjectStats = z.object({
   by_priority: PriorityCounts,
   by_type: TypeCounts,
   by_assignee: z.array(AssigneeCount),       // sorted by count desc
+  // In-progress tickets whose assignee is a `type = agent` user — the
+  // "N driven by agents" KPI subline (SWY-152). Unassigned in-progress work
+  // is NOT counted here, unlike the throughput split's agent bucket.
+  in_progress_agent: z.number().int().nonnegative(),
   stale_in_progress: z.number().int().nonnegative(),
   // Currently-open tickets whose due_date has passed.
   overdue: z.number().int().nonnegative(),
@@ -77,6 +81,8 @@ export const ProjectStatsRow = z.object({
   project: ProjectRef,
   totals: TicketTotals,
   by_category: CategoryCounts,
+  // See ProjectStats.in_progress_agent — boards sum this across their rows.
+  in_progress_agent: z.number().int().nonnegative(),
 });
 export type ProjectStatsRow = z.infer<typeof ProjectStatsRow>;
 
@@ -114,11 +120,19 @@ export type ThroughputStats = z.infer<typeof ThroughputStats>;
 
 // ─── closed-by-actor leaderboard ("who did the work") ───────────────────────
 //
-// Windowed, cross-project (scope-filtered) count of ticket.closed events per
-// closing ACTOR — the user who performed the close, not the assignee. Powers
-// the v4 insights leaderboard + force-multiplier. Closures with no surviving
-// actor row (deleted user / system) are omitted from the per-user list but
-// still appear in the throughput totals above.
+// Windowed, cross-project (scope-filtered) count of ticket.closed events.
+// Two attribution modes (SWY-151):
+//   - `actor` (default): credit the user who performed the close transition.
+//   - `assignee`: credit the ticket's CURRENT assignee, falling back to the
+//     closing actor when unassigned. This keeps credit with the agent that
+//     did the work when an automation (external-ref poller, rules engine)
+//     merely executed the close. Caveat: assignee is read at query time, not
+//     close time — reassigning a closed ticket moves its credit.
+// Closures whose credited user row no longer exists (deleted user / system)
+// are omitted from the per-user list but still appear in throughput totals.
+
+export const ClosedByActorAttribute = z.enum(["actor", "assignee"]);
+export type ClosedByActorAttribute = z.infer<typeof ClosedByActorAttribute>;
 
 export const ClosedByActorRow = z.object({
   user: UserRef,
@@ -281,6 +295,13 @@ export const StatsWindowQuery = z.object({
   bucket: StatsBucket.optional(),    // throughput-only; ignored elsewhere
 });
 export type StatsWindowQuery = z.infer<typeof StatsWindowQuery>;
+
+// Closed-by-actor adds the attribution mode on top of the shared window
+// params. Lives down here because it extends StatsWindowQuery (TDZ).
+export const ClosedByActorQuery = StatsWindowQuery.extend({
+  attribute: ClosedByActorAttribute.optional(), // server defaults to "actor"
+});
+export type ClosedByActorQuery = z.infer<typeof ClosedByActorQuery>;
 
 // Re-export StatusCategory for clients consuming this module without needing
 // to import status.js separately.

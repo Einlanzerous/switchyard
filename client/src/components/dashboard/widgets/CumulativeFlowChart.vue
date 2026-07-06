@@ -12,14 +12,20 @@ const props = defineProps<{
   project?: string;
   weeks?: number;
   bucket?: "day" | "week";
+  // Explicit window start (SWY-149 range control). Falls back to `weeks`.
+  since?: string;
 }>();
 
 const params = computed(() => {
-  const since = new Date();
-  since.setUTCDate(since.getUTCDate() - (props.weeks ?? 12) * 7);
+  let since = props.since;
+  if (!since) {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() - (props.weeks ?? 12) * 7);
+    since = d.toISOString();
+  }
   return {
     project: props.project,
-    since: since.toISOString(),
+    since,
     bucket: props.bucket ?? "week",
   };
 });
@@ -45,6 +51,8 @@ const option = computed(() => {
       type: "category",
       data: points.map((p) => formatBucketLabel(p.end, params.value.bucket ?? "week")),
       axisTick: { show: false },
+      // 1Y = 52 weekly labels; let ECharts thin them instead of overlapping.
+      axisLabel: { hideOverlap: true },
     },
     yAxis: { type: "value", minInterval: 1 },
     series: CATS.map((c) => ({

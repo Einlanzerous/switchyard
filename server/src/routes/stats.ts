@@ -16,7 +16,7 @@ import {
   CumulativeFlowStats, StaleRollup, ClosedByActorStats,
   ActivityPulseStats, ACTIVITY_PULSE_DAYS,
   EpicsInFlightStats, EPIC_STALL_AFTER_DAYS,
-  ProjectKey, StatsBucket, StatsWindowQuery,
+  ProjectKey, StatsBucket, StatsWindowQuery, ClosedByActorQuery,
   type StatusCategory, type TicketType, type Priority,
 } from "@switchyard/shared";
 import { db } from "../db.js";
@@ -137,14 +137,17 @@ const closedByActor = createRoute({
   method: "get",
   path: "/v1/stats/closed-by-actor",
   tags: [tag],
-  summary: "Windowed 'who did the work' leaderboard (closures per closing actor)",
+  summary: "Windowed 'who did the work' leaderboard (closures per credited user)",
   description:
-    "Counts ticket.closed events per closing ACTOR (the user who performed " +
-    "the close — not the assignee) in the window, scope-filtered like every " +
-    "stats endpoint. Closures whose actor row no longer exists (deleted " +
-    "user / system) are omitted here but still counted by /v1/stats/" +
-    "throughput totals. Sorted by count desc.",
-  request: { query: StatsWindowQuery },
+    "Counts ticket.closed events in the window, scope-filtered like every " +
+    "stats endpoint. `attribute=actor` (default) credits the user who " +
+    "performed the close; `attribute=assignee` credits the ticket's CURRENT " +
+    "assignee, falling back to the closing actor when unassigned — so agents " +
+    "keep credit when an automation merely executed the close. Assignee is " +
+    "read at query time, not close time. Closures whose credited user row " +
+    "no longer exists (deleted user / system) are omitted here but still " +
+    "counted by /v1/stats/throughput totals. Sorted by count desc.",
+  request: { query: ClosedByActorQuery },
   responses: { ...okJson(ClosedByActorStats), ...errorResponses },
 });
 
@@ -213,6 +216,7 @@ type AggRow = {
   cat_backlog: number; cat_planning: number; cat_in_progress: number; cat_blocked: number; cat_closed: number;
   prio_low: number; prio_medium: number; prio_high: number; prio_critical: number; prio_none: number;
   type_task: number; type_bug: number; type_spike: number; type_epic: number;
+  in_progress_agent: number;
   stale: number;
   overdue: number;
   completed_late: number;
@@ -240,6 +244,9 @@ async function fetchProjectAgg(projectId: string, staleDays: number): Promise<Ag
       COUNT(*) FILTER (WHERE t.type = 'spike')::int AS type_spike,
       COUNT(*) FILTER (WHERE t.type = 'epic')::int  AS type_epic,
       COUNT(*) FILTER (
+        WHERE s.category = 'in_progress' AND au.type = 'agent'
+      )::int AS in_progress_agent,
+      COUNT(*) FILTER (
         WHERE s.category = 'in_progress'
           AND t.updated_at < (NOW() - (${staleDays} * INTERVAL '1 day'))
       )::int AS stale,
@@ -265,6 +272,7 @@ async function fetchProjectAgg(projectId: string, staleDays: number): Promise<Ag
       MAX(t.updated_at)::text AS recent
     FROM tickets t
     JOIN statuses s ON s.id = t.status_id
+    LEFT JOIN users au ON au.id = t.assignee_id
     WHERE t.project_id = ${projectId}
       AND t.deleted_at IS NULL
   `);
@@ -277,6 +285,7 @@ async function fetchProjectAgg(projectId: string, staleDays: number): Promise<Ag
       cat_backlog: 0, cat_planning: 0, cat_in_progress: 0, cat_blocked: 0, cat_closed: 0,
       prio_low: 0, prio_medium: 0, prio_high: 0, prio_critical: 0, prio_none: 0,
       type_task: 0, type_bug: 0, type_spike: 0, type_epic: 0,
+      in_progress_agent: 0,
       stale: 0, overdue: 0, completed_late: 0, recent: null,
     };
   }
@@ -353,6 +362,7 @@ export function mount(app: OpenAPIHono) {
           epic: agg.type_epic,
         },
         by_assignee,
+        in_progress_agent: agg.in_progress_agent,
         stale_in_progress: agg.stale,
         overdue: agg.overdue,
         completed_late: agg.completed_late,
@@ -380,6 +390,7 @@ export function mount(app: OpenAPIHono) {
       open: number; closed: number; total: number;
       cat_backlog: number; cat_planning: number; cat_in_progress: number;
       cat_blocked: number; cat_closed: number;
+      in_progress_agent: number;
     }>(sql`
       SELECT
         p.id, p.key, p.name, p.color,
@@ -390,10 +401,14 @@ export function mount(app: OpenAPIHono) {
         COALESCE(COUNT(t.id) FILTER (WHERE s.category = 'planning'),    0)::int AS cat_planning,
         COALESCE(COUNT(t.id) FILTER (WHERE s.category = 'in_progress'), 0)::int AS cat_in_progress,
         COALESCE(COUNT(t.id) FILTER (WHERE s.category = 'blocked'),     0)::int AS cat_blocked,
-        COALESCE(COUNT(t.id) FILTER (WHERE s.category = 'closed'),      0)::int AS cat_closed
+        COALESCE(COUNT(t.id) FILTER (WHERE s.category = 'closed'),      0)::int AS cat_closed,
+        COALESCE(COUNT(t.id) FILTER (
+          WHERE s.category = 'in_progress' AND au.type = 'agent'
+        ), 0)::int AS in_progress_agent
       FROM projects p
       LEFT JOIN tickets t ON t.project_id = p.id AND t.deleted_at IS NULL
       LEFT JOIN statuses s ON s.id = t.status_id
+      LEFT JOIN users au ON au.id = t.assignee_id
       WHERE p.deleted_at IS NULL
         ${projFilter}
       GROUP BY p.id, p.key, p.name, p.color
@@ -413,6 +428,7 @@ export function mount(app: OpenAPIHono) {
             blocked: r.cat_blocked,
             closed: r.cat_closed,
           },
+          in_progress_agent: r.in_progress_agent,
         })),
       },
       200
@@ -701,12 +717,21 @@ export function mount(app: OpenAPIHono) {
       return c.json({ items: [] }, 200);
     }
 
+    // `assignee` credits COALESCE(current assignee, closing actor). LEFT JOIN
+    // tickets so a closure whose ticket was since hard-deleted still credits
+    // the actor.
+    const credited =
+      q.attribute === "assignee"
+        ? sql`COALESCE(t.assignee_id, e.actor_id)`
+        : sql`e.actor_id`;
+
     const rows = await db.execute<{
       id: string; name: string; icon: string | null; type: string; closed: number;
     }>(sql`
       SELECT u.id, u.name, u.icon, u.type, COUNT(*)::int AS closed
       FROM events e
-      JOIN users u ON u.id = e.actor_id
+      LEFT JOIN tickets t ON t.id = e.ticket_id
+      JOIN users u ON u.id = ${credited}
       WHERE e.event_type = 'ticket.closed'
         AND e.created_at >= ${since.toISOString()}
         AND e.created_at <= ${until.toISOString()}

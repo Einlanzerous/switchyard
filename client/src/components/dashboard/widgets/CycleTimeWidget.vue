@@ -11,12 +11,18 @@ import Chart from "@/components/charts/Chart.vue";
 const props = defineProps<{
   project?: string;
   weeks?: number;
+  // Explicit window start (SWY-149 range control). Falls back to `weeks`.
+  since?: string;
 }>();
 
 const params = computed(() => {
-  const since = new Date();
-  since.setUTCDate(since.getUTCDate() - (props.weeks ?? 12) * 7);
-  return { project: props.project, since: since.toISOString() };
+  let since = props.since;
+  if (!since) {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() - (props.weeks ?? 12) * 7);
+    since = d.toISOString();
+  }
+  return { project: props.project, since };
 });
 
 const q = useCycleTime(params);

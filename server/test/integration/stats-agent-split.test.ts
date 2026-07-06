@@ -172,6 +172,49 @@ describe("SWY-138 closed-by-actor leaderboard", () => {
     expect(data.items[1]!.closed).toBe(2);
   });
 
+  test("attribute=assignee credits the assignee, falls back to closing actor when unassigned", async () => {
+    const fx = await fixture();
+    const at = "2026-07-01T12:00:00.000Z";
+
+    // An automation agent that executes closes it shouldn't get credit for.
+    const [poller] = await testDb.insert(schema.users)
+      .values({ name: "external-ref-poller", type: "agent" })
+      .returning();
+
+    // Ticket assigned to claude, but every close transition is performed by
+    // the poller (the PR-merge auto-close shape).
+    const [assigned] = await testDb.insert(schema.tickets).values({
+      project_id: fx.project.id, number: 2, type: "task", title: "T-2",
+      status_id: fx.ticket.status_id, reporter_id: fx.magos.id,
+      assignee_id: fx.claude.id, resolution: "done",
+    }).returning();
+    for (let i = 0; i < 3; i++) await insertClosedEvent(fx.project.id, assigned!.id, poller!.id, at);
+    // The fixture ticket is unassigned: closes fall back to the actor.
+    for (let i = 0; i < 2; i++) await insertClosedEvent(fx.project.id, fx.ticket.id, fx.magos.id, at);
+
+    const token = await mintToken(fx.magos.id, ["tickets:read"]);
+    const window = "since=2026-06-28T00:00:00.000Z&until=2026-07-05T00:00:00.000Z";
+
+    const res = await GET(`/v1/stats/closed-by-actor?${window}&attribute=assignee`, token);
+    expect(res.status).toBe(200);
+    const data = await res.json() as {
+      items: Array<{ user: { name: string; type: string }; closed: number }>;
+    };
+    expect(data.items).toHaveLength(2);
+    expect(data.items[0]!.user.name).toBe("claude"); // assignee credited, not the poller
+    expect(data.items[0]!.closed).toBe(3);
+    expect(data.items[1]!.user.name).toBe("magos");  // unassigned → actor fallback
+    expect(data.items[1]!.closed).toBe(2);
+
+    // Default attribution is unchanged: the poller keeps its actor credit.
+    const resActor = await GET(`/v1/stats/closed-by-actor?${window}`, token);
+    const actorData = await resActor.json() as {
+      items: Array<{ user: { name: string }; closed: number }>;
+    };
+    expect(actorData.items[0]!.user.name).toBe("external-ref-poller");
+    expect(actorData.items[0]!.closed).toBe(3);
+  });
+
   test("member scope: only visible projects' closures count", async () => {
     const fx = await fixture();
     const at = "2026-07-01T12:00:00.000Z";
@@ -190,5 +233,48 @@ describe("SWY-138 closed-by-actor leaderboard", () => {
     expect(res.status).toBe(200);
     const data = await res.json() as { items: unknown[] };
     expect(data.items).toHaveLength(0);
+  });
+});
+
+describe("SWY-152 in_progress_agent count", () => {
+  test("counts only in-progress tickets assigned to agent users, on both endpoints", async () => {
+    const fx = await fixture();
+    const [inProgress] = await testDb.insert(schema.statuses).values({
+      project_id: fx.project.id, category: "in_progress", display_name: "In Progress",
+      position: 1, is_default: false,
+    }).returning();
+
+    // 2 agent-assigned + 1 human-assigned + 1 unassigned, all in_progress.
+    const rows = [
+      { number: 10, assignee_id: fx.claude.id },
+      { number: 11, assignee_id: fx.claude.id },
+      { number: 12, assignee_id: fx.magos.id },
+      { number: 13, assignee_id: null },
+    ];
+    for (const r of rows) {
+      await testDb.insert(schema.tickets).values({
+        project_id: fx.project.id, number: r.number, type: "task",
+        title: `T-${r.number}`, status_id: inProgress!.id,
+        reporter_id: fx.magos.id, assignee_id: r.assignee_id,
+      });
+    }
+
+    const token = await mintToken(fx.magos.id, ["tickets:read"]);
+
+    const perProject = await GET("/v1/projects/SPL/stats", token);
+    expect(perProject.status).toBe(200);
+    const pData = await perProject.json() as {
+      by_category: { in_progress: number }; in_progress_agent: number;
+    };
+    expect(pData.by_category.in_progress).toBe(4);
+    expect(pData.in_progress_agent).toBe(2);
+
+    const bulk = await GET("/v1/stats/projects", token);
+    expect(bulk.status).toBe(200);
+    const bData = await bulk.json() as {
+      items: Array<{ project: { key: string }; in_progress_agent: number }>;
+    };
+    const spl = bData.items.find((i) => i.project.key === "SPL");
+    expect(spl?.in_progress_agent).toBe(2);
   });
 });

@@ -14683,6 +14683,7 @@ export interface paths {
                                 } | null;
                                 count: number;
                             }[];
+                            in_progress_agent: number;
                             stale_in_progress: number;
                             overdue: number;
                             completed_late: number;
@@ -14873,6 +14874,7 @@ export interface paths {
                                     blocked: number;
                                     closed: number;
                                 };
+                                in_progress_agent: number;
                             }[];
                         };
                     };
@@ -15594,8 +15596,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Windowed 'who did the work' leaderboard (closures per closing actor)
-         * @description Counts ticket.closed events per closing ACTOR (the user who performed the close — not the assignee) in the window, scope-filtered like every stats endpoint. Closures whose actor row no longer exists (deleted user / system) are omitted here but still counted by /v1/stats/throughput totals. Sorted by count desc.
+         * Windowed 'who did the work' leaderboard (closures per credited user)
+         * @description Counts ticket.closed events in the window, scope-filtered like every stats endpoint. `attribute=actor` (default) credits the user who performed the close; `attribute=assignee` credits the ticket's CURRENT assignee, falling back to the closing actor when unassigned — so agents keep credit when an automation merely executed the close. Assignee is read at query time, not close time. Closures whose credited user row no longer exists (deleted user / system) are omitted here but still counted by /v1/stats/throughput totals. Sorted by count desc.
          */
         get: {
             parameters: {
@@ -15604,6 +15606,7 @@ export interface paths {
                     since?: string;
                     until?: string;
                     bucket?: "day" | "week";
+                    attribute?: "actor" | "assignee";
                 };
                 header?: never;
                 path?: never;

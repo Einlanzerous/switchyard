@@ -1,8 +1,9 @@
 <script setup lang="ts">
 // Per-project Insights view (`/projects/:key/insights`). Tab sibling of
-// ProjectBoardView. KPI strip + four widgets: throughput, status donut,
-// cycle time per type, assignee leaderboard. Each widget is independent
-// — its skeleton/error stays scoped.
+// ProjectBoardView. KPI strip + four widgets: throughput (agent/human
+// split), who-did-the-work leaderboard, status donut, cycle time per type.
+// Each widget is independent — its skeleton/error stays scoped. The 7D/12W/
+// 1Y range control (SWY-149) drives every windowed query.
 
 import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
@@ -12,15 +13,17 @@ import { Separator } from "@/components/ui/separator";
 import { useUiStore } from "@/stores/ui";
 import { useProjectStats } from "@/composables/useProjectStats";
 import { useThroughput } from "@/composables/useDashboardData";
+import { useInsightsRange } from "@/composables/useInsightsRange";
 import { formatDurationMs, formatDeltaPercent } from "@/lib/formatDuration";
 import KpiCard from "@/components/dashboard/KpiCard.vue";
 import DashboardWidget from "@/components/dashboard/DashboardWidget.vue";
 import InsightsTabs from "@/components/dashboard/InsightsTabs.vue";
+import InsightsRangeSelector from "@/components/dashboard/InsightsRangeSelector.vue";
 import ProjectHeaderLabel from "@/components/projects/ProjectHeaderLabel.vue";
 import ThroughputChart from "@/components/dashboard/widgets/ThroughputChart.vue";
 import StatusDonut from "@/components/dashboard/widgets/StatusDonut.vue";
 import CycleTimeWidget from "@/components/dashboard/widgets/CycleTimeWidget.vue";
-import AssigneeLeaderboard from "@/components/dashboard/widgets/AssigneeLeaderboard.vue";
+import WhoDidTheWorkCard from "@/components/dashboard/widgets/WhoDidTheWorkCard.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -33,6 +36,8 @@ const projectKey = computed(() => {
 
 const projectKeyOrNull = computed(() => projectKey.value || null);
 const stats = useProjectStats(projectKeyOrNull);
+
+const { rangeKey, since, bucket, windowLabel, perLabel } = useInsightsRange();
 
 // Closed-this-week mini-stat needs a 24-week throughput query so we have a
 // prior-period to delta against.
@@ -76,6 +81,7 @@ function back() { router.push("/projects"); }
           :setup-path="`/projects/${projectKey}/setup`"
         />
         <div class="flex-1 min-w-0" />
+        <InsightsRangeSelector v-model="rangeKey" />
         <Button size="sm" class="h-8" @click="ui.openCreateTicket(projectKey)">
           <Plus class="h-3.5 w-3.5 mr-1.5" /> New ticket
         </Button>
@@ -94,6 +100,8 @@ function back() { router.push("/projects"); }
             ? `${stats.data.value.totals.closed} of ${stats.data.value.totals.total} closed`
             : undefined"
         />
+        <!-- Note: KpiCard renders `warning` INSTEAD of the subline, so a
+             stale alert outranks the agent-driven note. Actionable > info. -->
         <KpiCard
           label="In progress"
           :value="stats.data.value?.by_category.in_progress ?? 0"
@@ -101,6 +109,9 @@ function back() { router.push("/projects"); }
           :warning="(stats.data.value?.stale_in_progress ?? 0) > 0
             ? `${stats.data.value!.stale_in_progress} stale`
             : null"
+          :subline="(stats.data.value?.in_progress_agent ?? 0) > 0
+            ? `${stats.data.value!.in_progress_agent} driven by agents`
+            : undefined"
         />
         <KpiCard
           label="Overdue"
@@ -119,6 +130,7 @@ function back() { router.push("/projects"); }
           :value="closedThisWeek"
           :loading="throughput24w.isLoading.value"
           :spark="closedSpark"
+          spark-color="#63b58c"
           :delta-percent="formatDeltaPercent(closedThisWeek, closedPriorWeek)"
           delta-good-when="up"
         />
@@ -132,22 +144,35 @@ function back() { router.push("/projects"); }
         />
       </div>
 
-      <!-- Charts row -->
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        <DashboardWidget title="Throughput" class="lg:col-span-7">
+      <!-- Charts row: throughput split | who did the work (SWY-150/151). -->
+      <div class="grid grid-cols-1 lg:grid-cols-[1.55fr_1fr] gap-4">
+        <DashboardWidget title="Throughput">
           <template #title-prefix>
             <BarChart2 class="h-3.5 w-3.5 text-muted-foreground" />
           </template>
           <template #title-suffix>
-            <span class="ml-1 text-[10px] text-muted-foreground">closed/week, last 12</span>
+            <span class="ml-1 font-mono text-[10px] text-ink-3">{{ perLabel }}</span>
           </template>
-          <ThroughputChart :project="projectKey" :weeks="12" />
+          <template #actions>
+            <div class="flex items-center gap-3 font-mono text-[10px] text-ink-3">
+              <span class="inline-flex items-center gap-1.5">
+                <span class="h-2 w-2 rounded-full bg-agent" /> agents
+              </span>
+              <span class="inline-flex items-center gap-1.5">
+                <span class="h-2 w-2 rounded-full bg-signal" /> you
+              </span>
+            </div>
+          </template>
+          <ThroughputChart :project="projectKey" :since="since" :bucket="bucket" />
         </DashboardWidget>
-        <DashboardWidget title="Status distribution" class="lg:col-span-5">
+        <DashboardWidget title="Who did the work">
           <template #title-prefix>
-            <PieChart class="h-3.5 w-3.5 text-muted-foreground" />
+            <UsersIcon class="h-3.5 w-3.5 text-muted-foreground" />
           </template>
-          <StatusDonut :project-key="projectKey" />
+          <template #title-suffix>
+            <span class="ml-1 font-mono text-[10px] text-ink-3">{{ windowLabel }} · closed</span>
+          </template>
+          <WhoDidTheWorkCard :project="projectKey" :since="since" />
         </DashboardWidget>
       </div>
 
@@ -157,15 +182,15 @@ function back() { router.push("/projects"); }
             <Clock class="h-3.5 w-3.5 text-muted-foreground" />
           </template>
           <template #title-suffix>
-            <span class="ml-1 text-[10px] text-muted-foreground">in_progress only</span>
+            <span class="ml-1 font-mono text-[10px] text-ink-3">in_progress only · {{ windowLabel }}</span>
           </template>
-          <CycleTimeWidget :project="projectKey" />
+          <CycleTimeWidget :project="projectKey" :since="since" />
         </DashboardWidget>
-        <DashboardWidget title="Assignees" class="lg:col-span-5">
+        <DashboardWidget title="Status distribution" class="lg:col-span-5">
           <template #title-prefix>
-            <UsersIcon class="h-3.5 w-3.5 text-muted-foreground" />
+            <PieChart class="h-3.5 w-3.5 text-muted-foreground" />
           </template>
-          <AssigneeLeaderboard :project-key="projectKey" />
+          <StatusDonut :project-key="projectKey" />
         </DashboardWidget>
       </div>
     </div>

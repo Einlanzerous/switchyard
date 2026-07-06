@@ -22926,6 +22926,9 @@ paths:
                       required:
                         - user
                         - count
+                  in_progress_agent:
+                    type: integer
+                    minimum: 0
                   stale_in_progress:
                     type: integer
                     minimum: 0
@@ -22946,6 +22949,7 @@ paths:
                   - by_priority
                   - by_type
                   - by_assignee
+                  - in_progress_agent
                   - stale_in_progress
                   - overdue
                   - completed_late
@@ -23204,10 +23208,14 @@ paths:
                             - in_progress
                             - blocked
                             - closed
+                        in_progress_agent:
+                          type: integer
+                          minimum: 0
                       required:
                         - project
                         - totals
                         - by_category
+                        - in_progress_agent
                 required:
                   - items
         "400":
@@ -24198,12 +24206,15 @@ paths:
     get:
       tags:
         - Stats
-      summary: Windowed 'who did the work' leaderboard (closures per closing actor)
-      description: Counts ticket.closed events per closing ACTOR (the user who
-        performed the close — not the assignee) in the window, scope-filtered
-        like every stats endpoint. Closures whose actor row no longer exists
-        (deleted user / system) are omitted here but still counted by
-        /v1/stats/throughput totals. Sorted by count desc.
+      summary: Windowed 'who did the work' leaderboard (closures per credited user)
+      description: Counts ticket.closed events in the window, scope-filtered like
+        every stats endpoint. `attribute=actor` (default) credits the user who
+        performed the close; `attribute=assignee` credits the ticket's CURRENT
+        assignee, falling back to the closing actor when unassigned — so agents
+        keep credit when an automation merely executed the close. Assignee is
+        read at query time, not close time. Closures whose credited user row no
+        longer exists (deleted user / system) are omitted here but still counted
+        by /v1/stats/throughput totals. Sorted by count desc.
       parameters:
         - schema:
             type: string
@@ -24227,6 +24238,14 @@ paths:
             enum: *a24
           required: false
           name: bucket
+          in: query
+        - schema:
+            type: string
+            enum:
+              - actor
+              - assignee
+          required: false
+          name: attribute
           in: query
       responses:
         "200":
