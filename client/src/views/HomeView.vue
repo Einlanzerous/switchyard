@@ -25,6 +25,7 @@ import KpiCard from "@/components/dashboard/KpiCard.vue";
 import DashboardWidget from "@/components/dashboard/DashboardWidget.vue";
 import ActivityFeed from "@/components/dashboard/widgets/ActivityFeed.vue";
 import ActiveProjectsCard from "@/components/dashboard/widgets/ActiveProjectsCard.vue";
+import EpicsInFlightCard from "@/components/dashboard/widgets/EpicsInFlightCard.vue";
 
 const auth = useAuthStore();
 const ui = useUiStore();
@@ -155,9 +156,10 @@ const narrativeReady = computed(
       />
     </div>
 
-    <!-- Row 2: active projects (1.9fr) + epics in flight (1fr, SWY-142) ───── -->
+    <!-- Row 2: active projects (1.9fr) + epics in flight (1fr) ─────────────── -->
     <div class="grid grid-cols-1 lg:grid-cols-[1.9fr_1fr] gap-4 items-start">
       <ActiveProjectsCard />
+      <EpicsInFlightCard />
     </div>
 
     <!-- Recent activity (interim full-width slot — SWY-143 moves this into
