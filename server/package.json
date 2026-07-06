@@ -12,6 +12,7 @@
     "db:studio": "drizzle-kit studio",
     "db:test:setup": "bun scripts/db-test-setup.ts",
     "dev:seed-sample": "bun scripts/dev-seed-sample.ts",
+    "dev:seed-insights": "bun scripts/dev-seed-insights.ts",
     "seed:swy": "bun scripts/seed-switchyard-project.ts",
     "seed:test-e2e": "bun scripts/seed-test-fixtures.ts",
     "seed:imperium-fields": "bun scripts/seed-imperium-loop-fields.ts",
