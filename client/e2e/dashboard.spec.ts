@@ -1,13 +1,11 @@
-// Dashboard E2E. KPI numerics render and charts mount without console
-// errors. Per-user noise (my open tickets, @mentions) lives off the
-// dashboard now — open tickets are reachable from the profile menu and
-// @mentions from the notification bell — so neither has a home widget.
+// Dashboard E2E — v4 "Elevated" layout (SWY-140–143). Greeting narrative,
+// work-centric KPI strip, Active-projects / Epics-in-flight cards, enriched
+// activity feed + Up-next.
 //
-// Charts: ECharts renders to a <canvas> inside its container — we
-// can't introspect chart contents from the DOM, so the smoke test here
-// is "the widget renders + the canvas exists". Visual regressions are
-// out of scope for E2E; lean on manual inspection or a dedicated
-// snapshot suite for those.
+// Assertions stay at the smoke level: widgets mount, labels render, empty
+// states appear with the read-only E2E seed (3 tickets, no event history).
+// Visual regressions are out of scope for E2E; lean on manual inspection
+// or a dedicated snapshot suite for those.
 
 import { test, expect } from "@playwright/test";
 
@@ -16,50 +14,60 @@ test.describe("dashboard (HomeView)", () => {
     await page.goto("/");
   });
 
-  test("KPI strip renders with numeric values", async ({ page }) => {
-    // Each KPI label has a numeric value inside its card. We assert on
-    // visibility rather than exact value (depends on seed state).
-    const labels = ["Open tickets", "In progress", "Closed this week", "Median cycle time"];
+  test("greeting renders time-of-day + New ticket button", async ({ page }) => {
+    await expect(
+      page.getByRole("heading", { name: /^Good (morning|afternoon|evening)/ }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: /new ticket/i })).toBeVisible();
+  });
+
+  test("KPI strip renders the four work-centric cards", async ({ page }) => {
+    // Assert on label visibility rather than exact values (depends on seed
+    // state). "Needs you" is the accent card fed by the stalled-epics
+    // interim source until SWY-139 lands.
+    const labels = ["Epics in flight", "Closed · 7d", "Agent share", "Needs you"];
     for (const label of labels) {
-      const card = page.locator("text=" + label).first();
-      await expect(card).toBeVisible();
+      await expect(page.locator(`text=${label}`).first()).toBeVisible();
     }
   });
 
-  test("throughput + status distribution widgets render", async ({ page }) => {
-    // ECharts in canvas-renderer mode mounts a <canvas> per chart when
-    // data exists; the widget framework renders a "No data yet." sentinel
-    // otherwise. Both prove the widget mounted without throwing — which
-    // is the smoke-test concern. With the E2E seed (3 tickets, no event
-    // history) the stats endpoints return all zeros, so the widgets sit
-    // in the empty state; against a populated install they show canvases.
-    // DashboardWidget renders its title in a CardTitle (<h3>) alongside
-    // optional prefix/suffix slots; the throughput card includes a
-    // "closed/week, last 12" suffix so the accessible name isn't an
-    // exact "Throughput" match. Hit by role + substring instead.
-    const throughput = page.getByRole("heading", { name: /throughput/i });
-    const statusDist = page.getByRole("heading", { name: /status distribution/i });
-    await expect(throughput).toBeVisible();
-    await expect(statusDist).toBeVisible();
-
-    // Either a canvas (data) or the "No data yet." sentinel (empty) must
-    // be present somewhere on the page. We don't enforce a count — the
-    // widget framework's loading → empty → populated transitions are
-    // verified in unit tests; here we just want a non-crashed mount.
+  test("active projects + epics in flight cards render", async ({ page }) => {
+    await expect(page.getByRole("heading", { name: /active projects/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /epics in flight/i })).toBeVisible();
+    // With the E2E seed either rows or the styled empty states must mount.
     await expect.poll(
-      async () => (await page.locator("canvas").count()) > 0
-        || (await page.getByText(/No data yet\./i).count()) > 0,
-      { message: "neither a chart canvas nor empty-state sentinel rendered", timeout: 10_000 },
+      async () =>
+        (await page.getByText(/No projects yet\./i).count()) > 0
+        || (await page.locator("svg polyline").count()) > 0,
+      { message: "active-projects card mounted neither rows nor empty state", timeout: 10_000 },
+    ).toBe(true);
+    await expect.poll(
+      async () =>
+        (await page.getByText(/No epics in flight\./i).count()) > 0
+        || (await page.getByText(/%|stalled|plan|done/).count()) > 0,
+      { message: "epics card mounted neither rows nor empty state", timeout: 10_000 },
     ).toBe(true);
   });
 
-  test("recent activity widget renders", async ({ page }) => {
+  test("recent activity + up next render", async ({ page }) => {
     await expect(page.getByText(/Recent activity/i).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: /up next/i })).toBeVisible();
+    // Up-next shows either backlog rows or its empty sentinel.
+    await expect.poll(
+      async () =>
+        (await page.getByText(/Backlog is clear\./i).count()) > 0
+        || (await page.locator("ul li").count()) > 0,
+      { message: "up-next card mounted neither rows nor empty state", timeout: 10_000 },
+    ).toBe(true);
   });
 
-  test("per-user widgets are no longer on the dashboard", async ({ page }) => {
-    // "My open tickets" and "Mentions" moved off the dashboard. Guard
-    // against a regression that reintroduces them here.
+  test("v3 vanity widgets are no longer on the dashboard", async ({ page }) => {
+    // Throughput/status-donut moved to Insights; stale rollup was
+    // superseded by the Needs-you KPI; per-user widgets stay off the
+    // dashboard (profile menu + notification bell). Guard regressions.
+    await expect(page.getByRole("heading", { name: /throughput/i })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: /status distribution/i })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: /stale work/i })).toHaveCount(0);
     await expect(page.getByRole("heading", { name: /my open tickets/i })).toHaveCount(0);
     await expect(page.getByRole("heading", { name: /^mentions$/i })).toHaveCount(0);
   });
