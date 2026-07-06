@@ -26,6 +26,7 @@ import DashboardWidget from "@/components/dashboard/DashboardWidget.vue";
 import ActivityFeed from "@/components/dashboard/widgets/ActivityFeed.vue";
 import ActiveProjectsCard from "@/components/dashboard/widgets/ActiveProjectsCard.vue";
 import EpicsInFlightCard from "@/components/dashboard/widgets/EpicsInFlightCard.vue";
+import UpNextCard from "@/components/dashboard/widgets/UpNextCard.vue";
 
 const auth = useAuthStore();
 const ui = useUiStore();
@@ -162,13 +163,23 @@ const narrativeReady = computed(
       <EpicsInFlightCard />
     </div>
 
-    <!-- Recent activity (interim full-width slot — SWY-143 moves this into
-         the second 1.9fr/1fr row beside "Up next") ─────────────────────────── -->
-    <DashboardWidget title="Recent activity" :padded="false">
-      <template #title-prefix>
-        <Activity class="h-3.5 w-3.5 text-muted-foreground" />
-      </template>
-      <ActivityFeed :limit="20" />
-    </DashboardWidget>
+    <!-- Row 3: recent activity (1.9fr) + up next (1fr) ──────────────────────── -->
+    <div class="grid grid-cols-1 lg:grid-cols-[1.9fr_1fr] gap-4 items-start">
+      <DashboardWidget title="Recent activity" :padded="false">
+        <template #title-prefix>
+          <Activity class="h-3.5 w-3.5 text-muted-foreground" />
+        </template>
+        <template #actions>
+          <!-- Legend, not a filter: the feed is agent-dominated by design. -->
+          <span class="flex items-center gap-1.5 rounded bg-surface-4 px-1.5 py-0.5 font-mono text-[10px] text-ink-3">
+            <UserAvatar :user="{ name: 'agents', type: 'agent' }" size="xs" class="h-3.5 w-3.5 text-[7px]" />
+            agents
+          </span>
+        </template>
+        <ActivityFeed :limit="7" />
+      </DashboardWidget>
+
+      <UpNextCard />
+    </div>
   </div>
 </template>
