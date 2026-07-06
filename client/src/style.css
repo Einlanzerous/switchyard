@@ -11,8 +11,8 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
     --sidebar: 60 5% 88%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 13 74% 56.3%;
+    --primary-foreground: 0 0% 100%;
     --secondary: 60 7% 90%;
     --secondary-foreground: 222.2 47.4% 11.2%;
     --muted: 60 6% 94%;
@@ -23,34 +23,92 @@
     --destructive-foreground: 210 40% 98%;
     --border: 60 6% 90%;
     --input: 60 6% 90%;
-    --ring: 222.2 84% 4.9%;
-    --radius: 0.5rem;
+    --ring: 13 74% 56.3%;
+    --radius: 10px;
+
+    /* ---- v4 "Elevated" design tokens ----------------------------------
+       Raw values for hand-written styles; Tailwind utilities (surface/line/
+       ink/signal/st/agent) mirror them. Dark is the primary theme — these
+       are dark-palette constants and do not flip in light mode.
+       The design doc's `--accent` (coral) lives here as `--signal` because
+       shadcn already owns `--accent` as its hover-surface slot; coral is
+       also wired into shadcn `--primary`/`--ring`. */
+    --surface-1: #101114;
+    --surface-2: #16171b;
+    --surface-3: #1c1d22;
+    --surface-4: #232429;
+    --line: #26272d;
+    --line-soft: #1b1c21;
+
+    --text: #eceded;
+    --text-2: #a3a4aa;
+    --text-3: #6c6d73;
+    --text-4: #4d4e54;
+
+    --signal: #e2623d;
+    --signal-2: #f0855f;
+    --signal-weak: rgba(226, 98, 61, 0.13);
+    --signal-line: rgba(226, 98, 61, 0.42);
+    --signal-glow: rgba(226, 98, 61, 0.28);
+
+    --st-backlog: #808289;
+    --st-planning: #c08cd8;
+    --st-progress: #64a0d6;
+    --st-blocked: #d76f6a;
+    --st-closed: #63b58c;
+    --st-backlog-bg: rgba(128, 130, 137, 0.14);
+    --st-planning-bg: rgba(192, 140, 216, 0.15);
+    --st-progress-bg: rgba(100, 160, 214, 0.15);
+    --st-blocked-bg: rgba(215, 111, 106, 0.15);
+    --st-closed-bg: rgba(99, 181, 140, 0.15);
+
+    --agent: #8fa6bd;
+    --agent-bg: rgba(143, 166, 189, 0.14);
+
+    --pos: #63b58c;
+    --neg: #d76f6a;
+
+    --radius-sm: 7px;
+    --radius-lg: 14px;
+
+    --sans: "Hanken Grotesk Variable", ui-sans-serif, system-ui, sans-serif;
+    --mono: "JetBrains Mono Variable", ui-monospace, "Cascadia Mono", Menlo, monospace;
+
+    --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.02) inset, 0 8px 24px -12px rgba(0, 0, 0, 0.6);
   }
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --sidebar: 240 5% 12%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 60 5% 24%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 60 4% 17%;
-    --muted-foreground: 60 5% 64%;
-    --accent: 60 4% 20%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 60 4% 20%;
-    --input: 60 4% 20%;
-    --ring: 212.7 26.8% 83.9%;
+    /* shadcn semantic slots mapped onto the Elevated ink (see hex in the
+       :root token block): background/sidebar=--bg #0b0c0e, card=surface-2,
+       popover/accent=surface-3, muted/input=surface-4, border=--line,
+       primary/ring=coral signal, destructive=--st-blocked. */
+    --background: 220 12% 4.9%;
+    --foreground: 180 3% 92.7%;
+    --card: 228 10% 9.6%;
+    --card-foreground: 180 3% 92.7%;
+    --popover: 230 10% 12.2%;
+    --popover-foreground: 180 3% 92.7%;
+    --sidebar: 220 12% 4.9%;
+    --primary: 13 74% 56.3%;
+    --primary-foreground: 17 53% 6.7%;
+    --secondary: 228 10% 9.6%;
+    --secondary-foreground: 180 3% 92.7%;
+    --muted: 230 8% 14.9%;
+    --muted-foreground: 231 4% 65.3%;
+    --accent: 230 10% 12.2%;
+    --accent-foreground: 180 3% 92.7%;
+    --destructive: 3 58% 62.9%;
+    --destructive-foreground: 17 53% 6.7%;
+    --border: 231 8% 16.3%;
+    --input: 230 8% 14.9%;
+    --ring: 13 74% 56.3%;
   }
 }
 
 @layer base {
   * { @apply border-border; }
-  body { @apply bg-background text-foreground; }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "cv11", "ss01";
+    text-rendering: optimizeLegibility;
+  }
 }
