@@ -46,5 +46,6 @@ const modelValue = useVModel(vmodelProps, "modelValue", emits, {
   <!-- @vue-expect-error vue-tsc can't represent this input's intrinsic attributes
        merged with the wide $attrs fallthrough (TS2590). v-model is correct at
        runtime and kept (over :value/@input) so IME composition still works. -->
-  <input v-model="modelValue" :class="cn('flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-foreground file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50', props.class)">
+  <!-- v4: compact 32px input well on the surface-4 tone (muted slot). -->
+  <input v-model="modelValue" :class="cn('flex h-8 w-full rounded-[7px] border border-border bg-muted/60 px-2.5 py-1.5 text-[13px] ring-offset-background file:border-0 file:bg-transparent file:text-foreground file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50', props.class)">
 </template>

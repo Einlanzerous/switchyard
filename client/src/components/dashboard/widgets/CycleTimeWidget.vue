@@ -24,6 +24,15 @@ const theme = useThemeStore();
 
 const types = ["task", "bug", "spike", "epic"] as const;
 
+// Per-type bar hues from the v4 family (design: task progress-blue, bug
+// closed-green, spike planning-purple, epic signal-coral).
+const TYPE_HEX: Record<(typeof types)[number], string> = {
+  task: "#64a0d6",
+  bug: "#63b58c",
+  spike: "#c08cd8",
+  epic: "#e2623d",
+};
+
 // Bumped on every html.class flip (Tailwind dark/light) so the bar-label
 // color recomputes from the live CSS variable. Same MutationObserver
 // pattern Chart.vue uses; we duplicate it here because the label color is
@@ -73,7 +82,10 @@ const option = computed(() => {
     },
     series: [{
       type: "bar",
-      data: types.map((t) => data?.by_type?.[t]?.median_ms ?? 0),
+      data: types.map((t) => ({
+        value: data?.by_type?.[t]?.median_ms ?? 0,
+        itemStyle: { color: TYPE_HEX[t] },
+      })),
       barMaxWidth: 16,
       itemStyle: { borderRadius: [0, 3, 3, 0] },
       label: {

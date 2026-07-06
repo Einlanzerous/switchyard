@@ -16,19 +16,21 @@ const props = defineProps<{
 
 // Tone per (kind, state) — keeps the badge visually meaningful at a
 // glance even without the tooltip.
+// v4 family: landed work (merged PR / closed issue / green build) is
+// closed-green, in-flight is progress-blue, failed/dead is blocked-red.
 const tone = computed(() => {
   const { kind, state } = props.value;
   if (kind === "github_pr") {
-    if (state === "merged") return "text-purple-500";
-    if (state === "closed") return "text-red-500";
-    return "text-emerald-500"; // open or null
+    if (state === "merged") return "text-st-closed";
+    if (state === "closed") return "text-neg";
+    return "text-st-progress"; // open or null
   }
   if (kind === "github_issue") {
-    return state === "closed" ? "text-purple-500" : "text-emerald-500";
+    return state === "closed" ? "text-st-closed" : "text-st-progress";
   }
   if (kind === "github_action") {
-    if (state === "success") return "text-emerald-500";
-    if (state === "failed") return "text-red-500";
+    if (state === "success") return "text-pos";
+    if (state === "failed") return "text-neg";
     return "text-muted-foreground"; // running
   }
   return "text-muted-foreground";

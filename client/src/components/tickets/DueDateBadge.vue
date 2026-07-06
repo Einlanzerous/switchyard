@@ -43,12 +43,13 @@ const info = computed(() => {
     label = `Due ${due.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
   }
 
+  // v4: overdue in blocked-red, today/soon in the coral signal.
   const tone = isOverdue
-    ? "text-red-500"
+    ? "text-neg"
     : isDueToday
-    ? "text-amber-500"
+    ? "text-signal-2"
     : isDueSoon
-    ? "text-amber-500/80"
+    ? "text-signal-2/80"
     : "text-muted-foreground";
 
   return { label, tone, isOverdue, fullTitle: due.toLocaleDateString(undefined, { dateStyle: "full" }) };

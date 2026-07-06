@@ -9,11 +9,13 @@ const props = defineProps<{
   showLabel?: boolean;
 }>();
 
+// v4: high reads in the coral signal (per the ticket full-page mock's meta
+// row); medium in progress-blue, critical in blocked-red.
 const meta: Record<Priority, { tone: string; icon: any; label: string }> = {
   low: { tone: "text-muted-foreground", icon: ChevronDown, label: "Low" },
-  medium: { tone: "text-blue-500", icon: Equal, label: "Medium" },
-  high: { tone: "text-amber-500", icon: ChevronUp, label: "High" },
-  critical: { tone: "text-red-500", icon: Flame, label: "Critical" },
+  medium: { tone: "text-st-progress", icon: Equal, label: "Medium" },
+  high: { tone: "text-signal-2", icon: ChevronUp, label: "High" },
+  critical: { tone: "text-st-blocked", icon: Flame, label: "Critical" },
 };
 
 const data = computed(() => (props.priority ? meta[props.priority] : null));

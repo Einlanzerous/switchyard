@@ -42,6 +42,11 @@ client/playwright/.auth/
 # Local secrets (GitHub app private keys, bot env files, etc.) — never commit
 .secrets/
 
+# v4 design handoff (mocks + tokens) — lives on this server only, referenced by
+# the SWY-130 epic tickets; deliberately untracked (design source of truth is
+# the claude.ai/design project)
+design_handoff_switchyard_v4/
+
 # Logs
 *.log
 
