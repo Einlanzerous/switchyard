@@ -32,21 +32,23 @@ function logout() {
     page-level FilterBars) keeps the topbar from looking like a mirror
     image of the sub-page search inputs sitting directly underneath it.
   -->
-  <header class="flex h-16 items-center gap-3 border-b px-4">
+  <header class="flex h-14 items-center gap-3 border-b dark:border-line-soft px-5">
     <div class="flex-1" aria-hidden="true" />
 
-    <div class="w-full max-w-2xl">
+    <div class="w-full max-w-[560px]">
+      <!-- v4 search pill: 34px on the card surface with a line border; the
+           kbd hint rides the right edge. -->
       <button
         type="button"
-        class="relative w-full h-11 rounded-md border border-transparent bg-muted/50 hover:bg-muted text-left text-sm text-muted-foreground px-3 transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-ring flex items-center gap-2"
+        class="relative w-full h-[34px] rounded-[7px] border border-border bg-card hover:bg-accent text-left text-[13px] text-ink-3 px-3 transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-ring flex items-center gap-2.5"
         aria-label="Open command palette"
         @click="ui.openPalette()"
       >
-        <kbd class="hidden sm:inline-flex h-6 select-none items-center gap-1 rounded border bg-background px-1.5 font-mono text-[10px] font-medium text-muted-foreground shrink-0">
+        <Search class="h-[15px] w-[15px] shrink-0 opacity-60" />
+        <span class="truncate">Search tickets, projects, boards…</span>
+        <kbd class="kbd-chip ml-auto hidden sm:inline-flex select-none items-center shrink-0">
           Ctrl+K
         </kbd>
-        <Search class="h-4 w-4 shrink-0" />
-        <span class="truncate">Search tickets, projects, boards…</span>
       </button>
     </div>
 

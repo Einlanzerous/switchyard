@@ -54,27 +54,35 @@ function isActive(to: string) {
 }
 
 // Per-item classes. Collapsed → icon centered, no inline label; expanded →
-// icon + label with a gap. Active highlight spans the whole item either way.
+// icon + label with a gap. Active (v4): raised surface + line border + a
+// 2.5px coral bar hugging the sidebar edge (the ::before), coral icon.
 function itemClass(to: string) {
   return [
-    "flex items-center rounded-md py-1.5 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors",
-    collapsed.value ? "justify-center px-0" : "gap-2 px-3",
-    isActive(to) && "bg-accent text-foreground",
+    "relative flex items-center rounded-[7px] border border-transparent py-1.5 text-[13.5px] text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors",
+    collapsed.value ? "justify-center px-0" : "gap-[11px] px-2.5",
+    isActive(to) &&
+      "bg-accent text-foreground border-border before:absolute before:-left-3 before:top-2 before:bottom-2 before:w-[2.5px] before:rounded-full before:bg-signal before:content-['']",
   ];
+}
+
+// Icons ride at 72% opacity until their item is active, where they pick up
+// the coral signal (the v4 active treatment).
+function iconClass(to: string) {
+  return isActive(to) ? "text-signal opacity-100" : "opacity-70";
 }
 </script>
 
 <template>
   <aside
-    class="hidden md:flex md:flex-col border-r bg-sidebar transition-[width] duration-200 ease-in-out"
-    :class="collapsed ? 'md:w-16' : 'md:w-60'"
+    class="hidden md:flex md:flex-col border-r dark:border-line-soft bg-sidebar transition-[width] duration-200 ease-in-out"
+    :class="collapsed ? 'md:w-16' : 'md:w-[232px]'"
   >
     <!-- Logo header — structurally separate from the nav, so collapsing the
          menu below leaves the logo in place. Collapsed → cube mark only,
          centered in the rail; expanded → full mark + wordmark.
          TODO: replace wordmark with Commissioner (fonts.google.com/specimen/Commissioner)
          once the logo SVG is cleaned up as a proper mark-only file -->
-    <div class="flex h-16 items-center border-b px-3 overflow-hidden">
+    <div class="flex h-14 items-center border-b dark:border-line-soft px-3 overflow-hidden">
       <RouterLink to="/" class="flex items-center" aria-label="Switchyard home">
         <SwitchyardLogo :collapsed="collapsed" />
       </RouterLink>
@@ -86,7 +94,7 @@ function itemClass(to: string) {
           <Tooltip v-for="item in main" :key="item.to">
             <TooltipTrigger as-child>
               <RouterLink :to="item.to" :class="itemClass(item.to)" :aria-label="item.label">
-                <component :is="item.icon" class="h-4 w-4 shrink-0" />
+                <component :is="item.icon" class="h-4 w-4 shrink-0 transition-colors" :class="iconClass(item.to)" />
                 <span v-if="!collapsed" class="truncate">{{ item.label }}</span>
               </RouterLink>
             </TooltipTrigger>
@@ -96,8 +104,8 @@ function itemClass(to: string) {
           <Separator class="my-3" />
           <!-- Section header collapses to a single-letter glyph in the rail. -->
           <div
-            class="text-xs font-medium uppercase tracking-wider text-muted-foreground"
-            :class="collapsed ? 'text-center px-0' : 'px-3'"
+            class="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-4"
+            :class="collapsed ? 'text-center px-0' : 'px-2.5'"
           >
             {{ collapsed ? "A" : "Admin" }}
           </div>
@@ -105,7 +113,7 @@ function itemClass(to: string) {
           <Tooltip v-for="item in admin" :key="item.to">
             <TooltipTrigger as-child>
               <RouterLink :to="item.to" :class="itemClass(item.to)" :aria-label="item.label">
-                <component :is="item.icon" class="h-4 w-4 shrink-0" />
+                <component :is="item.icon" class="h-4 w-4 shrink-0 transition-colors" :class="iconClass(item.to)" />
                 <span v-if="!collapsed" class="truncate">{{ item.label }}</span>
               </RouterLink>
             </TooltipTrigger>
@@ -119,10 +127,10 @@ function itemClass(to: string) {
          keeps a constant vertical position across collapse/expand (the version
          just hides in the rail — the string can't fit). Chevron points the way
          it affords: left to collapse, right to expand. -->
-    <div class="flex items-center gap-2 border-t p-2">
+    <div class="flex items-center gap-2 border-t dark:border-line-soft p-2">
       <span
         v-if="!collapsed"
-        class="min-w-0 flex-1 truncate px-2 text-[10px] text-muted-foreground/70 font-mono"
+        class="min-w-0 flex-1 truncate px-2 text-[10.5px] tracking-[0.04em] text-ink-4 font-mono"
       >
         {{ APP_VERSION_DISPLAY }}
       </span>
