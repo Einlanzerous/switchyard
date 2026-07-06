@@ -14,6 +14,7 @@ import { and, eq, gte, inArray, isNull, lte, sql, type SQL } from "drizzle-orm";
 import {
   ProjectStats, ProjectStatsList, ThroughputStats, CycleTimeStats,
   CumulativeFlowStats, StaleRollup, ClosedByActorStats,
+  ActivityPulseStats, ACTIVITY_PULSE_DAYS,
   ProjectKey, StatsBucket, StatsWindowQuery,
   type StatusCategory, type TicketType, type Priority,
 } from "@switchyard/shared";
@@ -100,6 +101,20 @@ const staleRollup = createRoute({
   tags: [tag],
   summary: "Per-project rollup of stale in-progress tickets",
   responses: { ...okJson(StaleRollup), ...errorResponses },
+});
+
+const activityPulse = createRoute({
+  method: "get",
+  path: "/v1/stats/activity-pulse",
+  tags: [tag],
+  summary: "Per-project activity pulse (last activity, 14d daily series, recent actors)",
+  description:
+    "One row per visible non-deleted project: all-time most-recent event " +
+    "timestamp, a fixed 14-day UTC-day-aligned daily event-count series " +
+    "(oldest → newest, last bucket = today, partial), and up to 3 distinct " +
+    "recent actors (most-recent first) from the same window. Constant query " +
+    "count regardless of project count.",
+  responses: { ...okJson(ActivityPulseStats), ...errorResponses },
 });
 
 const closedByActor = createRoute({
@@ -433,6 +448,101 @@ export function mount(app: OpenAPIHono) {
     const human_total = points.reduce((a, b) => a + b.human_count, 0);
     return c.json(
       { bucket, points, total, agent_total: total - human_total, human_total },
+      200
+    );
+  }) as any);
+
+  // ─── per-project activity pulse ───────────────────────────────────────────
+
+  app.openapi(activityPulse, (async (c: any) => {
+    const user = c.get("auth").user;
+    const visible = hasInstanceWideAccess(user) ? null : await visibleProjectIds(user);
+    if (visible && visible.size === 0) return c.json({ days: ACTIVITY_PULSE_DAYS, items: [] }, 200);
+    const projFilter = visible ? projectInSql([...visible], false, "p.id") : sql``;
+    const evFilter = visible ? projectInSql([...visible], false, "e.project_id") : sql``;
+
+    // UTC-day-aligned buckets: [today-13d .. today], oldest → newest.
+    const now = new Date();
+    const todayUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+    const sinceIso = new Date(todayUtc - (ACTIVITY_PULSE_DAYS - 1) * 86_400_000).toISOString();
+
+    // Three fixed queries regardless of project count (no per-project N+1):
+    // projects + all-time last activity, windowed per-day counts, windowed
+    // distinct actors.
+    const projectRows = await db.execute<{
+      id: string; key: string; name: string; color: string | null;
+      repo_url: string | null; last: string | null;
+    }>(sql`
+      SELECT p.id, p.key, p.name, p.color, p.repo_url, MAX(e.created_at)::text AS last
+      FROM projects p
+      LEFT JOIN events e ON e.project_id = p.id
+      WHERE p.deleted_at IS NULL
+        ${projFilter}
+      GROUP BY p.id, p.key, p.name, p.color, p.repo_url
+      ORDER BY p.key
+    `);
+
+    const dayRows = await db.execute<{ project_id: string; day: string; count: number }>(sql`
+      SELECT e.project_id, date_trunc('day', e.created_at)::text AS day, COUNT(*)::int AS count
+      FROM events e
+      WHERE e.created_at >= ${sinceIso}
+        ${evFilter}
+      GROUP BY 1, 2
+    `);
+
+    const actorRows = await db.execute<{
+      project_id: string; id: string; name: string; icon: string | null; type: string; last: string;
+    }>(sql`
+      SELECT e.project_id, u.id, u.name, u.icon, u.type, MAX(e.created_at)::text AS last
+      FROM events e
+      JOIN users u ON u.id = e.actor_id
+      WHERE e.created_at >= ${sinceIso}
+        ${evFilter}
+      GROUP BY e.project_id, u.id, u.name, u.icon, u.type
+      ORDER BY last DESC
+    `);
+
+    const pRows = ((projectRows as any).rows ?? projectRows) as Array<{
+      id: string; key: string; name: string; color: string | null;
+      repo_url: string | null; last: string | null;
+    }>;
+    const dRows = ((dayRows as any).rows ?? dayRows) as Array<{ project_id: string; day: string; count: number }>;
+    const aRows = ((actorRows as any).rows ?? actorRows) as Array<{
+      project_id: string; id: string; name: string; icon: string | null; type: string; last: string;
+    }>;
+
+    const seriesByProject = new Map<string, number[]>();
+    for (const r of dRows) {
+      let series = seriesByProject.get(r.project_id);
+      if (!series) {
+        series = new Array<number>(ACTIVITY_PULSE_DAYS).fill(0);
+        seriesByProject.set(r.project_id, series);
+      }
+      // date_trunc comes back as "YYYY-MM-DD 00:00:00+00" text — new Date()
+      // parses it (same convention as the throughput handler above).
+      const idx = Math.floor((new Date(r.day).getTime() - (todayUtc - (ACTIVITY_PULSE_DAYS - 1) * 86_400_000)) / 86_400_000);
+      if (idx >= 0 && idx < ACTIVITY_PULSE_DAYS) series[idx] = r.count;
+    }
+
+    const actorsByProject = new Map<string, Array<{ id: string; name: string; icon: string | null; type: string }>>();
+    for (const r of aRows) {
+      const arr = actorsByProject.get(r.project_id) ?? [];
+      if (arr.length < 3) {
+        arr.push({ id: r.id, name: r.name, icon: r.icon, type: r.type });
+        actorsByProject.set(r.project_id, arr);
+      }
+    }
+
+    return c.json(
+      {
+        days: ACTIVITY_PULSE_DAYS,
+        items: pRows.map((p) => ({
+          project: { id: p.id, key: p.key, name: p.name, color: p.color, repo_url: p.repo_url },
+          last_activity_at: p.last ? new Date(p.last).toISOString() : null,
+          activity_series: seriesByProject.get(p.id) ?? new Array<number>(ACTIVITY_PULSE_DAYS).fill(0),
+          recent_actors: actorsByProject.get(p.id) ?? [],
+        })),
+      },
       200
     );
   }) as any);

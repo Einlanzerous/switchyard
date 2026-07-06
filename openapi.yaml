@@ -23625,6 +23625,272 @@ paths:
                       - message
                 required:
                   - error
+  /v1/stats/activity-pulse:
+    get:
+      tags:
+        - Stats
+      summary: Per-project activity pulse (last activity, 14d daily series, recent
+        actors)
+      description: "One row per visible non-deleted project: all-time most-recent
+        event timestamp, a fixed 14-day UTC-day-aligned daily event-count series
+        (oldest → newest, last bucket = today, partial), and up to 3 distinct
+        recent actors (most-recent first) from the same window. Constant query
+        count regardless of project count."
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  days:
+                    type: number
+                    enum:
+                      - 14
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        project:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            key:
+                              type: string
+                              pattern: ^[A-Z][A-Z0-9]{1,9}$
+                            name:
+                              type: string
+                              minLength: 1
+                              maxLength: 200
+                            color:
+                              type: string
+                              nullable: true
+                              pattern: ^#[0-9a-fA-F]{6}$
+                            repo_url:
+                              type: string
+                              nullable: true
+                              maxLength: 2048
+                              format: uri
+                          required:
+                            - id
+                            - key
+                            - name
+                            - color
+                            - repo_url
+                        last_activity_at:
+                          type: string
+                          nullable: true
+                          format: date-time
+                        activity_series:
+                          type: array
+                          items:
+                            type: integer
+                            minimum: 0
+                        recent_actors:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              id:
+                                type: string
+                                format: uuid
+                              name:
+                                type: string
+                                minLength: 1
+                                maxLength: 100
+                              icon:
+                                type: string
+                                nullable: true
+                                maxLength: 500
+                              type:
+                                type: string
+                                enum: *a2
+                            required:
+                              - id
+                              - name
+                              - icon
+                              - type
+                          maxItems: 3
+                      required:
+                        - project
+                        - last_activity_at
+                        - activity_series
+                        - recent_actors
+                required:
+                  - days
+                  - items
+        "400":
+          description: bad request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "401":
+          description: unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "403":
+          description: forbidden
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "404":
+          description: not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "409":
+          description: conflict
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "422":
+          description: unprocessable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "500":
+          description: internal
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
   /v1/stats/closed-by-actor:
     get:
       tags:

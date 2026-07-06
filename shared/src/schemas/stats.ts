@@ -131,6 +131,33 @@ export const ClosedByActorStats = z.object({
 });
 export type ClosedByActorStats = z.infer<typeof ClosedByActorStats>;
 
+// ─── per-project activity pulse (SWY-136) ────────────────────────────────────
+//
+// Powers the dashboard "Active projects" card: rank projects by recency,
+// draw the 14-day pulse sparkline, show who's driving each project, and
+// classify dormant projects. One row per visible non-deleted project.
+
+export const ACTIVITY_PULSE_DAYS = 14;
+
+export const ActivityPulseRow = z.object({
+  project: ProjectRef,
+  // Most recent event of any kind, all-time (null = never touched).
+  last_activity_at: Iso8601.nullable(),
+  // Daily event counts, UTC-day aligned, oldest → newest; the last bucket is
+  // today (partial). Always exactly ACTIVITY_PULSE_DAYS entries.
+  activity_series: z.array(z.number().int().nonnegative()).length(ACTIVITY_PULSE_DAYS),
+  // Distinct actors in the window, most-recent first, capped at 3. UserRef
+  // carries `type` so clients can render the square-agent/circle-human split.
+  recent_actors: z.array(UserRef).max(3),
+});
+export type ActivityPulseRow = z.infer<typeof ActivityPulseRow>;
+
+export const ActivityPulseStats = z.object({
+  days: z.literal(ACTIVITY_PULSE_DAYS),
+  items: z.array(ActivityPulseRow),
+});
+export type ActivityPulseStats = z.infer<typeof ActivityPulseStats>;
+
 // ─── cycle time (in_progress duration distribution) ─────────────────────────
 //
 // One sample per ticket closed in the window. `duration_ms` is the total time
