@@ -1,5 +1,38 @@
 # Changelog
 
+## [4.0.0](https://github.com/Einlanzerous/switchyard/compare/v3.6.2...v4.0.0) (2026-07-07)
+
+
+### Features
+
+* SWY-131, SWY-132, SWY-133, SWY-134, SWY-135 — v4 Elevated foundation (theme, avatars, status family, components, shell) ([#129](https://github.com/Einlanzerous/switchyard/issues/129)) ([57cd518](https://github.com/Einlanzerous/switchyard/commit/57cd5183698df10745c371706386ec6940dcd027))
+* SWY-136 — per-project activity pulse endpoint (last activity, 14d series, recent actors) ([#133](https://github.com/Einlanzerous/switchyard/issues/133)) ([8e50d4b](https://github.com/Einlanzerous/switchyard/commit/8e50d4b7dbf572b801548adfa5c6160e3c2413c8))
+* SWY-137 — epics-in-flight endpoint (progress %, driver, stalled flag) ([#134](https://github.com/Einlanzerous/switchyard/issues/134)) ([cf67597](https://github.com/Einlanzerous/switchyard/commit/cf67597859acb1d179bd4e2f645eace0a6a6a1ee))
+* SWY-138 — agent-vs-human throughput split + closed-by-actor leaderboard ([#132](https://github.com/Einlanzerous/switchyard/issues/132)) ([ff1e698](https://github.com/Einlanzerous/switchyard/commit/ff1e698b0d60b44d5169930581ec57c6f11847ad))
+* SWY-140–143 — v4 dashboard (greeting + KPI strip, active projects, epics in flight, activity + up next) ([#136](https://github.com/Einlanzerous/switchyard/issues/136)) ([6830dc4](https://github.com/Einlanzerous/switchyard/commit/6830dc476df305fad528df71402e6618ab2ad3ca))
+* SWY-144, SWY-145, SWY-146, SWY-148 — v4 board re-skin (cards, columns, sub-nav) ([#130](https://github.com/Einlanzerous/switchyard/issues/130)) ([b2772a8](https://github.com/Einlanzerous/switchyard/commit/b2772a841afe6d6ed0ae752acd87e53847736bb2))
+* SWY-149–152 — v4 insights (time range, agent/human throughput, leaderboard, KPI cards) ([#137](https://github.com/Einlanzerous/switchyard/issues/137)) ([31369ac](https://github.com/Einlanzerous/switchyard/commit/31369aca4698cc2f1aa2bde2a71b19214ea4a95e))
+* SWY-154, SWY-155 — v4 ticket views (drawer 860px, page 920px, counts row) ([#131](https://github.com/Einlanzerous/switchyard/issues/131)) ([2c24149](https://github.com/Einlanzerous/switchyard/commit/2c241493cb503e173736f1bf2907e195e412ad8c))
+* SWY-156 — v4 ticket detail rich description rendering (GFM alerts, styled tables + hexchips, task-list checkboxes) ([#138](https://github.com/Einlanzerous/switchyard/issues/138)) ([0354dd0](https://github.com/Einlanzerous/switchyard/commit/0354dd0adc9789ffcc57bb34d94c56e5e1d285ef))
+* SWY-158 — v4 light-mode pass (theme-aware Elevated tokens) ([#140](https://github.com/Einlanzerous/switchyard/issues/140)) ([6eaf71f](https://github.com/Einlanzerous/switchyard/commit/6eaf71f2010c6c011011f9233755f0b3ea6e80a5))
+* SWY-159 — interactive checklist toggling (concurrent-edit-safe description PATCH) ([#139](https://github.com/Einlanzerous/switchyard/issues/139)) ([7997a85](https://github.com/Einlanzerous/switchyard/commit/7997a854206b782e74f96f5f95bbdf6d5db4c093))
+
+
+### Maintenance
+
+* force 4.0.0 release cut for the v4 Elevated redesign ([3847291](https://github.com/Einlanzerous/switchyard/commit/3847291737cc4c6aef074eff1b28cd1b9e30d19a))
+* update knowledge graph [skip ci] ([1d9ea91](https://github.com/Einlanzerous/switchyard/commit/1d9ea91b72b7cae997b07a539d911b14a69c80dc))
+* update knowledge graph [skip ci] ([ede2a74](https://github.com/Einlanzerous/switchyard/commit/ede2a742f059bf2efe260da86ed172b49fa1b461))
+* update knowledge graph [skip ci] ([e3d8a3c](https://github.com/Einlanzerous/switchyard/commit/e3d8a3c190792b5a463b5dc106d46119eb50c92c))
+* update knowledge graph [skip ci] ([b24db45](https://github.com/Einlanzerous/switchyard/commit/b24db45c05ad4281d481ba6b6ece61f89543486c))
+* update knowledge graph [skip ci] ([7f91bb7](https://github.com/Einlanzerous/switchyard/commit/7f91bb7614fcad565b1097c45443411420ac452f))
+* update knowledge graph [skip ci] ([c22d942](https://github.com/Einlanzerous/switchyard/commit/c22d942eb4295d2f15f226af6bd7f0a1af9b5f47))
+* update knowledge graph [skip ci] ([a717ba5](https://github.com/Einlanzerous/switchyard/commit/a717ba5e4fa63455b62a855cb8d32019e4e74d9d))
+* update knowledge graph [skip ci] ([1e01176](https://github.com/Einlanzerous/switchyard/commit/1e011769e7b5b71a58b379e7a9c52196237a2ec0))
+* update knowledge graph [skip ci] ([124a96d](https://github.com/Einlanzerous/switchyard/commit/124a96db3df0afb6a81c7260ef144df7e666ba55))
+* update knowledge graph [skip ci] ([aaf1795](https://github.com/Einlanzerous/switchyard/commit/aaf179577fc1126f22c13e06473a6a30f936ccb3))
+* update knowledge graph [skip ci] ([a3ccd44](https://github.com/Einlanzerous/switchyard/commit/a3ccd4409ea4cbb849c2df500d7e49f992fa6681))
+
 ## [3.6.2](https://github.com/Einlanzerous/switchyard/compare/v3.6.1...v3.6.2) (2026-07-02)
 
 
