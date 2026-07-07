@@ -16,6 +16,7 @@ import { useInsightsRange } from "@/composables/useInsightsRange";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
 import { formatDeltaPercent, formatDurationMs } from "@/lib/formatDuration";
+import { STATUS_HEX } from "@/lib/statusColors";
 import KpiCard from "@/components/dashboard/KpiCard.vue";
 import DashboardWidget from "@/components/dashboard/DashboardWidget.vue";
 import InsightsTabs from "@/components/dashboard/InsightsTabs.vue";
@@ -269,7 +270,7 @@ function back() { router.push("/boards"); }
           :value="closedThisWeek"
           :loading="throughput24w.isLoading.value"
           :spark="closedSpark"
-          spark-color="#63b58c"
+          :spark-color="STATUS_HEX.closed"
           :delta-percent="formatDeltaPercent(closedThisWeek, closedPriorWeek)"
           delta-good-when="up"
         />

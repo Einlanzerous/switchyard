@@ -201,7 +201,7 @@ const closedAgo = computed(() =>
     :class="cn(
       'relative cursor-grab active:cursor-grabbing select-none',
       'rounded-[9px] border bg-card px-3 py-[11px] text-sm',
-      'hover:border-[#34353c] hover:bg-accent transition-colors',
+      'hover:border-line-strong hover:bg-accent transition-colors',
       live && 'border-signal-line ring-1 ring-signal-weak',
       dragging && 'opacity-40',
       focused && 'ring-2 ring-ring ring-offset-1',

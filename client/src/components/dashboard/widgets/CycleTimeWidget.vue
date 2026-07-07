@@ -6,6 +6,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useCycleTime } from "@/composables/useDashboardData";
 import { formatDurationMs } from "@/lib/formatDuration";
 import { useThemeStore } from "@/stores/theme";
+import { cssVarRgb } from "@/lib/statusColors";
 import Chart from "@/components/charts/Chart.vue";
 
 const props = defineProps<{
@@ -31,13 +32,17 @@ const theme = useThemeStore();
 const types = ["task", "bug", "spike", "epic"] as const;
 
 // Per-type bar hues from the v4 family (design: task progress-blue, bug
-// closed-green, spike planning-purple, epic signal-coral).
-const TYPE_HEX: Record<(typeof types)[number], string> = {
-  task: "#64a0d6",
-  bug: "#63b58c",
-  spike: "#c08cd8",
-  epic: "#e2623d",
-};
+// closed-green, spike planning-purple, epic signal-coral). The status hues
+// are theme-aware (SWY-158) so they're read from the live vars inside the
+// option computed — cssVarRgb is reactive; coral is shared and stays fixed.
+function typeHex(t: (typeof types)[number]): string {
+  return {
+    task: cssVarRgb("--st-progress", "#64a0d6"),
+    bug: cssVarRgb("--st-closed", "#63b58c"),
+    spike: cssVarRgb("--st-planning", "#c08cd8"),
+    epic: "#e2623d",
+  }[t];
+}
 
 // Bumped on every html.class flip (Tailwind dark/light) so the bar-label
 // color recomputes from the live CSS variable. Same MutationObserver
@@ -90,7 +95,7 @@ const option = computed(() => {
       type: "bar",
       data: types.map((t) => ({
         value: data?.by_type?.[t]?.median_ms ?? 0,
-        itemStyle: { color: TYPE_HEX[t] },
+        itemStyle: { color: typeHex(t) },
       })),
       barMaxWidth: 16,
       itemStyle: { borderRadius: [0, 3, 3, 0] },

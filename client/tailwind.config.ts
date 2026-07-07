@@ -49,50 +49,57 @@ export default {
           foreground: "hsl(var(--card-foreground))",
         },
 
-        // v4 "Elevated" palette — dark-first constants (see style.css :root).
+        // v4 "Elevated" palette — theme-aware CSS vars since SWY-158 (light
+        // values in style.css :root, dark in .dark). Status hues / agent /
+        // pos / neg vars hold raw `R G B` triplets so alpha modifiers
+        // (`border-st-planning/30`) compose; the rest are full colors, so
+        // no alpha modifiers on those (none are used).
         surface: {
-          1: "#101114",
-          2: "#16171b",
-          3: "#1c1d22",
-          4: "#232429",
+          1: "var(--surface-1)",
+          2: "var(--surface-2)",
+          3: "var(--surface-3)",
+          4: "var(--surface-4)",
         },
         line: {
-          DEFAULT: "#26272d",
-          soft: "#1b1c21",
+          DEFAULT: "var(--line)",
+          soft: "var(--line-soft)",
+          strong: "var(--line-strong)",
         },
         ink: {
-          DEFAULT: "#eceded",
-          2: "#a3a4aa",
-          3: "#6c6d73",
-          4: "#4d4e54",
+          DEFAULT: "var(--text)",
+          2: "var(--text-2)",
+          3: "var(--text-3)",
+          4: "var(--text-4)",
         },
         // Coral brand accent ("signal light"); shadcn `accent` stays the
         // hover-surface slot, so the design doc's --accent lives here.
+        // Shared across both themes (plain constants) — except signal-2,
+        // the "readable coral" text tint, which flips per theme.
         signal: {
           DEFAULT: "#e2623d",
-          2: "#f0855f",
+          2: "rgb(var(--signal-2) / <alpha-value>)",
           weak: "rgba(226,98,61,0.13)",
           line: "rgba(226,98,61,0.42)",
           glow: "rgba(226,98,61,0.28)",
         },
         st: {
-          backlog: "#808289",
-          planning: "#c08cd8",
-          progress: "#64a0d6",
-          blocked: "#d76f6a",
-          closed: "#63b58c",
-          "backlog-bg": "rgba(128,130,137,0.14)",
-          "planning-bg": "rgba(192,140,216,0.15)",
-          "progress-bg": "rgba(100,160,214,0.15)",
-          "blocked-bg": "rgba(215,111,106,0.15)",
-          "closed-bg": "rgba(99,181,140,0.15)",
+          backlog: "rgb(var(--st-backlog) / <alpha-value>)",
+          planning: "rgb(var(--st-planning) / <alpha-value>)",
+          progress: "rgb(var(--st-progress) / <alpha-value>)",
+          blocked: "rgb(var(--st-blocked) / <alpha-value>)",
+          closed: "rgb(var(--st-closed) / <alpha-value>)",
+          "backlog-bg": "var(--st-backlog-bg)",
+          "planning-bg": "var(--st-planning-bg)",
+          "progress-bg": "var(--st-progress-bg)",
+          "blocked-bg": "var(--st-blocked-bg)",
+          "closed-bg": "var(--st-closed-bg)",
         },
         agent: {
-          DEFAULT: "#8fa6bd",
-          bg: "rgba(143,166,189,0.14)",
+          DEFAULT: "rgb(var(--agent) / <alpha-value>)",
+          bg: "var(--agent-bg)",
         },
-        pos: "#63b58c",
-        neg: "#d76f6a",
+        pos: "rgb(var(--pos) / <alpha-value>)",
+        neg: "rgb(var(--neg) / <alpha-value>)",
       },
       fontFamily: {
         sans: ["Hanken Grotesk Variable", ...defaultTheme.fontFamily.sans],
@@ -105,7 +112,7 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       boxShadow: {
-        card: "0 1px 0 rgba(255,255,255,0.02) inset, 0 8px 24px -12px rgba(0,0,0,0.6)",
+        card: "var(--shadow-card)",
       },
     },
   },
