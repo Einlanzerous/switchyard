@@ -18,6 +18,8 @@
     "@atlaskit/pragmatic-drag-and-drop-hitbox": "^1.1.0",
     "@fontsource-variable/hanken-grotesk": "^5.2.8",
     "@fontsource-variable/jetbrains-mono": "^5.2.8",
+    "@mdit/plugin-alert": "^1.0.1",
+    "@mdit/plugin-tasklist": "^1.0.1",
     "@switchyard/shared": "workspace:*",
     "@tanstack/vue-query": "^5.62.0",
     "@tanstack/vue-virtual": "^3.10.9",
