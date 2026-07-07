@@ -1,5 +1,17 @@
 # Changelog
 
+## [4.1.0](https://github.com/Einlanzerous/switchyard/compare/v4.0.0...v4.1.0) (2026-07-07)
+
+
+### Features
+
+* SWY-160 — dashboard bounded widget heights + internal scrolling ([#141](https://github.com/Einlanzerous/switchyard/issues/141)) ([292e468](https://github.com/Einlanzerous/switchyard/commit/292e46858607f3658275b1ee768cb4eff646e7ae))
+
+
+### Maintenance
+
+* update knowledge graph [skip ci] ([e2b9a92](https://github.com/Einlanzerous/switchyard/commit/e2b9a9214cc29891894cfde2810d91909c36334d))
+
 ## [4.0.0](https://github.com/Einlanzerous/switchyard/compare/v3.6.2...v4.0.0) (2026-07-07)
 
 
