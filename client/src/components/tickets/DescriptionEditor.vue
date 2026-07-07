@@ -5,6 +5,7 @@ import { Pencil, Loader2 } from "lucide-vue-next";
 import { toast } from "vue-sonner";
 import { Button } from "@/components/ui/button";
 import Markdown from "@/components/markdown/Markdown.vue";
+import { toggleTaskInMarkdown } from "@/components/markdown/taskToggle";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
 import { useMentionAutocomplete } from "@/composables/useMentionAutocomplete";
@@ -53,7 +54,7 @@ function cancel() {
 }
 
 const saveMutation = useMutation({
-  mutationFn: async (description: string) => {
+  mutationFn: async ({ description }: { description: string; message: string }) => {
     const { data, error } = await api.PATCH("/v1/tickets/{idOrKey}", {
       params: { path: { idOrKey: props.ticket.key } },
       body: { description },
@@ -61,11 +62,11 @@ const saveMutation = useMutation({
     if (error) throw error;
     return data;
   },
-  onSuccess: () => {
+  onSuccess: (_data, { message }) => {
     qc.invalidateQueries({ queryKey: queryKeys.ticket(props.ticket.key) });
     qc.invalidateQueries({ queryKey: queryKeys.ticket(props.ticket.id) });
     qc.invalidateQueries({ queryKey: queryKeys.ticketEvents(props.ticket.key) });
-    toast.success("Description updated");
+    toast.success(message);
     editing.value = false;
   },
 });
@@ -74,7 +75,39 @@ const saving = computed(() => saveMutation.isPending.value);
 
 function save() {
   if (saving.value) return;
-  saveMutation.mutate(draft.value);
+  saveMutation.mutate({ description: draft.value, message: "Description updated" });
+}
+
+// Interactive checklist toggling (SWY-159). Concurrent-edit safe: the
+// toggle is computed against a FRESHLY fetched description (not the
+// possibly-stale rendered copy), and toggleTaskInMarkdown additionally
+// verifies the clicked item's text still matches before rewriting — on any
+// mismatch we surface a conflict instead of silently clobbering an agent's
+// parallel edit.
+const toggling = ref(false);
+
+async function onToggleTask({ index, checked, text }: { index: number; checked: boolean; text: string }) {
+  if (toggling.value || saving.value) return;
+  toggling.value = true;
+  try {
+    const { data, error } = await api.GET("/v1/tickets/{idOrKey}", {
+      params: { path: { idOrKey: props.ticket.key } },
+    });
+    if (error) throw error;
+    const next = toggleTaskInMarkdown(data.description, index, checked, text);
+    if (next === null) {
+      toast.error("Description changed — checklist reloaded, try again.");
+      qc.invalidateQueries({ queryKey: queryKeys.ticket(props.ticket.key) });
+      qc.invalidateQueries({ queryKey: queryKeys.ticket(props.ticket.id) });
+      return;
+    }
+    if (next === data.description) return; // already in the desired state
+    await saveMutation.mutateAsync({ description: next, message: "Checklist updated" });
+  } catch {
+    toast.error("Couldn't update the checklist");
+  } finally {
+    toggling.value = false;
+  }
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -129,7 +162,12 @@ function onKeydown(e: KeyboardEvent) {
       </div>
     </div>
 
-    <Markdown v-else-if="ticket.description" :body="ticket.description" />
+    <Markdown
+      v-else-if="ticket.description"
+      :body="ticket.description"
+      :interactive-tasks="canWrite"
+      @toggle-task="onToggleTask"
+    />
     <p v-else class="text-sm text-muted-foreground italic">No description.</p>
   </section>
 </template>

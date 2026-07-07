@@ -1,53 +1,31 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import MarkdownIt from "markdown-it";
-import { alert } from "@mdit/plugin-alert";
-import { tasklist } from "@mdit/plugin-tasklist";
 import DOMPurify from "dompurify";
-
-// One MarkdownIt instance is reused across all renders. Configured for the
-// agentic ticket workflow: GFM tables on, autolinks on, html OFF (we never
-// trust raw HTML in ticket bodies), single-newline → <br> for paragraph-light
-// agent output, and external links default to opening in a new tab.
-const md = new MarkdownIt({
-  html: false,
-  linkify: true,
-  breaks: true,
-  typographer: false,
-});
-
-// GFM alerts (`> [!WARNING]` …) — the dialect agents already emit; degrades
-// to a plain blockquote in renderers that don't know it. Task-list checkboxes
-// render disabled (read-only): toggling that PATCHes the description is a
-// separate ticket because of concurrent-edit safety.
-md.use(alert);
-md.use(tasklist);
-
-const defaultLinkOpen = md.renderer.rules.link_open ?? function (tokens, idx, options, _env, self) {
-  return self.renderToken(tokens, idx, options);
-};
-md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
-  const token = tokens[idx];
-  if (token) {
-    const href = token.attrGet("href");
-    if (href && /^https?:\/\//.test(href)) {
-      token.attrSet("target", "_blank");
-      token.attrSet("rel", "noopener noreferrer");
-    }
-  }
-  return defaultLinkOpen(tokens, idx, options, env, self);
-};
+import { md } from "./engine";
 
 const HEX_CODE = /#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b/g;
 
-// Decorate hex color codes in table cells with an inline swatch chip.
-// Runs AFTER DOMPurify on already-sanitized markup and only inserts
-// elements built via DOM APIs from regex-constrained matches, so it
-// cannot introduce anything the sanitizer would have stripped.
-function decorateHexChips(html: string): string {
-  if (!html.includes("<td")) return html;
+// Post-render DOM pass. Runs AFTER DOMPurify on already-sanitized markup
+// and only inserts elements built via DOM APIs from regex-constrained
+// matches, so it cannot introduce anything the sanitizer would have
+// stripped. Two jobs:
+//  - decorate hex color codes in table cells with an inline swatch chip
+//  - when the caller opts into interactive task lists, re-enable the
+//    checkboxes (the tasklist plugin emits them disabled) and drop the
+//    label→input `for` association so only the box itself toggles — text
+//    clicks would otherwise write to the description on a stray selection.
+function postProcess(html: string, interactive: boolean): string {
+  if (!interactive && !html.includes("<td")) return html;
   const tpl = document.createElement("template");
   tpl.innerHTML = html;
+  if (interactive) {
+    for (const box of tpl.content.querySelectorAll("input.task-list-item-checkbox")) {
+      box.removeAttribute("disabled");
+    }
+    for (const label of tpl.content.querySelectorAll("label.task-list-item-label")) {
+      label.removeAttribute("for");
+    }
+  }
   for (const td of tpl.content.querySelectorAll("td")) {
     const walker = document.createTreeWalker(td, NodeFilter.SHOW_TEXT);
     const textNodes: Text[] = [];
@@ -79,9 +57,38 @@ function decorateHexChips(html: string): string {
 
 const props = defineProps<{
   body: string;
+  /** Enable clickable task-list checkboxes. Caller persists via @toggle-task. */
+  interactiveTasks?: boolean;
 }>();
 
-const html = computed(() => decorateHexChips(DOMPurify.sanitize(md.render(props.body ?? ""))));
+const emit = defineEmits<{
+  toggleTask: [payload: { index: number; checked: boolean; text: string }];
+}>();
+
+const html = computed(() =>
+  postProcess(DOMPurify.sanitize(md.render(props.body ?? "")), props.interactiveTasks ?? false),
+);
+
+// Click delegation over v-html content. The checkbox's ordinal among all
+// rendered checkboxes identifies the task; taskToggle.ts re-finds it in the
+// source. preventDefault keeps the DOM box on its rendered state — the
+// visual flip arrives with the re-render after the PATCH round-trips.
+function onClick(e: MouseEvent) {
+  if (!props.interactiveTasks) return;
+  const target = e.target;
+  if (!(target instanceof HTMLInputElement) || !target.classList.contains("task-list-item-checkbox")) return;
+  e.preventDefault();
+  const root = e.currentTarget as HTMLElement;
+  const boxes = Array.from(root.querySelectorAll("input.task-list-item-checkbox"));
+  // Checkbox activation flips `checked` before the click event fires (and
+  // reverts it on preventDefault), so `target.checked` here IS the state
+  // the user asked for.
+  emit("toggleTask", {
+    index: boxes.indexOf(target),
+    checked: target.checked,
+    text: target.nextElementSibling?.textContent ?? target.closest("li")?.textContent ?? "",
+  });
+}
 </script>
 
 <template>
@@ -95,6 +102,7 @@ const html = computed(() => decorateHexChips(DOMPurify.sanitize(md.render(props.
            prose-pre:bg-muted prose-pre:text-foreground/90
            prose-a:text-primary"
     v-html="html"
+    @click="onClick"
   />
 </template>
 
@@ -253,6 +261,12 @@ const html = computed(() => decorateHexChips(DOMPurify.sanitize(md.render(props.
   background: var(--surface-2);
   flex: none;
   margin: 2px 0 0;
+}
+.md-body input.task-list-item-checkbox:not([disabled]) {
+  cursor: pointer;
+}
+.md-body input.task-list-item-checkbox:not([disabled]):hover {
+  border-color: var(--text-3);
 }
 .md-body input.task-list-item-checkbox:checked {
   border-color: var(--st-closed);

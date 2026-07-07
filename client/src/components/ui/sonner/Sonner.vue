@@ -3,6 +3,9 @@ import type { ToasterProps } from "vue-sonner"
 import { reactiveOmit } from "@vueuse/core"
 import { CircleCheckIcon, InfoIcon, Loader2Icon, OctagonXIcon, TriangleAlertIcon, XIcon } from "lucide-vue-next"
 import { Toaster as Sonner } from "vue-sonner"
+// vue-sonner v2 stopped auto-injecting its styles; without this import the
+// toaster renders position:static below the fold and every toast is invisible.
+import "vue-sonner/style.css"
 
 const props = defineProps<ToasterProps>()
 const delegatedProps = reactiveOmit(props, "toastOptions")
