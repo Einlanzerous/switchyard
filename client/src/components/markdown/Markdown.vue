@@ -121,7 +121,7 @@ function onClick(e: MouseEvent) {
   border: 1px solid var(--line);
   border-radius: 4px;
   padding: 1px 5px;
-  color: var(--signal-2);
+  color: rgb(var(--signal-2));
 }
 .md-body code::before,
 .md-body code::after {
@@ -144,7 +144,7 @@ function onClick(e: MouseEvent) {
   top: 14px;
   width: 18px;
   height: 18px;
-  background-color: var(--signal-2);
+  background-color: rgb(var(--signal-2));
   mask: var(--alert-icon) no-repeat center / contain;
   -webkit-mask: var(--alert-icon) no-repeat center / contain;
 }
@@ -158,19 +158,19 @@ function onClick(e: MouseEvent) {
   --alert-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'/%3E%3Cpath d='M12 7v2'/%3E%3Cpath d='M12 13h.01'/%3E%3C/svg%3E");
 }
 .md-body .markdown-alert-important::before {
-  background-color: var(--st-planning);
+  background-color: rgb(var(--st-planning));
 }
 .md-body .markdown-alert-note {
   --alert-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 16v-4'/%3E%3Cpath d='M12 8h.01'/%3E%3C/svg%3E");
 }
 .md-body .markdown-alert-note::before {
-  background-color: var(--st-progress);
+  background-color: rgb(var(--st-progress));
 }
 .md-body .markdown-alert-tip {
   --alert-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5.76.76 1.23 1.52 1.41 2.5'/%3E%3Cpath d='M9 18h6'/%3E%3Cpath d='M10 22h4'/%3E%3C/svg%3E");
 }
 .md-body .markdown-alert-tip::before {
-  background-color: var(--st-closed);
+  background-color: rgb(var(--st-closed));
 }
 .md-body .markdown-alert p {
   margin: 0;
@@ -231,7 +231,16 @@ function onClick(e: MouseEvent) {
   font-style: normal;
 }
 
-/* Task lists — 16px checkboxes; checked = green check (never a red X). */
+/* Task lists — 16px checkboxes; checked = green check (never a red X).
+   The check glyph is a data-URL background (inputs can't carry ::after, and
+   a mask would clip the tint), so its stroke can't read a CSS color var —
+   instead the whole URL swaps per theme to match that theme's --st-closed. */
+.md-body {
+  --check-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232e8f63' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+}
+.dark .md-body {
+  --check-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2363b58c' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+}
 .md-body ul.task-list-container {
   list-style: none;
   padding-left: 2px;
@@ -269,7 +278,7 @@ function onClick(e: MouseEvent) {
   border-color: var(--text-3);
 }
 .md-body input.task-list-item-checkbox:checked {
-  border-color: var(--st-closed);
-  background: var(--st-closed-bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2363b58c' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") no-repeat center / 10px 10px;
+  border-color: rgb(var(--st-closed));
+  background: var(--st-closed-bg) var(--check-icon) no-repeat center / 10px 10px;
 }
 </style>

@@ -40,10 +40,11 @@ const initials = computed(() =>
     : computeInitials(props.user?.name),
 );
 
-const color = computed(() => {
-  if (!props.user) return "#4d4e54";
-  return avatarColorFor(props.user.id ?? props.user.name ?? "");
-});
+// Per-user chip color — humans only; agents and the "no user" placeholder
+// get theme-aware utility classes instead (see fallbackClasses).
+const color = computed(() =>
+  props.user ? avatarColorFor(props.user.id ?? props.user.name ?? "") : null,
+);
 
 // Size tokens map to the same h/w/text combinations the existing direct
 // Avatar usages picked. Defaults to `sm` (h-6 w-6) which is the most
@@ -69,10 +70,17 @@ const shapeClasses = computed(() =>
     : "",
 );
 
+// Agents and the "no user" ghost ride the theme-aware v4 tokens (SWY-158:
+// agent steel / ink-4 flip between light and dark); human chips keep their
+// stable per-user inline color, which reads fine on both themes.
 const fallbackStyle = computed(() =>
-  isAgent.value
-    ? { backgroundColor: "rgba(143,166,189,0.14)", color: "#8fa6bd" }
-    : { backgroundColor: color.value, color: "#fff" },
+  color.value && !isAgent.value
+    ? { backgroundColor: color.value, color: "#fff" }
+    : undefined,
+);
+
+const fallbackClasses = computed(() =>
+  isAgent.value ? "bg-agent-bg text-agent" : !props.user ? "bg-ink-4 text-white" : "",
 );
 
 const ariaTitle = computed(() => props.title ?? props.user?.name ?? undefined);
@@ -111,6 +119,7 @@ const ariaTitle = computed(() => props.title ?? props.user?.name ?? undefined);
       :class="cn(
         'flex h-full w-full items-center justify-center leading-none',
         isAgent ? 'font-mono font-medium tracking-tight' : 'font-medium tracking-wide',
+        fallbackClasses,
       )"
     >
       {{ initials }}

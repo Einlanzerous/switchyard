@@ -28,45 +28,59 @@
 
     /* ---- v4 "Elevated" design tokens ----------------------------------
        Raw values for hand-written styles; Tailwind utilities (surface/line/
-       ink/signal/st/agent) mirror them. Dark is the primary theme — these
-       are dark-palette constants and do not flip in light mode.
+       ink/signal/st/agent) mirror them. Theme-aware since SWY-158: light
+       values here, dark values in `.dark` below. Dark stays the primary
+       theme — its values are the design constants; light is derived.
+       Status hues, agent steel and pos/neg are raw `R G B` channel triplets
+       (not colors) so Tailwind can compose alpha modifiers like
+       `border-st-planning/30` via `rgb(var(--st-planning) / <alpha-value>)`;
+       hand-written styles wrap them as `rgb(var(--st-planning))`.
        The design doc's `--accent` (coral) lives here as `--signal` because
        shadcn already owns `--accent` as its hover-surface slot; coral is
-       also wired into shadcn `--primary`/`--ring`. */
-    --surface-1: #101114;
-    --surface-2: #16171b;
-    --surface-3: #1c1d22;
-    --surface-4: #232429;
-    --line: #26272d;
-    --line-soft: #1b1c21;
+       also wired into shadcn `--primary`/`--ring` and is shared by both
+       themes, so the signal family does not flip. */
+    --surface-1: #f8f8f5;
+    --surface-2: #f2f2ee;
+    --surface-3: #ecece7;
+    --surface-4: #e6e6e1;
+    --line: #e0e0da;
+    --line-soft: #eaeae5;
+    --line-strong: #cfcfc8;
 
-    --text: #eceded;
-    --text-2: #a3a4aa;
-    --text-3: #6c6d73;
-    --text-4: #4d4e54;
+    --text: #1d1e20;
+    --text-2: #4c4d53;
+    --text-3: #63646b;
+    --text-4: #898a90;
 
     --signal: #e2623d;
-    --signal-2: #f0855f;
+    /* signal-2 is "coral tuned for readability against the backdrop" — a
+       brighter tint in dark, a darker shade in light (AA at inline-code
+       size on white and on surface-4). Channel triplet: `text-signal-2/80`
+       is used. The rest of the signal family (weak/line/glow tints and the
+       brand coral itself) is shared with dark. */
+    --signal-2: 176 68 36;
     --signal-weak: rgba(226, 98, 61, 0.13);
     --signal-line: rgba(226, 98, 61, 0.42);
     --signal-glow: rgba(226, 98, 61, 0.28);
 
-    --st-backlog: #808289;
-    --st-planning: #c08cd8;
-    --st-progress: #64a0d6;
-    --st-blocked: #d76f6a;
-    --st-closed: #63b58c;
-    --st-backlog-bg: rgba(128, 130, 137, 0.14);
-    --st-planning-bg: rgba(192, 140, 216, 0.15);
-    --st-progress-bg: rgba(100, 160, 214, 0.15);
-    --st-blocked-bg: rgba(215, 111, 106, 0.15);
-    --st-closed-bg: rgba(99, 181, 140, 0.15);
+    /* Status hues + tints tuned for WCAG AA (≥4.5) as text on their own
+       -bg tint over white (scripted check, see SWY-158). */
+    --st-backlog: 105 107 115;
+    --st-planning: 143 79 176;
+    --st-progress: 56 110 169;
+    --st-blocked: 177 73 67;
+    --st-closed: 39 120 83;
+    --st-backlog-bg: rgba(105, 107, 115, 0.12);
+    --st-planning-bg: rgba(143, 79, 176, 0.12);
+    --st-progress-bg: rgba(56, 110, 169, 0.12);
+    --st-blocked-bg: rgba(177, 73, 67, 0.12);
+    --st-closed-bg: rgba(39, 120, 83, 0.13);
 
-    --agent: #8fa6bd;
-    --agent-bg: rgba(143, 166, 189, 0.14);
+    --agent: 80 108 139;
+    --agent-bg: rgba(80, 108, 139, 0.13);
 
-    --pos: #63b58c;
-    --neg: #d76f6a;
+    --pos: 39 120 83;
+    --neg: 177 73 67;
 
     --radius-sm: 7px;
     --radius-lg: 14px;
@@ -74,7 +88,7 @@
     --sans: "Hanken Grotesk Variable", ui-sans-serif, system-ui, sans-serif;
     --mono: "JetBrains Mono Variable", ui-monospace, "Cascadia Mono", Menlo, monospace;
 
-    --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.02) inset, 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+    --shadow-card: 0 1px 2px rgba(24, 24, 20, 0.04), 0 8px 24px -16px rgba(24, 24, 20, 0.16);
   }
   .dark {
     /* shadcn semantic slots mapped onto the Elevated ink (see hex in the
@@ -101,6 +115,43 @@
     --border: 231 8% 16.3%;
     --input: 230 8% 14.9%;
     --ring: 13 74% 56.3%;
+
+    /* v4 dark values — the original "Elevated" design constants (pre-SWY-158
+       these lived in :root). Values must stay byte-identical so dark mode
+       renders exactly as designed. */
+    --surface-1: #101114;
+    --surface-2: #16171b;
+    --surface-3: #1c1d22;
+    --surface-4: #232429;
+    --line: #26272d;
+    --line-soft: #1b1c21;
+    --line-strong: #34353c;
+
+    --text: #eceded;
+    --text-2: #a3a4aa;
+    --text-3: #6c6d73;
+    --text-4: #4d4e54;
+
+    --signal-2: 240 133 95;
+
+    --st-backlog: 128 130 137;
+    --st-planning: 192 140 216;
+    --st-progress: 100 160 214;
+    --st-blocked: 215 111 106;
+    --st-closed: 99 181 140;
+    --st-backlog-bg: rgba(128, 130, 137, 0.14);
+    --st-planning-bg: rgba(192, 140, 216, 0.15);
+    --st-progress-bg: rgba(100, 160, 214, 0.15);
+    --st-blocked-bg: rgba(215, 111, 106, 0.15);
+    --st-closed-bg: rgba(99, 181, 140, 0.15);
+
+    --agent: 143 166 189;
+    --agent-bg: rgba(143, 166, 189, 0.14);
+
+    --pos: 99 181 140;
+    --neg: 215 111 106;
+
+    --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.02) inset, 0 8px 24px -12px rgba(0, 0, 0, 0.6);
   }
 }
 

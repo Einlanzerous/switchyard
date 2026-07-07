@@ -47,6 +47,15 @@ function readCss(name: string, fallback = "#000"): string {
   return v ? `hsl(${v})` : fallback;
 }
 
+// Read a v4 `R G B` channel-triplet variable (st-*/agent, see style.css) and
+// return comma-form `rgb(r,g,b)` — zrender's color parser doesn't understand
+// the space-separated syntax.
+function readCssRgb(name: string, fallback = "#000"): string {
+  if (typeof window === "undefined") return fallback;
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return v ? `rgb(${v.split(/\s+/).join(",")})` : fallback;
+}
+
 // Bumped whenever html.class changes (Tailwind dark/light flip). Kept as a
 // separate ref so the computed theme depends on it; the MutationObserver
 // below increments it.
@@ -54,16 +63,20 @@ const themeRev = ref(0);
 
 // v4 "Elevated" family — status hues + brand coral + agent steel, so multi-
 // series charts stay inside the design palette (no stock ECharts blue).
-const PALETTE = [
-  "#64a0d6", // progress blue
-  "#63b58c", // closed green
-  "#c08cd8", // planning purple
-  "#e2623d", // signal coral
-  "#8fa6bd", // agent steel
-  "#d76f6a", // blocked red
-  "#808289", // backlog gray
-  "#f0855f", // coral (light)
-];
+// Status/agent entries read the theme-aware vars (SWY-158) so series keep
+// contrast on white; the coral pair is theme-shared and stays constant.
+function palette(): string[] {
+  return [
+    readCssRgb("--st-progress", "#64a0d6"), // progress blue
+    readCssRgb("--st-closed", "#63b58c"), // closed green
+    readCssRgb("--st-planning", "#c08cd8"), // planning purple
+    "#e2623d", // signal coral
+    readCssRgb("--agent", "#8fa6bd"), // agent steel
+    readCssRgb("--st-blocked", "#d76f6a"), // blocked red
+    readCssRgb("--st-backlog", "#808289"), // backlog gray
+    "#f0855f", // coral (light)
+  ];
+}
 
 const echartsTheme = computed(() => {
   // Reading reactive sources establishes the dependency.
@@ -75,7 +88,7 @@ const echartsTheme = computed(() => {
   const popover = readCss("--popover");
   const popoverFg = readCss("--popover-foreground");
   return {
-    color: PALETTE,
+    color: palette(),
     backgroundColor: "transparent",
     textStyle: { color: muted, fontFamily: "inherit" },
     title: { textStyle: { color: fg, fontWeight: 500 } },

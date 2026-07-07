@@ -8,10 +8,11 @@
 import { computed } from "vue";
 import { useThroughput } from "@/composables/useDashboardData";
 import { fillThroughputBuckets } from "@/lib/statsBuckets";
+import { cssVarRgb } from "@/lib/statusColors";
 import Chart from "@/components/charts/Chart.vue";
 
-// Match the v4 tokens (--agent / --signal); ECharts can't read CSS vars.
-const AGENT_HEX = "#8fa6bd";
+// Coral is theme-shared so it stays a constant; agent steel flips with the
+// theme and is read from the live var inside the option computed (SWY-158).
 const SIGNAL_HEX = "#e2623d";
 
 const props = defineProps<{
@@ -82,7 +83,7 @@ const option = computed(() => {
           // The agent segment only gets the rounded top when it IS the top
           // (no human cap that bucket).
           itemStyle: {
-            color: AGENT_HEX,
+            color: cssVarRgb("--agent", "#8fa6bd"),
             borderRadius: p.human_count === 0 ? [3, 3, 0, 0] : [0, 0, 0, 0],
           },
         })),
