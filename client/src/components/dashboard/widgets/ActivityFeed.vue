@@ -119,10 +119,13 @@ function open(item: FeedItem) {
 </script>
 
 <template>
-  <div v-if="q.isLoading.value" class="space-y-2">
-    <div v-for="n in 6" :key="n" class="flex items-center gap-2 px-1">
-      <div class="h-6 w-6 rounded-full bg-muted/50" />
-      <div class="flex-1 h-4 bg-muted/50 rounded" />
+  <!-- Skeleton at real row metrics so loading → loaded doesn't jump the
+       bounded window the dashboard wraps this feed in (SWY-160). -->
+  <div v-if="q.isLoading.value" class="divide-y divide-border/60">
+    <div v-for="n in 9" :key="n" class="flex items-center gap-3 px-4 py-2.5">
+      <div class="h-6 w-6 shrink-0 rounded-full bg-muted/50" />
+      <div class="h-3.5 flex-1 rounded bg-muted/50" />
+      <div class="h-3 w-10 shrink-0 rounded bg-muted/50" />
     </div>
   </div>
   <div v-else-if="items.length === 0" class="flex flex-col items-center justify-center py-6 text-xs text-muted-foreground">

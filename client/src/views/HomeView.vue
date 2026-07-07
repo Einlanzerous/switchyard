@@ -160,10 +160,13 @@ const narrativeReady = computed(
     <!-- Row 2: active projects (1.9fr) + epics in flight (1fr). No items-start:
          the cards stretch to the row height so the pair reads as one band.
          min-w-0 keeps a wide row's min-content from forcing the column past
-         its fr share (the "card sticks out on resize" failure mode). ──────── -->
+         its fr share (the "card sticks out on resize" failure mode).
+         lg:h-0 zeroes the epics card's intrinsic row contribution so Active
+         projects' natural height alone sizes the row; lg:min-h-full restores
+         the stretch, and the card scrolls internally (SWY-160). ──────────── -->
     <div class="grid grid-cols-1 lg:grid-cols-[1.9fr_1fr] gap-4">
       <ActiveProjectsCard class="min-w-0" />
-      <EpicsInFlightCard class="min-w-0" />
+      <EpicsInFlightCard class="min-w-0 lg:h-0 lg:min-h-full" />
     </div>
 
     <!-- Row 3: recent activity (1.9fr) + up next (1fr) ──────────────────────── -->
@@ -179,7 +182,11 @@ const narrativeReady = computed(
             agents
           </span>
         </template>
-        <ActivityFeed :limit="7" />
+        <!-- Bounded window (~10 rows), scrolls internally; the wrapper owns the
+             height policy so the feed component stays layout-agnostic. -->
+        <div class="max-h-[420px] overflow-y-auto overscroll-contain rounded-b-xl">
+          <ActivityFeed :limit="25" />
+        </div>
       </DashboardWidget>
 
       <UpNextCard class="min-w-0" />
