@@ -64,6 +64,9 @@ paths:
                           enum: &a3
                             - owner
                             - member
+                        email:
+                          type: string
+                          nullable: true
                         created_at:
                           type: string
                           format: date-time
@@ -80,6 +83,7 @@ paths:
                         - icon
                         - type
                         - instance_role
+                        - email
                         - created_at
                         - updated_at
                         - deleted_at
@@ -119,6 +123,8 @@ paths:
                           - rate_limited
                           - internal
                           - service_unavailable
+                          - sso_disabled
+                          - sso_no_account
                       message:
                         type: string
                       details:
@@ -297,6 +303,10 @@ paths:
                 instance_role:
                   type: string
                   enum: *a3
+                email:
+                  type: string
+                  maxLength: 255
+                  format: email
               required:
                 - name
                 - type
@@ -325,6 +335,9 @@ paths:
                   instance_role:
                     type: string
                     enum: *a3
+                  email:
+                    type: string
+                    nullable: true
                   created_at:
                     type: string
                     format: date-time
@@ -341,6 +354,7 @@ paths:
                   - icon
                   - type
                   - instance_role
+                  - email
                   - created_at
                   - updated_at
                   - deleted_at
@@ -542,6 +556,9 @@ paths:
                   instance_role:
                     type: string
                     enum: *a3
+                  email:
+                    type: string
+                    nullable: true
                   created_at:
                     type: string
                     format: date-time
@@ -558,6 +575,7 @@ paths:
                   - icon
                   - type
                   - instance_role
+                  - email
                   - created_at
                   - updated_at
                   - deleted_at
@@ -1783,6 +1801,9 @@ paths:
                   instance_role:
                     type: string
                     enum: *a3
+                  email:
+                    type: string
+                    nullable: true
                   created_at:
                     type: string
                     format: date-time
@@ -1799,6 +1820,7 @@ paths:
                   - icon
                   - type
                   - instance_role
+                  - email
                   - created_at
                   - updated_at
                   - deleted_at
@@ -2000,6 +2022,11 @@ paths:
                 instance_role:
                   type: string
                   enum: *a3
+                email:
+                  type: string
+                  nullable: true
+                  maxLength: 255
+                  format: email
       responses:
         "200":
           description: ok
@@ -2025,6 +2052,9 @@ paths:
                   instance_role:
                     type: string
                     enum: *a3
+                  email:
+                    type: string
+                    nullable: true
                   created_at:
                     type: string
                     format: date-time
@@ -2041,6 +2071,7 @@ paths:
                   - icon
                   - type
                   - instance_role
+                  - email
                   - created_at
                   - updated_at
                   - deleted_at
@@ -35810,6 +35841,236 @@ paths:
                     minimum: 0
                 required:
                   - ok
+        "400":
+          description: bad request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "401":
+          description: unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "403":
+          description: forbidden
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "404":
+          description: not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "409":
+          description: conflict
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "422":
+          description: unprocessable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+        "500":
+          description: internal
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        enum: *a1
+                      message:
+                        type: string
+                      details:
+                        type: object
+                        additionalProperties:
+                          nullable: true
+                    required:
+                      - code
+                      - message
+                required:
+                  - error
+  /v1/auth/sso/cloudflare:
+    post:
+      tags:
+        - Auth
+      summary: Exchange a Cloudflare Access JWT (Cf-Access-Jwt-Assertion header) for
+        an API token
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  user:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      name:
+                        type: string
+                        minLength: 1
+                        maxLength: 100
+                      icon:
+                        type: string
+                        nullable: true
+                        maxLength: 500
+                      type:
+                        type: string
+                        enum: *a2
+                      instance_role:
+                        type: string
+                        enum: *a3
+                      email:
+                        type: string
+                        nullable: true
+                      created_at:
+                        type: string
+                        format: date-time
+                      updated_at:
+                        type: string
+                        format: date-time
+                      deleted_at:
+                        type: string
+                        nullable: true
+                        format: date-time
+                    required:
+                      - id
+                      - name
+                      - icon
+                      - type
+                      - instance_role
+                      - email
+                      - created_at
+                      - updated_at
+                      - deleted_at
+                required:
+                  - token
+                  - user
         "400":
           description: bad request
           content:

@@ -64,6 +64,7 @@ const draftName = ref("");
 const draftType = ref<UserTypeEnum>("agent");
 const draftIcon = ref("");
 const draftRole = ref<InstanceRole>("member");
+const draftEmail = ref("");
 
 watch(dialogOpen, (v) => {
   if (!v) editing.value = null;
@@ -75,6 +76,7 @@ function openCreate() {
   draftType.value = "agent";
   draftIcon.value = "";
   draftRole.value = "member";
+  draftEmail.value = "";
   dialogOpen.value = true;
 }
 
@@ -84,11 +86,13 @@ function openEdit(u: UserType) {
   draftType.value = u.type;
   draftIcon.value = u.icon ?? "";
   draftRole.value = u.instance_role;
+  draftEmail.value = u.email ?? "";
   dialogOpen.value = true;
 }
 
 const saveMutation = useMutation({
   mutationFn: async () => {
+    const email = draftEmail.value.trim();
     const body = {
       name: draftName.value.trim(),
       type: draftType.value,
@@ -98,14 +102,17 @@ const saveMutation = useMutation({
       ...(draftType.value === "human" ? { instance_role: draftRole.value } : {}),
     };
     if (editing.value) {
+      // null (not undefined) so clearing the field actually wipes the email.
       const { data, error } = await api.PATCH("/v1/users/{id}", {
         params: { path: { id: editing.value.id } },
-        body,
+        body: { ...body, email: email || null },
       });
       if (error) throw error;
       return data;
     }
-    const { data, error } = await api.POST("/v1/users", { body });
+    const { data, error } = await api.POST("/v1/users", {
+      body: { ...body, email: email || undefined },
+    });
     if (error) throw error;
     return data;
   },
@@ -379,6 +386,16 @@ const mintMutation = useMutation({
                 <SelectItem value="owner">Owner — blanket access to everything</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+          <div v-if="draftType === 'human'" class="space-y-1.5">
+            <Label for="user-email">Email</Label>
+            <Input
+              id="user-email"
+              v-model="draftEmail"
+              type="email"
+              maxlength="255"
+              placeholder="Optional — for Cloudflare Access SSO"
+            />
           </div>
           <div class="space-y-1.5">
             <Label for="user-icon">Avatar URL</Label>

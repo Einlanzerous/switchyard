@@ -25,6 +25,20 @@ export const conflict = (message: string, details?: Record<string, unknown>) =>
 export const unprocessable = (message: string, details?: Record<string, unknown>) =>
   new HttpError(422, "unprocessable", message, details);
 
+// Cloudflare Access SSO (SWY-161). `ssoDisabled` = env not configured or the
+// Cf-Access-Jwt-Assertion header is absent (401, so the login page falls back
+// to token paste). `ssoNoAccount` = the JWT verified but no live user has that
+// email; the email is echoed in details so the client can name it.
+export const ssoDisabled = (message = "Cloudflare Access SSO is not available") =>
+  new HttpError(401, "sso_disabled", message);
+export const ssoNoAccount = (email: string) =>
+  new HttpError(
+    403,
+    "sso_no_account",
+    `signed in to Cloudflare as ${email}, but no switchyard account has that email`,
+    { email },
+  );
+
 // Wrap an INSERT/UPDATE that may fail with a Postgres unique-constraint
 // violation. Translates the 23505 SQLSTATE into a friendly 409 with the
 // caller's message; lets every other error propagate.

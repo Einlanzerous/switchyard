@@ -20,6 +20,7 @@ import * as ticketLinks from "./ticketLinks.js";
 import * as customFields from "./customFields.js";
 import * as ticketExternalRefs from "./ticketExternalRefs.js";
 import * as external from "./external.js";
+import * as auth from "./auth.js";
 import * as ticketTemplates from "./ticketTemplates.js";
 import * as llmObservations from "./llmObservations.js";
 import * as llmInsights from "./llmInsights.js";
@@ -53,6 +54,9 @@ export function mountRoutes(app: OpenAPIHono) {
   customFields.mount(app);
   ticketExternalRefs.mount(app);
   external.mount(app);
+  // Unauthenticated: the Cloudflare Access JWT is the auth, not a bearer token
+  // (same model as external.mount above). No /v1/auth/* requireAuth wildcard.
+  auth.mount(app);
   ticketTemplates.mount(app);
   llmObservations.mount(app);
 }

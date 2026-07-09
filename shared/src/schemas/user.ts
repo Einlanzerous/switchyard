@@ -18,6 +18,9 @@ export const User = z
     icon: z.string().max(500).nullable(),
     type: UserType,
     instance_role: InstanceRole,
+    // Lowercased; unique among non-deleted users. Matched against the verified
+    // Cloudflare Access `email` claim for SSO (SWY-161).
+    email: z.string().nullable(),
   })
   .merge(SoftDeletable);
 export type User = z.infer<typeof User>;
@@ -33,8 +36,12 @@ export const CreateUser = z.object({
   // Optional on create — defaults to `member` server-side. Invited humans are
   // members; promoting to owner is a deliberate later action.
   instance_role: InstanceRole.optional(),
+  email: z.string().email().max(255).optional(),
 });
 export type CreateUser = z.infer<typeof CreateUser>;
 
-export const UpdateUser = CreateUser.partial();
+// email is nullable on update so an admin can clear it (disables SSO for the user).
+export const UpdateUser = CreateUser.partial().extend({
+  email: z.string().email().max(255).nullable().optional(),
+});
 export type UpdateUser = z.infer<typeof UpdateUser>;

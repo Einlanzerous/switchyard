@@ -305,13 +305,15 @@ export function mount(app: OpenAPIHono) {
     checkScope(c, "users:manage");
     assertInstanceAdmin(c.get("auth").user, "users");
     const body = c.req.valid("json");
-    const [created] = await catchUnique(`user "${body.name}" already exists`, () =>
+    const [created] = await catchUnique(`user "${body.name}" already exists (name or email in use)`, () =>
       db.insert(schema.users).values({
         name: body.name,
         type: body.type,
         icon: body.icon ?? null,
         // Invited humans default to `member`; promoting to owner is deliberate.
         instance_role: body.instance_role ?? "member",
+        // Lowercased so SSO's case-insensitive email match works (SWY-161).
+        email: body.email ? body.email.toLowerCase() : null,
       }).returning()
     );
     if (!created) throw new Error("insert returned nothing");
@@ -330,6 +332,8 @@ export function mount(app: OpenAPIHono) {
     if (body.type !== undefined) sets.type = body.type;
     if (body.icon !== undefined) sets.icon = body.icon ?? null;
     if (body.instance_role !== undefined) sets.instance_role = body.instance_role;
+    // null clears the email (disables SSO for the user); otherwise lowercase.
+    if (body.email !== undefined) sets.email = body.email === null ? null : body.email.toLowerCase();
 
     // Last-owner guard: never demote the final instance owner, or the instance
     // loses its only blanket-access human (agents bypass membership but can't
@@ -347,7 +351,7 @@ export function mount(app: OpenAPIHono) {
       return c.json(mapUser(u), 200);
     }
 
-    const [updated] = await catchUnique("name already in use", () =>
+    const [updated] = await catchUnique("name or email already in use", () =>
       db.update(schema.users)
         .set(sets)
         .where(eq(schema.users.id, id))

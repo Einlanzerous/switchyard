@@ -71,6 +71,10 @@ export const ErrorCode = z.enum([
   "rate_limited",
   "internal",
   "service_unavailable",
+  // Cloudflare Access SSO (SWY-161): feature not configured / header absent,
+  // and verified-email-has-no-account respectively.
+  "sso_disabled",
+  "sso_no_account",
 ]);
 export type ErrorCode = z.infer<typeof ErrorCode>;
 

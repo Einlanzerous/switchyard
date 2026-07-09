@@ -39,6 +39,7 @@ export function mapUser(u: UserRow): User {
     icon: u.icon,
     type: u.type,
     instance_role: u.instance_role,
+    email: u.email,
     created_at: u.created_at,
     updated_at: u.updated_at,
     deleted_at: u.deleted_at,
