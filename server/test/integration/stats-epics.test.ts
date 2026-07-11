@@ -88,12 +88,12 @@ type Fx = Awaited<ReturnType<typeof fixture>>;
 let seq = 0;
 async function makeTicket(
   fx: Fx,
-  opts: { type?: "epic" | "task"; statusId: string; parentId?: string; resolution?: "done" },
+  opts: { type?: "epic" | "task"; statusId: string; parentId?: string; resolution?: "done"; title?: string },
 ) {
   seq += 1;
   const [t] = await testDb.insert(schema.tickets).values({
     project_id: fx.project.id, number: seq, type: opts.type ?? "task",
-    title: `T-${seq}`, status_id: opts.statusId, reporter_id: fx.magos.id,
+    title: opts.title ?? `T-${seq}`, status_id: opts.statusId, reporter_id: fx.magos.id,
     parent_id: opts.parentId ?? null, resolution: opts.resolution ?? null,
   }).returning();
   return t!;
@@ -177,6 +177,41 @@ describe("SWY-137 epics in flight", () => {
 
     const rc = byKey.get(`EPX-${c2.number}`)!;
     expect(rc.stalled).toBe(false);
+  });
+
+  test("SWY-162: ordered by recent activity; null-activity sinks, title tie-break", async () => {
+    const fx = await fixture();
+    // Three active epics with distinct last-activity times (activity rolls up
+    // from a child event so the FAMILY window is exercised, not just the epic).
+    const recent = await makeTicket(fx, { type: "epic", statusId: fx.inProgress.id, title: "recent" });
+    const rChild = await makeTicket(fx, { statusId: fx.backlog.id, parentId: recent.id });
+    await event(rChild.id, fx.claude.id, hoursAgo(1));
+
+    const middle = await makeTicket(fx, { type: "epic", statusId: fx.inProgress.id, title: "middle" });
+    await event(middle.id, fx.claude.id, hoursAgo(5));
+
+    const oldest = await makeTicket(fx, { type: "epic", statusId: fx.inProgress.id, title: "oldest" });
+    await event(oldest.id, fx.claude.id, hoursAgo(10));
+
+    // Two never-touched epics: both sink below the active ones and order
+    // case-insensitively by title ("Apple" before "zebra").
+    const zebra = await makeTicket(fx, { type: "epic", statusId: fx.backlog.id, title: "zebra" });
+    const apple = await makeTicket(fx, { type: "epic", statusId: fx.backlog.id, title: "Apple" });
+
+    const token = await mintToken(fx.magos.id, ["tickets:read"]);
+    const res = await GET("/v1/stats/epics", token);
+    expect(res.status).toBe(200);
+    const data = await res.json() as { items: Array<{ key: string; last_activity_at: string | null }> };
+
+    expect(data.items.map((i) => i.key)).toEqual([
+      `EPX-${recent.number}`,
+      `EPX-${middle.number}`,
+      `EPX-${oldest.number}`,
+      `EPX-${apple.number}`, // null activity, alphabetically first (case-insensitive)
+      `EPX-${zebra.number}`, // null activity, alphabetically last
+    ]);
+    expect(data.items.at(-1)!.last_activity_at).toBeNull();
+    expect(data.items.at(-2)!.last_activity_at).toBeNull();
   });
 
   test("member scope: epics from invisible projects are excluded", async () => {
