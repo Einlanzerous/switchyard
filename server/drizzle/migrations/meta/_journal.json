@@ -169,6 +169,13 @@
       "when": 1782623320251,
       "tag": "0023_swy_109_plans",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1783624115290,
+      "tag": "0024_easy_garia",
+      "breakpoints": true
     }
   ]
 }

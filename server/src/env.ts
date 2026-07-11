@@ -67,6 +67,14 @@ const Env = z.object({
   // 1–9 uppercase alphanumerics).
   EXTERNAL_REF_KEY_PREFIX: z.string().min(1).max(10).default("SWY"),
 
+  // Cloudflare Access SSO (SWY-161). Both must be set for
+  // POST /v1/auth/sso/cloudflare to work; otherwise it returns 401
+  // sso_disabled and the login page falls back to token paste. Team domain
+  // is a bare host, e.g. "example.cloudflareaccess.com"; AUD is the Access
+  // application's audience tag from the Zero Trust dashboard.
+  CF_ACCESS_TEAM_DOMAIN: z.string().min(1).optional(),
+  CF_ACCESS_AUD: z.string().min(16).optional(),
+
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 });
 

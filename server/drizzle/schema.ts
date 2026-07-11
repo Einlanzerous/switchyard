@@ -83,12 +83,16 @@ export const users = pgTable(
     icon: varchar("icon", { length: 500 }),
     type: userType("type").notNull(),
     instance_role: instanceRole("instance_role").notNull().default("member"),
+    // Lowercased at the app layer (create/update handlers + SSO lookup).
+    // Matched against the verified Cloudflare Access email claim (SWY-161).
+    email: varchar("email", { length: 255 }),
     created_at: createdAt(),
     updated_at: updatedAt(),
     deleted_at: deletedAt(),
   },
   (t) => ({
     nameUnique: uniqueIndex("users_name_unique").on(t.name).where(sql`${t.deleted_at} IS NULL`),
+    emailUnique: uniqueIndex("users_email_unique").on(t.email).where(sql`${t.deleted_at} IS NULL`),
   })
 );
 

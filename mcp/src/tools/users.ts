@@ -48,8 +48,9 @@ export function registerUserTools(server: McpServer): void {
       title: "List users",
       description:
         "List the instance user directory (humans + agents). Each user has an " +
-        "`id` (UUID), `name`, `type` (`agent`/`human`), and `instance_role` " +
-        "(`owner`/`member`). Use this to find the `id` you need for " +
+        "`id` (UUID), `name`, `type` (`agent`/`human`), `instance_role` " +
+        "(`owner`/`member`), and an optional `email` (used for Cloudflare " +
+        "Access SSO). Use this to find the `id` you need for " +
         "`update_user`, `delete_user`, or the token tools. Results paginate via " +
         "`cursor`." + ADMIN_NOTE,
       inputSchema: {
@@ -118,6 +119,14 @@ export function registerUserTools(server: McpServer): void {
           .max(500)
           .optional()
           .describe("Optional icon/avatar URL or emoji (max 500 chars)."),
+        email: z
+          .string()
+          .email()
+          .optional()
+          .describe(
+            "Email for Cloudflare Access SSO matching. Must be unique among " +
+              "active users; lowercased server-side.",
+          ),
       },
     },
     async (input) => {
@@ -152,6 +161,15 @@ export function registerUserTools(server: McpServer): void {
           "New instance role (`owner`/`member`). Cannot demote the last owner.",
         ),
         icon: z.string().max(500).optional().describe("New icon/avatar (max 500 chars)."),
+        email: z
+          .string()
+          .email()
+          .nullable()
+          .optional()
+          .describe(
+            "New email for Cloudflare Access SSO matching (null clears it). " +
+              "Must be unique among active users; lowercased server-side.",
+          ),
       },
     },
     async ({ user_id, ...body }) => {
