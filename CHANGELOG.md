@@ -1,5 +1,17 @@
 # Changelog
 
+## [4.2.0](https://github.com/Einlanzerous/switchyard/compare/v4.1.0...v4.2.0) (2026-07-11)
+
+
+### Features
+
+* SWY-161 — Cloudflare Access SSO auto sign-in + login-page cleanup ([#143](https://github.com/Einlanzerous/switchyard/issues/143)) ([3d561ac](https://github.com/Einlanzerous/switchyard/commit/3d561ac0647bc38fccb808c33a2ecbb957eadd33))
+
+
+### Maintenance
+
+* update knowledge graph [skip ci] ([95dffe1](https://github.com/Einlanzerous/switchyard/commit/95dffe1fc683f26d6a49b400398dec45d9bd90a8))
+
 ## [4.1.0](https://github.com/Einlanzerous/switchyard/compare/v4.0.0...v4.1.0) (2026-07-07)
 
 
