@@ -1,5 +1,17 @@
 # Changelog
 
+## [4.3.0](https://github.com/Einlanzerous/switchyard/compare/v4.2.0...v4.3.0) (2026-07-12)
+
+
+### Features
+
+* SWY-162 — order epics-in-flight by recent activity ([#145](https://github.com/Einlanzerous/switchyard/issues/145)) ([6db67b7](https://github.com/Einlanzerous/switchyard/commit/6db67b755bf6dee86e78386f5e2dae480d21a374))
+
+
+### Maintenance
+
+* update knowledge graph [skip ci] ([5162491](https://github.com/Einlanzerous/switchyard/commit/51624910f384b4dd614c78eefe29ec73aa308084))
+
 ## [4.2.0](https://github.com/Einlanzerous/switchyard/compare/v4.1.0...v4.2.0) (2026-07-11)
 
 
