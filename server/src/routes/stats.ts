@@ -580,36 +580,49 @@ export function mount(app: OpenAPIHono) {
 
     const stallCutoff = Date.now() - EPIC_STALL_AFTER_DAYS * 86_400_000;
 
-    return c.json(
-      {
-        stall_after_days: EPIC_STALL_AFTER_DAYS,
-        items: eRows.map((r) => {
-          const prog = progress.get(r.id);
-          const total = prog?.total ?? 0;
-          const done = prog?.done ?? 0;
-          const last = lastAny.get(r.id);
-          const agentAt = lastAgentAt.get(r.id);
-          const stalled =
-            r.s_category === "in_progress" && (agentAt === undefined || agentAt < stallCutoff);
-          return {
-            id: r.id,
-            key: `${r.p_key}-${r.key_num}`,
-            title: r.title,
-            project: { id: r.p_id, key: r.p_key, name: r.p_name, color: r.p_color, repo_url: r.p_repo },
-            status: { id: r.s_id, category: r.s_category, display_name: r.s_display },
-            progress_pct: total === 0 ? 0 : Math.round((done / total) * 100),
-            children_total: total,
-            children_closed: done,
-            driver: last?.u_id
-              ? { id: last.u_id, name: last.u_name!, icon: last.u_icon, type: last.u_type! }
-              : null,
-            last_activity_at: last ? new Date(last.at).toISOString() : null,
-            stalled,
-          };
-        }),
-      },
-      200
-    );
+    const items = eRows.map((r) => {
+      const prog = progress.get(r.id);
+      const total = prog?.total ?? 0;
+      const done = prog?.done ?? 0;
+      const last = lastAny.get(r.id);
+      const agentAt = lastAgentAt.get(r.id);
+      const stalled =
+        r.s_category === "in_progress" && (agentAt === undefined || agentAt < stallCutoff);
+      return {
+        id: r.id,
+        key: `${r.p_key}-${r.key_num}`,
+        title: r.title,
+        project: { id: r.p_id, key: r.p_key, name: r.p_name, color: r.p_color, repo_url: r.p_repo },
+        status: { id: r.s_id, category: r.s_category, display_name: r.s_display },
+        progress_pct: total === 0 ? 0 : Math.round((done / total) * 100),
+        children_total: total,
+        children_closed: done,
+        driver: last?.u_id
+          ? { id: last.u_id, name: last.u_name!, icon: last.u_icon, type: last.u_type! }
+          : null,
+        last_activity_at: last ? new Date(last.at).toISOString() : null,
+        stalled,
+      };
+    });
+
+    // Order by most-recently-active first (SWY-162), so the home page tracks
+    // where work is actually happening rather than a static project/number
+    // sort. `last_activity_at` folds in child-ticket events, so an epic bubbles
+    // up when any of its children moves. Never-touched epics (null activity)
+    // sink to the bottom; ties (and the whole null-activity group) fall back to
+    // case-insensitive title order for a stable, predictable list.
+    items.sort((a, b) => {
+      const aAt = a.last_activity_at ? Date.parse(a.last_activity_at) : null;
+      const bAt = b.last_activity_at ? Date.parse(b.last_activity_at) : null;
+      if (aAt !== bAt) {
+        if (aAt === null) return 1;
+        if (bAt === null) return -1;
+        return bAt - aAt;
+      }
+      return a.title.localeCompare(b.title, undefined, { sensitivity: "base" });
+    });
+
+    return c.json({ stall_after_days: EPIC_STALL_AFTER_DAYS, items }, 200);
   }) as any);
 
   // ─── per-project activity pulse ───────────────────────────────────────────
