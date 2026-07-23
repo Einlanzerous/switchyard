@@ -176,6 +176,13 @@
       "when": 1783624115290,
       "tag": "0024_easy_garia",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1784090907361,
+      "tag": "0025_chemical_boomer",
+      "breakpoints": true
     }
   ]
 }

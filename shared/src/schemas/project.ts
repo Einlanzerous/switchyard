@@ -8,11 +8,15 @@ import { ClosedWindowDays } from "./settings.js";
 // counter. Longest real description at the time of this cap was ~540 chars.
 export const PROJECT_DESCRIPTION_MAX = 1_000;
 
-// Per-project role carried on `user_projects.role` (Phase 6). viewer ⊂ editor ⊂
-// admin: viewer reads, editor writes tickets/comments, admin manages project
-// config + membership. Shared so both `my_role` and the membership endpoints
-// reference one source of truth.
-export const ProjectRole = z.enum(["admin", "editor", "viewer"]);
+// Per-project role carried on `user_projects.role` (Phase 6; four tiers as of
+// SWY-163). viewer ⊂ user ⊂ editor ⊂ admin:
+//   viewer — read-only;
+//   user   — write (comment, create/edit tickets) but NOT delete others' work;
+//   editor — write + delete tickets/comments;
+//   admin  — the above + manage project config + membership.
+// `delete` is a capability split out of `write` (see lib/authz.ts). Shared so
+// both `my_role` and the membership endpoints reference one source of truth.
+export const ProjectRole = z.enum(["admin", "editor", "user", "viewer"]);
 export type ProjectRole = z.infer<typeof ProjectRole>;
 
 export const Project = z

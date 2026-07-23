@@ -24,8 +24,10 @@ type AuthToken = typeof schema.apiTokens.$inferSelect;
 /** Per-project role carried on `user_projects.role`. */
 export type ProjectRole = (typeof schema.projectMemberRole.enumValues)[number];
 
-/** Project-level capability — the closure of read ⊂ write ⊂ manage. */
-export type Capability = "read" | "write" | "manage";
+/** Project-level capability — the closure of read ⊂ write ⊂ delete ⊂ manage.
+ * `delete` is split OUT of `write` (SWY-163): a `user` role writes (comment,
+ * create/edit tickets) WITHOUT gaining destructive power over others' work. */
+export type Capability = "read" | "write" | "delete" | "manage";
 
 // Single source of the owner/agent bypass. The read/write enforcement that
 // lands in 6.1+ checks this first and skips project scoping when it's true —
@@ -187,10 +189,32 @@ export async function assertProjectRole(
   if (hasInstanceWideAccess(user)) return;
   const role = await projectRole(user.id, projectId);
   if (role && ROLE_CAPABILITIES[role].includes(capability)) return;
+  const verb = { write: "writing", delete: "deleting", manage: "managing" }[capability];
+  const needs = { write: "editor", delete: "editor", manage: "project-admin" }[capability];
+  throw forbidden(`${verb} ${resource} requires ${needs} access to this project`);
+}
+
+// Author-scoped delete gate (SWY-163). Instance-wide actors and roles that hold
+// the `delete` capability (editor/admin) may delete ANY matching resource in the
+// project; a `user` (write but not delete) may delete ONLY a resource it
+// authored. Viewers and non-members can't delete. `authorId` is the resource's
+// author/reporter (e.g. `ticket.reporter_id`); pass `null` when unknown, which
+// then only clears instance-wide/delete-capable actors.
+export async function assertCanDelete(
+  user: Pick<AuthUser, "id" | "type" | "instance_role">,
+  projectId: string,
+  resource: string,
+  authorId: string | null,
+): Promise<void> {
+  if (hasInstanceWideAccess(user)) return;
+  const role = await projectRole(user.id, projectId);
+  if (role) {
+    const caps = ROLE_CAPABILITIES[role];
+    if (caps.includes("delete")) return;
+    if (caps.includes("write") && authorId !== null && authorId === user.id) return;
+  }
   throw forbidden(
-    `${capability === "manage" ? "managing" : "writing"} ${resource} requires ${
-      capability === "manage" ? "project-admin" : "editor"
-    } access to this project`,
+    `deleting ${resource} requires editor access, or authorship of the ${resource}`,
   );
 }
 
@@ -251,10 +275,16 @@ async function projectRole(userId: string, projectId: string): Promise<ProjectRo
   return row?.role ?? null;
 }
 
+// SWY-163 four-tier lattice. `user` sits between `viewer` and `editor`: it can
+// write (comment, create/edit tickets) but lacks `delete`, so it can't destroy
+// others' work. `editor`/`admin` gain `delete` explicitly — same behavior they
+// had when `write` bundled deletion. Author-scoped delete for `user` (deleting
+// its OWN tickets/comments) lives in `assertCanDelete`, not here.
 const ROLE_CAPABILITIES: Record<ProjectRole, Capability[]> = {
   viewer: ["read"],
-  editor: ["read", "write"],
-  admin: ["read", "write", "manage"],
+  user: ["read", "write"],
+  editor: ["read", "write", "delete"],
+  admin: ["read", "write", "delete", "manage"],
 };
 
 // What a token's global scopes permit, collapsed to the three project-level
@@ -265,7 +295,7 @@ const ROLE_CAPABILITIES: Record<ProjectRole, Capability[]> = {
 // mapping; here we only need the read/write/manage gate for the intersection.
 function scopeCapabilities(scopes: readonly string[]): Set<Capability> {
   const caps = new Set<Capability>();
-  if (scopes.includes("admin")) return new Set<Capability>(["read", "write", "manage"]);
+  if (scopes.includes("admin")) return new Set<Capability>(["read", "write", "delete", "manage"]);
   if (scopes.includes("projects:manage") || scopes.includes("users:manage")) caps.add("manage");
   const writeScopes = [
     "tickets:write",
@@ -276,14 +306,24 @@ function scopeCapabilities(scopes: readonly string[]): Set<Capability> {
     "targets:manage",
     "webhooks:manage",
   ];
-  if (writeScopes.some((s) => scopes.includes(s))) caps.add("write");
+  // No separate `*:delete` scope (SWY-163 decision 3): a write-capable token is
+  // delete-capable at the SCOPE layer, so both `write` and `delete` are emitted
+  // together. What actually withholds deletion from a `user` is the ROLE layer
+  // (`ROLE_CAPABILITIES.user` has no `delete`), intersected in here.
+  if (writeScopes.some((s) => scopes.includes(s))) {
+    caps.add("write");
+    caps.add("delete");
+  }
   if (scopes.includes("tickets:read")) caps.add("read");
   return caps;
 }
 
-// read ⊂ write ⊂ manage: a higher capability implies the lower ones.
+// read ⊂ write ⊂ delete ⊂ manage: a higher capability implies the lower ones.
+// Note `write` does NOT imply `delete` — that gap is the whole point of the
+// `user` tier (SWY-163). Deletion is above write but below project management.
 function closure(caps: Set<Capability>): Set<Capability> {
-  if (caps.has("manage")) caps.add("write");
+  if (caps.has("manage")) caps.add("delete");
+  if (caps.has("delete")) caps.add("write");
   if (caps.has("write")) caps.add("read");
   return caps;
 }

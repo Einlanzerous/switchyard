@@ -14,8 +14,11 @@ import TicketBody from "@/components/tickets/TicketBody.vue";
 import MoveTicketDialog from "@/components/tickets/MoveTicketDialog.vue";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
+import { useProjectPermissions } from "@/composables/useProjectPermissions";
+import { useAuthStore } from "@/stores/auth";
 
 const route = useRoute();
+const auth = useAuthStore();
 const router = useRouter();
 const qc = useQueryClient();
 
@@ -38,6 +41,13 @@ const ticketQuery = useQuery({
   },
 });
 const ticket = computed(() => ticketQuery.data.value ?? null);
+
+// SWY-163: editors/admins/instance-wide delete any ticket; a `user` may delete
+// only tickets it reported. Server enforces the same rule (assertCanDelete).
+const { canDelete } = useProjectPermissions(() => ticket.value?.project.key ?? null);
+const canDeleteTicket = computed(
+  () => canDelete.value || (!!auth.me && ticket.value?.reporter?.id === auth.me.id),
+);
 
 function back() {
   // Try to fall back to the ticket list if there's no nav history (deep link).
@@ -106,6 +116,7 @@ function onMoved(newKey: string) {
               <FolderInput class="h-3.5 w-3.5 mr-2" /> Move to project…
             </DropdownMenuItem>
             <DropdownMenuItem
+              v-if="canDeleteTicket"
               class="cursor-pointer text-destructive focus:text-destructive"
               @click="confirming = true"
             >

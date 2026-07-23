@@ -2256,7 +2256,7 @@ export interface paths {
                                 archived_at: string | null;
                                 board_closed_window_days: 7 | 14 | 30 | unknown | unknown;
                                 /** @enum {string|null} */
-                                my_role?: "admin" | "editor" | "viewer" | null;
+                                my_role?: "admin" | "editor" | "user" | "viewer" | null;
                                 /** Format: date-time */
                                 created_at: string;
                                 /** Format: date-time */
@@ -2443,7 +2443,7 @@ export interface paths {
                             archived_at: string | null;
                             board_closed_window_days: 7 | 14 | 30 | unknown | unknown;
                             /** @enum {string|null} */
-                            my_role?: "admin" | "editor" | "viewer" | null;
+                            my_role?: "admin" | "editor" | "user" | "viewer" | null;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
@@ -2626,7 +2626,7 @@ export interface paths {
                             archived_at: string | null;
                             board_closed_window_days: 7 | 14 | 30 | unknown | unknown;
                             /** @enum {string|null} */
-                            my_role?: "admin" | "editor" | "viewer" | null;
+                            my_role?: "admin" | "editor" | "user" | "viewer" | null;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
@@ -2960,7 +2960,7 @@ export interface paths {
                             archived_at: string | null;
                             board_closed_window_days: 7 | 14 | 30 | unknown | unknown;
                             /** @enum {string|null} */
-                            my_role?: "admin" | "editor" | "viewer" | null;
+                            my_role?: "admin" | "editor" | "user" | "viewer" | null;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
@@ -3136,7 +3136,7 @@ export interface paths {
                                     type: "agent" | "human";
                                 };
                                 /** @enum {string} */
-                                role: "admin" | "editor" | "viewer";
+                                role: "admin" | "editor" | "user" | "viewer";
                                 /** Format: date-time */
                                 created_at: string;
                             }[];
@@ -3288,7 +3288,7 @@ export interface paths {
                         /** Format: uuid */
                         user_id: string;
                         /** @enum {string} */
-                        role: "admin" | "editor" | "viewer";
+                        role: "admin" | "editor" | "user" | "viewer";
                     };
                 };
             };
@@ -3309,7 +3309,7 @@ export interface paths {
                                 type: "agent" | "human";
                             };
                             /** @enum {string} */
-                            role: "admin" | "editor" | "viewer";
+                            role: "admin" | "editor" | "user" | "viewer";
                             /** Format: date-time */
                             created_at: string;
                         };
@@ -3624,7 +3624,7 @@ export interface paths {
                 content: {
                     "application/json": {
                         /** @enum {string} */
-                        role: "admin" | "editor" | "viewer";
+                        role: "admin" | "editor" | "user" | "viewer";
                     };
                 };
             };
@@ -3645,7 +3645,7 @@ export interface paths {
                                 type: "agent" | "human";
                             };
                             /** @enum {string} */
-                            role: "admin" | "editor" | "viewer";
+                            role: "admin" | "editor" | "user" | "viewer";
                             /** Format: date-time */
                             created_at: string;
                         };

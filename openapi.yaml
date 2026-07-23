@@ -3208,6 +3208,7 @@ paths:
                           enum: &a6
                             - admin
                             - editor
+                            - user
                             - viewer
                         created_at:
                           type: string
