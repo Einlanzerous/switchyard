@@ -24,6 +24,24 @@ export const conflict = (message: string, details?: Record<string, unknown>) =>
   new HttpError(409, "conflict", message, details);
 export const unprocessable = (message: string, details?: Record<string, unknown>) =>
   new HttpError(422, "unprocessable", message, details);
+// 503 for a configured-but-unavailable upstream dependency (SWY-165: the Signet
+// daemon is unset or unreachable). The `service_unavailable` ErrorCode already
+// exists in shared; this is its factory.
+export const serviceUnavailable = (message: string, details?: Record<string, unknown>) =>
+  new HttpError(503, "service_unavailable", message, details);
+// Relay a non-2xx from an upstream dependency (SWY-165: the Signet daemon),
+// preserving its status where it maps to one of our error codes; anything
+// unmapped (401/403/500/…) collapses to 503, since from the client's view the
+// dependency is effectively unavailable rather than the client being at fault.
+export const upstreamError = (status: number, message: string): HttpError => {
+  const code: ErrorCode =
+    status === 400 ? "bad_request"
+      : status === 404 ? "not_found"
+        : status === 409 ? "conflict"
+          : status === 422 ? "unprocessable"
+            : "service_unavailable";
+  return new HttpError(code === "service_unavailable" ? 503 : status, code, message);
+};
 
 // Cloudflare Access SSO (SWY-161). `ssoDisabled` = env not configured or the
 // Cf-Access-Jwt-Assertion header is absent (401, so the login page falls back

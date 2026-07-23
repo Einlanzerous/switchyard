@@ -26,3 +26,4 @@ export * from "./schemas/customField.js";
 export * from "./schemas/externalRef.js";
 export * from "./schemas/ticketTemplate.js";
 export * from "./schemas/llmObservation.js";
+export * from "./schemas/signet.js";

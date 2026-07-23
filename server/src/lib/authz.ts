@@ -155,6 +155,18 @@ export function assertInstanceAdmin(
   throw forbidden(`${surface} is restricted to instance admins`);
 }
 
+// Stricter than assertInstanceAdmin: the instance OWNER only — agents are
+// excluded even though they otherwise carry instance-wide access. For surfaces
+// that must never be driven by automation by default, e.g. the Signet
+// credential-vault mirror (SWY-165). `surface` shapes the message.
+export function assertInstanceOwner(
+  user: Pick<AuthUser, "type" | "instance_role">,
+  surface = "this resource",
+): void {
+  if (user.instance_role === "owner") return;
+  throw forbidden(`${surface} is restricted to the instance owner`);
+}
+
 // ─── 6.2 write-path gate ──────────────────────────────────────────────────────
 
 // Assert the user holds at least `capability` on `projectId`, else throw 403 —

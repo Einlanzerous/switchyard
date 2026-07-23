@@ -24,6 +24,7 @@ import * as auth from "./auth.js";
 import * as ticketTemplates from "./ticketTemplates.js";
 import * as llmObservations from "./llmObservations.js";
 import * as llmInsights from "./llmInsights.js";
+import * as signet from "./signet.js";
 
 export function mountRoutes(app: OpenAPIHono) {
   users.mount(app);
@@ -59,4 +60,5 @@ export function mountRoutes(app: OpenAPIHono) {
   auth.mount(app);
   ticketTemplates.mount(app);
   llmObservations.mount(app);
+  signet.mount(app);
 }

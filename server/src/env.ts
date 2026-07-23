@@ -75,6 +75,17 @@ const Env = z.object({
   CF_ACCESS_TEAM_DOMAIN: z.string().min(1).optional(),
   CF_ACCESS_AUD: z.string().min(16).optional(),
 
+  // Signet connector (SWY-165). The blind-mirror admin surfaces proxy to the
+  // Signet daemon's `signet serve` HTTP API. Both URL and token must be set for
+  // the connector to be "configured"; otherwise /v1/signet/status reports
+  // configured:false and the data/command endpoints return 503. Presence is the
+  // enable switch — there is no separate boolean flag. Switchyard runs
+  // in-container while Signet is a host daemon, so SIGNET_BASE_URL is typically
+  // http://host.docker.internal:4010 (see SERV-44 for the extra_hosts wiring).
+  SIGNET_BASE_URL: z.string().url().optional(),
+  SIGNET_API_TOKEN: z.string().min(8).optional(),
+  SIGNET_TIMEOUT_MS: z.coerce.number().int().positive().default(5_000),
+
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 });
 
