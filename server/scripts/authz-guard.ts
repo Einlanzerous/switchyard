@@ -12,7 +12,8 @@
 //   WRITES (6.2 / SWY-102) — flags route files that mutate a project-scoped or
 //   admin table (insert/update/delete) without referencing a write gate
 //   (`assertProjectRole` for project role, `assertInstanceAdmin` for instance
-//   surfaces). A write to a member's non-project resource must 403.
+//   surfaces, `assertCanDelete` for author-scoped destructive routes). A write
+//   to a member's non-project resource must 403.
 //
 //   BYPASS (6.5 / SWY-104) — flags route files that re-derive the owner/agent
 //   instance-wide bypass with a bare `type === "agent"` comparison instead of
@@ -67,7 +68,10 @@ const WRITE_TABLES = [
   "labels", "users",
 ] as const;
 const WRITE_VERBS = ["insert", "update", "delete"] as const;
-const WRITE_HELPERS = ["assertProjectRole", "assertInstanceAdmin"] as const;
+// `assertCanDelete` is the author-scoped delete gate (SWY-163) — a valid write
+// gate for destructive routes (ticket soft-delete), distinct from the flat
+// `assertProjectRole` used by create/edit.
+const WRITE_HELPERS = ["assertProjectRole", "assertInstanceAdmin", "assertCanDelete"] as const;
 
 // BYPASS shape: a bare comparison against the `agent` literal. The owner/agent
 // bypass must flow through `hasInstanceWideAccess`; a handler comparing
