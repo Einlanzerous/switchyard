@@ -180,6 +180,91 @@ describe("SWY-165 — proxy happy-path (stubbed upstream)", () => {
     expect(JSON.parse(seenBody!)).toEqual({ project: "lyceum", name: "API_TOKEN" });
   });
 
+  test("add-target forwards {project,name,repo,secret_name} to the daemon", async () => {
+    const { ownerToken } = await seed();
+    setSignetConfigForTests({ baseUrl: "http://signet.test", token: "tok", timeoutMs: 1000 });
+    let seenUrl: string | null = null;
+    let seenActor: string | null = null;
+    let seenBody: string | null = null;
+    globalThis.fetch = (async (input: any, init: any) => {
+      seenUrl = String(input);
+      seenActor = new Headers(init.headers).get("x-signet-actor");
+      seenBody = init.body;
+      return new Response(
+        JSON.stringify({ added: true, target: { kind: "gh-actions", repo: "Einlanzerous/purser", secret_name: "API_TOKEN", state: "never" } }),
+        { status: 200 },
+      );
+    }) as typeof fetch;
+
+    const res = await request("POST", "/v1/signet/commands/add-target", ownerToken, {
+      project: "lyceum", name: "API_TOKEN", repo: "Einlanzerous/purser", secret_name: "API_TOKEN",
+    });
+    expect(res.status).toBe(200);
+    expect(seenUrl).toBe("http://signet.test/v1/commands/add-target");
+    expect(seenActor).toBe("magos");
+    expect(JSON.parse(seenBody!)).toEqual({ project: "lyceum", name: "API_TOKEN", repo: "Einlanzerous/purser", secret_name: "API_TOKEN" });
+    expect((await res.json()).added).toBe(true);
+  });
+
+  test("add-target relays an upstream 409 (duplicate target)", async () => {
+    const { ownerToken } = await seed();
+    setSignetConfigForTests({ baseUrl: "http://signet.test", token: "tok", timeoutMs: 1000 });
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ error: "target already exists: Einlanzerous/purser → API_TOKEN (Actions secret API_TOKEN)" }), { status: 409 })) as typeof fetch;
+
+    const res = await request("POST", "/v1/signet/commands/add-target", ownerToken, {
+      project: "lyceum", name: "API_TOKEN", repo: "Einlanzerous/purser",
+    });
+    expect(res.status).toBe(409);
+    expect((await res.json()).error.message).toContain("already exists");
+  });
+
+  test("add-target without a repo is rejected before reaching the daemon", async () => {
+    const { ownerToken } = await seed();
+    setSignetConfigForTests({ baseUrl: "http://signet.test", token: "tok", timeoutMs: 1000 });
+    let called = false;
+    globalThis.fetch = (async () => { called = true; return new Response("{}", { status: 200 }); }) as typeof fetch;
+
+    const res = await request("POST", "/v1/signet/commands/add-target", ownerToken, { project: "lyceum", name: "API_TOKEN" });
+    expect(res.status).toBe(400);
+    expect(called).toBe(false);
+  });
+
+  test("set-expiry forwards {project,name,expires_at} to the daemon", async () => {
+    const { ownerToken } = await seed();
+    setSignetConfigForTests({ baseUrl: "http://signet.test", token: "tok", timeoutMs: 1000 });
+    let seenUrl: string | null = null;
+    let seenBody: string | null = null;
+    globalThis.fetch = (async (input: any, init: any) => {
+      seenUrl = String(input);
+      seenBody = init.body;
+      return new Response(JSON.stringify({ project: "lyceum", name: "API_TOKEN", expires_at: "2027-01-15T00:00:00Z" }), { status: 200 });
+    }) as typeof fetch;
+
+    const res = await request("POST", "/v1/signet/commands/set-expiry", ownerToken, {
+      project: "lyceum", name: "API_TOKEN", expires_at: "2027-01-15",
+    });
+    expect(res.status).toBe(200);
+    expect(seenUrl).toBe("http://signet.test/v1/commands/set-expiry");
+    expect(JSON.parse(seenBody!)).toEqual({ project: "lyceum", name: "API_TOKEN", expires_at: "2027-01-15" });
+  });
+
+  test("set-expiry accepts an empty expires_at (clear)", async () => {
+    const { ownerToken } = await seed();
+    setSignetConfigForTests({ baseUrl: "http://signet.test", token: "tok", timeoutMs: 1000 });
+    let seenBody: string | null = null;
+    globalThis.fetch = (async (_input: any, init: any) => {
+      seenBody = init.body;
+      return new Response(JSON.stringify({ project: "lyceum", name: "API_TOKEN", expires_at: "" }), { status: 200 });
+    }) as typeof fetch;
+
+    const res = await request("POST", "/v1/signet/commands/set-expiry", ownerToken, {
+      project: "lyceum", name: "API_TOKEN", expires_at: "",
+    });
+    expect(res.status).toBe(200);
+    expect(JSON.parse(seenBody!)).toEqual({ project: "lyceum", name: "API_TOKEN", expires_at: "" });
+  });
+
   test("an upstream 404 is relayed as 404", async () => {
     const { ownerToken } = await seed();
     setSignetConfigForTests({ baseUrl: "http://signet.test", token: "tok", timeoutMs: 1000 });
