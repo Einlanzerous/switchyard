@@ -54,11 +54,17 @@ async function seed() {
     .values({ name: "magos", type: "human", instance_role: "owner" }).returning();
   const [member] = await testDb.insert(schema.users)
     .values({ name: "friend", type: "human", instance_role: "member" }).returning();
+  // An agent carries instance-wide access elsewhere, but the vault mirror must
+  // exclude it — so it's seeded here to prove the owner-only gate.
+  const [agent] = await testDb.insert(schema.users)
+    .values({ name: "claude", type: "agent", instance_role: "member" }).returning();
   return {
     owner: owner!,
     member: member!,
+    agent: agent!,
     ownerToken: await mintToken(owner!.id, ["read", "write"]),
     memberToken: await mintToken(member!.id, ["read", "write"]),
+    agentToken: await mintToken(agent!.id, ["admin"]),
   };
 }
 
@@ -87,6 +93,15 @@ describe("SWY-165 — owner gating", () => {
     }
     const cmd = await request("POST", "/v1/signet/commands/sync", memberToken, { project: "p", name: "n" });
     expect(cmd.status).toBe(403);
+  });
+
+  test("an agent (instance-wide elsewhere) is also 403 — vault is owner-only", async () => {
+    const { agentToken } = await seed();
+    setSignetConfigForTests({ baseUrl: "http://signet.test", token: "t", timeoutMs: 1000 });
+    for (const path of ["/v1/signet/status", "/v1/signet/secrets"]) {
+      const res = await GET(path, agentToken);
+      expect(res.status).toBe(403);
+    }
   });
 });
 

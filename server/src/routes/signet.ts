@@ -2,9 +2,11 @@
 // credential vault daemon (~/projects/signet).
 //
 // Every endpoint here forwards to the daemon's `signet serve` API and is gated
-// to instance admins (owners/agents) — the vault surface is not project-scoped.
-// Signet never returns plaintext values; only metadata, version hashes, sync
-// state, and the audit chain cross this boundary (see shared/schemas/signet.ts).
+// to the instance OWNER only — agents are excluded even though they carry
+// instance-wide access elsewhere, because the credential-vault mirror must not
+// be driven by automation by default. Signet never returns plaintext values;
+// only metadata, version hashes, sync state, and the audit chain cross this
+// boundary (see shared/schemas/signet.ts).
 //
 // Degradation (the epic's feasibility constraint — no page ships against APIs
 // that don't exist):
@@ -22,7 +24,7 @@ import {
 } from "@switchyard/shared";
 import { requireAuth } from "../auth.js";
 import { idempotency } from "../lib/idempotency.js";
-import { assertInstanceAdmin } from "../lib/authz.js";
+import { assertInstanceOwner } from "../lib/authz.js";
 import { serviceUnavailable } from "../errors.js";
 import {
   signetConfig, signetHealth, signetGet, signetPost, type SignetConfig,
@@ -112,7 +114,7 @@ const cmdSetExpiry = createRoute({
 // Owner-gate + resolve config, or throw the degraded-state 503. Reads and
 // commands both require the connector to be configured.
 function requireSignet(c: any): SignetConfig {
-  assertInstanceAdmin(c.get("auth").user, "signet");
+  assertInstanceOwner(c.get("auth").user, "signet");
   const cfg = signetConfig();
   if (!cfg) throw serviceUnavailable("Signet is not configured");
   return cfg;
@@ -125,7 +127,7 @@ export function mount(app: OpenAPIHono) {
   // status — owner-gated, but answers even when not configured so the UI banner
   // has a single source of truth for connectivity.
   app.openapi(status, (async (c: any) => {
-    assertInstanceAdmin(c.get("auth").user, "signet");
+    assertInstanceOwner(c.get("auth").user, "signet");
     const cfg = signetConfig();
     if (!cfg) return c.json({ configured: false, reachable: false }, 200);
     const health = await signetHealth(cfg);

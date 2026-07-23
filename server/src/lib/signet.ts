@@ -22,14 +22,15 @@ let configOverride: SignetConfig | null | undefined;
 
 export function setSignetConfigForTests(cfg: SignetConfig | null | undefined): void {
   configOverride = cfg;
+  healthCache = null; // a config change may point at a different daemon
 }
 
 // Active config, or null when the connector is disabled (either env var unset).
 export function signetConfig(): SignetConfig | null {
   if (configOverride !== undefined) return configOverride;
-  if (!env.SIGNET_API_URL || !env.SIGNET_API_TOKEN) return null;
+  if (!env.SIGNET_BASE_URL || !env.SIGNET_API_TOKEN) return null;
   return {
-    baseUrl: env.SIGNET_API_URL.replace(/\/+$/, ""),
+    baseUrl: env.SIGNET_BASE_URL.replace(/\/+$/, ""),
     token: env.SIGNET_API_TOKEN,
     timeoutMs: env.SIGNET_TIMEOUT_MS,
   };
@@ -121,20 +122,32 @@ export function signetPost<T>(
   });
 }
 
+type HealthResult = { reachable: boolean; version?: string; error?: string };
+
+// Cache the /healthz result briefly so a polling UI doesn't hammer the host
+// daemon (SWY-165 asks for ~30s). Keyed by baseUrl; reset on config override.
+const HEALTH_TTL_MS = 30_000;
+let healthCache: { key: string; at: number; result: HealthResult } | null = null;
+
 // Liveness probe for GET /v1/signet/status. Hits the unauthenticated /healthz.
 // Never throws — a failed probe is the reportable "not reachable" state.
-export async function signetHealth(
-  cfg: SignetConfig,
-): Promise<{ reachable: boolean; version?: string; error?: string }> {
+export async function signetHealth(cfg: SignetConfig): Promise<HealthResult> {
+  const now = Date.now();
+  if (healthCache && healthCache.key === cfg.baseUrl && now - healthCache.at < HEALTH_TTL_MS) {
+    return healthCache.result;
+  }
+  let result: HealthResult;
   try {
     const res = await signetFetch(cfg, "GET", "/healthz");
-    if (!res.ok) return { reachable: false, error: `healthz responded ${res.status}` };
-    const json = (await res.json().catch(() => ({}))) as { version?: unknown };
-    return {
-      reachable: true,
-      ...(typeof json.version === "string" ? { version: json.version } : {}),
-    };
+    if (!res.ok) {
+      result = { reachable: false, error: `healthz responded ${res.status}` };
+    } else {
+      const json = (await res.json().catch(() => ({}))) as { version?: unknown };
+      result = { reachable: true, ...(typeof json.version === "string" ? { version: json.version } : {}) };
+    }
   } catch (err) {
-    return { reachable: false, error: err instanceof Error ? err.message : String(err) };
+    result = { reachable: false, error: err instanceof Error ? err.message : String(err) };
   }
+  healthCache = { key: cfg.baseUrl, at: now, result };
+  return result;
 }
