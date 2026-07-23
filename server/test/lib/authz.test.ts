@@ -32,7 +32,7 @@ async function makeProject(key: string, name: string) {
   return p!.id;
 }
 
-async function addMember(userId: string, projectId: string, role: "admin" | "editor" | "viewer") {
+async function addMember(userId: string, projectId: string, role: "admin" | "editor" | "user" | "viewer") {
   await testDb.insert(schema.userProjects).values({ user_id: userId, project_id: projectId, role });
 }
 
@@ -83,7 +83,7 @@ describe("effectivePermissions (token scopes ∩ project role)", () => {
     const owner = await makeUser("magos", "human", "owner");
     const p = await makeProject("AAA", "Alpha");
     const caps = await authz.effectivePermissions(owner, { scopes: ["admin"] }, p);
-    expect(caps).toEqual(new Set(["read", "write", "manage"]));
+    expect(caps).toEqual(new Set(["read", "write", "delete", "manage"]));
   });
 
   test("agent with a read-only token is capped at read", async () => {
@@ -109,11 +109,29 @@ describe("effectivePermissions (token scopes ∩ project role)", () => {
     expect(caps).toEqual(new Set(["read"]));
   });
 
-  test("editor role + write token yields read+write, not manage", async () => {
+  test("editor role + write token yields read+write+delete, not manage", async () => {
     const u = await makeUser("dev", "human", "member");
     const p = await makeProject("PLEX", "Plex");
     await addMember(u.id, p, "editor");
     const caps = await authz.effectivePermissions(u, { scopes: ["tickets:write"] }, p);
+    expect(caps).toEqual(new Set(["read", "write", "delete"]));
+  });
+
+  // SWY-163: `user` is the write-without-delete tier. `write` does NOT close
+  // over `delete`, so even a broad token can't lift a `user` into deletion.
+  test("user role + write token yields read+write, NOT delete", async () => {
+    const u = await makeUser("dev", "human", "member");
+    const p = await makeProject("PLEX", "Plex");
+    await addMember(u.id, p, "user");
+    const caps = await authz.effectivePermissions(u, { scopes: ["tickets:write"] }, p);
+    expect(caps).toEqual(new Set(["read", "write"]));
+  });
+
+  test("user role caps an admin token at read+write (no delete/manage)", async () => {
+    const u = await makeUser("dev", "human", "member");
+    const p = await makeProject("PLEX", "Plex");
+    await addMember(u.id, p, "user");
+    const caps = await authz.effectivePermissions(u, { scopes: ["admin"] }, p);
     expect(caps).toEqual(new Set(["read", "write"]));
   });
 
@@ -122,7 +140,7 @@ describe("effectivePermissions (token scopes ∩ project role)", () => {
     const p = await makeProject("PLEX", "Plex");
     await addMember(u.id, p, "admin");
     const caps = await authz.effectivePermissions(u, { scopes: ["admin"] }, p);
-    expect(caps).toEqual(new Set(["read", "write", "manage"]));
+    expect(caps).toEqual(new Set(["read", "write", "delete", "manage"]));
   });
 
   test("non-member gets nothing even with an admin token", async () => {
@@ -130,6 +148,59 @@ describe("effectivePermissions (token scopes ∩ project role)", () => {
     const p = await makeProject("SWY", "Switchyard");
     const caps = await authz.effectivePermissions(friend, { scopes: ["admin"] }, p);
     expect(caps.size).toBe(0);
+  });
+});
+
+// SWY-163: destructive routes gate on `assertCanDelete`. Delete-capable roles
+// (editor/admin) and instance-wide actors delete ANY resource; a `user` may
+// delete only what it authored; viewers and non-members can't delete at all.
+describe("assertCanDelete (author-scoped delete)", () => {
+  test("instance-wide actors (owner, agent) may delete anything", async () => {
+    const owner = await makeUser("magos", "human", "owner");
+    const agent = await makeUser("claude", "agent", "member");
+    const author = await makeUser("author", "human", "member");
+    const p = await makeProject("PLEX", "Plex");
+    await expect(authz.assertCanDelete(owner, p, "ticket", author.id)).resolves.toBeUndefined();
+    await expect(authz.assertCanDelete(agent, p, "ticket", author.id)).resolves.toBeUndefined();
+  });
+
+  test("editor / admin delete any resource, even ones they didn't author", async () => {
+    const editor = await makeUser("ed", "human", "member");
+    const admin = await makeUser("ad", "human", "member");
+    const author = await makeUser("author", "human", "member");
+    const p = await makeProject("PLEX", "Plex");
+    await addMember(editor.id, p, "editor");
+    await addMember(admin.id, p, "admin");
+    await expect(authz.assertCanDelete(editor, p, "ticket", author.id)).resolves.toBeUndefined();
+    await expect(authz.assertCanDelete(admin, p, "ticket", author.id)).resolves.toBeUndefined();
+  });
+
+  test("a `user` may delete its OWN resource", async () => {
+    const u = await makeUser("collab", "human", "member");
+    const p = await makeProject("PLEX", "Plex");
+    await addMember(u.id, p, "user");
+    await expect(authz.assertCanDelete(u, p, "ticket", u.id)).resolves.toBeUndefined();
+  });
+
+  test("a `user` may NOT delete someone else's resource", async () => {
+    const u = await makeUser("collab", "human", "member");
+    const author = await makeUser("author", "human", "member");
+    const p = await makeProject("PLEX", "Plex");
+    await addMember(u.id, p, "user");
+    await expect(authz.assertCanDelete(u, p, "ticket", author.id)).rejects.toThrow();
+  });
+
+  test("a viewer cannot delete even its own resource", async () => {
+    const u = await makeUser("watcher", "human", "member");
+    const p = await makeProject("PLEX", "Plex");
+    await addMember(u.id, p, "viewer");
+    await expect(authz.assertCanDelete(u, p, "ticket", u.id)).rejects.toThrow();
+  });
+
+  test("a non-member cannot delete", async () => {
+    const u = await makeUser("stranger", "human", "member");
+    const p = await makeProject("SWY", "Switchyard");
+    await expect(authz.assertCanDelete(u, p, "ticket", u.id)).rejects.toThrow();
   });
 });
 

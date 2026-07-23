@@ -1,0 +1,1 @@
+ALTER TYPE "public"."project_member_role" ADD VALUE 'user' BEFORE 'viewer';

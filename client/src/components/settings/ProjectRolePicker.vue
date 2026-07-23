@@ -99,6 +99,7 @@ function setRole(key: string, role: ProjectRole) {
           <SelectTrigger class="w-28 h-8"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="viewer">Viewer</SelectItem>
+            <SelectItem value="user">User</SelectItem>
             <SelectItem value="editor">Editor</SelectItem>
             <SelectItem value="admin">Admin</SelectItem>
           </SelectContent>

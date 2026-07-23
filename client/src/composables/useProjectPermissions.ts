@@ -5,7 +5,9 @@
 // HIDE affordances a user can't use, instead of letting a viewer click into a
 // 403 toast. Effective rule:
 //   - instance-wide actors (owner / agent) → write everywhere (no role lookup),
-//   - a member → write only where their `my_role` is editor/admin.
+//   - a member → write only where their `my_role` is user/editor/admin;
+//     delete-affordances (SWY-163) are narrower — editor/admin only, since a
+//     `user` may delete just its OWN work (checked per-resource by the caller).
 // `my_role` rides along on the project detail payload (the same field the
 // Members tab already gates on); we read it through the shared, cached
 // `/v1/projects/{key}` query so there's no extra fetch per affordance.
@@ -19,11 +21,12 @@ import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
 import { useAuthStore } from "@/stores/auth";
 
-export type ProjectRole = "admin" | "editor" | "viewer";
+export type ProjectRole = "admin" | "editor" | "user" | "viewer";
 
 export type ProjectPermissions = {
   myRole: ComputedRef<ProjectRole | null>;
   canWrite: ComputedRef<boolean>;
+  canDelete: ComputedRef<boolean>;
   canManage: ComputedRef<boolean>;
   isReadOnly: ComputedRef<boolean>;
 };
@@ -64,6 +67,14 @@ export function useProjectPermissions(
     // No single-project context (global list / all-projects board) → don't gate
     // the CTA; the create dialog picks the project and the server enforces.
     if (!key.value) return true;
+    return myRole.value === "user" || myRole.value === "editor" || myRole.value === "admin";
+  });
+  // Unconditional delete of others' work (SWY-163). A `user` is deliberately
+  // excluded — it may delete only its OWN tickets/comments, which the caller
+  // decides per-resource (e.g. `canDelete || ticket.reporter.id === me.id`).
+  const canDelete = computed(() => {
+    if (auth.isInstanceWide) return true;
+    if (!key.value) return true;
     return myRole.value === "editor" || myRole.value === "admin";
   });
   const canManage = computed(
@@ -78,7 +89,7 @@ export function useProjectPermissions(
     return !canWrite.value;
   });
 
-  return { myRole, canWrite, canManage, isReadOnly };
+  return { myRole, canWrite, canDelete, canManage, isReadOnly };
 }
 
 // Ticket-scoped write capability, shared from TicketBody down to the inline

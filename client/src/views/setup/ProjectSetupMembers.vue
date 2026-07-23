@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Members sub-tab of the project Setup page (6.4). Project-admins + owners add
-// people to the project, set their role (viewer/editor/admin), and remove them.
+// people to the project, set their role (viewer/user/editor/admin), and remove them.
 // The tab is gated upstream in ProjectSetupView on `my_role === 'admin' ||
 // isOwner`; this view still degrades gracefully if the API forbids the read.
 import { computed, ref } from "vue";
@@ -156,6 +156,7 @@ const removeMutation = useMutation({
                 <SelectTrigger class="w-32"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="viewer">Viewer</SelectItem>
+                  <SelectItem value="user">User</SelectItem>
                   <SelectItem value="editor">Editor</SelectItem>
                   <SelectItem value="admin">Admin</SelectItem>
                 </SelectContent>
@@ -192,6 +193,7 @@ const removeMutation = useMutation({
                 <SelectTrigger class="w-32"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="viewer">Viewer</SelectItem>
+                  <SelectItem value="user">User</SelectItem>
                   <SelectItem value="editor">Editor</SelectItem>
                   <SelectItem value="admin">Admin</SelectItem>
                 </SelectContent>

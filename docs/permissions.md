@@ -14,9 +14,17 @@ primitives it describes live in `server/src/lib/authz.ts`.
 
 - **Instance role** (`users.instance_role`): `owner | member`. `owner` = magos,
   the full instance admin. `member` = every other human.
-- **Per-project role** (`user_projects.role`): `admin | editor | viewer`.
-  `viewer` = read-only; `editor` = ticket/comment writes; `admin` = project
-  config. Membership is the `user_projects` join row itself — no row, no access.
+- **Per-project role** (`user_projects.role`): `admin | editor | user | viewer`
+  (four tiers as of SWY-163). `viewer` = read-only; **`user` = write (comment,
+  create/edit tickets) but no deletion of others' work**; `editor` = write +
+  delete tickets/comments; `admin` = the above + project config + membership.
+  Membership is the `user_projects` join row itself — no row, no access.
+- **Capabilities** (`lib/authz.ts`): `read ⊂ write ⊂ delete ⊂ manage`. Crucially
+  `write` does **not** imply `delete` — that gap is what the `user` tier buys.
+  A `user` may still delete its **own** tickets/comments (author-scoped, via
+  `assertCanDelete`); it just can't touch others'. There is no separate
+  `*:delete` token scope — a write-capable token is delete-capable at the scope
+  layer, and the project role is what withholds deletion.
 - **Agents are instance-wide service accounts.** `users.type = 'agent'` bypasses
   per-project membership entirely and keeps seeing everything.
 - **Effective permission = token scopes ∩ project role.** A `viewer` with an
@@ -64,7 +72,8 @@ which is `user.type === 'agent' || user.instance_role === 'owner'`.
    (`visibleProjectFilter` / `assertProjectReadable` / …); the **write** check
    (added in 6.2) flags `.insert|update|delete(schema.X)` on a project-scoped or
    admin table (`tickets`, `comments`, `statuses`, `projects`, `rules`, `users`,
-   …) without a write gate (`assertProjectRole` / `assertInstanceAdmin`). It was
+   …) without a write gate (`assertProjectRole` / `assertInstanceAdmin` /
+   `assertCanDelete`). It was
    **advisory through 6.1.0–6.1.4**, **ENFORCING since 6.1.5** — it runs in
    `.github/workflows/ci.yml` and a new unscoped read OR write handler fails the
    build. A file that legitimately touches these tables outside the project model

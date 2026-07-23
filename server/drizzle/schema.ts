@@ -25,9 +25,12 @@ export const userType = pgEnum("user_type", ["agent", "human"]);
 // `user_projects`. Agents bypass membership regardless of this value
 // (see `hasInstanceWideAccess` in lib/authz.ts).
 export const instanceRole = pgEnum("instance_role", ["owner", "member"]);
-// Per-project role (Phase 6), carried on `user_projects.role`. `viewer` =
-// read-only; `editor` = ticket/comment writes; `admin` = project config.
-export const projectMemberRole = pgEnum("project_member_role", ["admin", "editor", "viewer"]);
+// Per-project role (Phase 6; four tiers as of SWY-163), carried on
+// `user_projects.role`. `viewer` = read-only; `user` = write but no delete of
+// others' work; `editor` = ticket/comment write + delete; `admin` = the above +
+// project config. Enum ordinality is irrelevant — roles resolve via capability
+// lookup (lib/authz.ROLE_CAPABILITIES), never ORDER BY role.
+export const projectMemberRole = pgEnum("project_member_role", ["admin", "editor", "user", "viewer"]);
 export const statusCategory = pgEnum("status_category", [
   "backlog",
   "planning",

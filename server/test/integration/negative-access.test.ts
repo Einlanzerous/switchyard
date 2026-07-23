@@ -864,6 +864,59 @@ describe("6.2 — write-path enforcement (HTTP)", () => {
   });
 });
 
+// ─── SWY-163 — author-scoped ticket delete (real HTTP) ───────────────────────
+// `delete` is split out of `write`: a `user` role writes but may delete only
+// tickets it reported; an `editor` (delete-capable) deletes any; a `viewer`
+// none. All tokens carry tickets:write so the ROLE gate — not the scope — is
+// what draws the line (assertCanDelete). Owners/agents bypass as always.
+describe("SWY-163 — author-scoped ticket delete (HTTP)", () => {
+  async function seed() {
+    const ctx = await fixture();
+    const [collab] = await testDb.insert(schema.users)
+      .values({ name: "collab", type: "human", instance_role: "member" }).returning();
+    await testDb.insert(schema.userProjects).values({ user_id: collab!.id, project_id: ctx.plex.id, role: "user" });
+    const [editor] = await testDb.insert(schema.users)
+      .values({ name: "editor", type: "human", instance_role: "member" }).returning();
+    await testDb.insert(schema.userProjects).values({ user_id: editor!.id, project_id: ctx.plex.id, role: "editor" });
+
+    // PLEX-1 reported by collab (their own); PLEX-2, PLEX-3 reported by magos.
+    const mk = (number: number, reporter_id: string) =>
+      testDb.insert(schema.tickets).values({
+        project_id: ctx.plex.id, number, type: "task", title: `T-${number}`,
+        status_id: ctx.plexBacklog.id, reporter_id,
+      }).returning().then((r) => r[0]!);
+    await mk(1, collab!.id);
+    await mk(2, ctx.magos.id);
+    await mk(3, ctx.magos.id);
+    await testDb.update(schema.projectCounters).set({ last_used_number: 3 })
+      .where(inArray(schema.projectCounters.project_id, [ctx.plex.id]));
+
+    return {
+      ctx,
+      collabToken: await mintToken(collab!.id, ["tickets:write"]),
+      editorToken: await mintToken(editor!.id, ["tickets:write"]),
+      friendToken: await mintToken(ctx.friend.id, ["tickets:write"]),
+    };
+  }
+
+  test("a `user` deletes its OWN reported ticket (204) but not another's (403)", async () => {
+    const { collabToken } = await seed();
+    expect((await DELETE("/v1/tickets/PLEX-1", collabToken)).status).toBe(204); // own
+    expect((await DELETE("/v1/tickets/PLEX-2", collabToken)).status).toBe(403); // magos'
+  });
+
+  test("an editor deletes any ticket, including ones it didn't report (204)", async () => {
+    const { editorToken } = await seed();
+    expect((await DELETE("/v1/tickets/PLEX-3", editorToken)).status).toBe(204);
+  });
+
+  test("a viewer cannot delete even a ticket in its own project (403)", async () => {
+    const { friendToken } = await seed();
+    // friend is a viewer on PLEX (fixture) — no delete, not the author.
+    expect((await DELETE("/v1/tickets/PLEX-2", friendToken)).status).toBe(403);
+  });
+});
+
 // 6.3 / SWY-74 — read-only (dashboard) tokens. Creation is read-only-by-
 // construction (scopes capped server-side); a minted dashboard token then reads
 // but can't write, proving it converges on the same read-only path as a viewer.

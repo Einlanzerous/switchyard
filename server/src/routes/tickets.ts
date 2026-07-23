@@ -27,7 +27,7 @@ import {
   loadTicketDetail, loadTicketSummary, allocateTicketNumber, fetchExternalRefsByTicket,
 } from "../lib/tickets.js";
 import { detectAndNotify, detectAndNotifyOnEdit } from "../lib/mentions.js";
-import { assertProjectReadable, assertProjectRole, visibleProjectFilter } from "../lib/authz.js";
+import { assertProjectReadable, assertProjectRole, assertCanDelete, visibleProjectFilter } from "../lib/authz.js";
 import { badRequest, unprocessable } from "../errors.js";
 
 const tag = "Tickets";
@@ -655,7 +655,9 @@ export function mount(app: OpenAPIHono) {
     const { idOrKey: param } = c.req.valid("param");
     const auth = c.get("auth");
     const existing = await resolveTicket(param);
-    await assertProjectRole(auth.user, existing.project_id, "write", "ticket");
+    // SWY-163: destructive, so gate on `delete` (author-scoped for `user`), not
+    // plain `write` — a `user` may delete only tickets they reported.
+    await assertCanDelete(auth.user, existing.project_id, "ticket", existing.reporter_id);
 
     const summary = await loadTicketSummary(existing);
 
