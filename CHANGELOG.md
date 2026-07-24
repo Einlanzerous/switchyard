@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.4.1](https://github.com/Einlanzerous/switchyard/compare/v4.4.0...v4.4.1) (2026-07-24)
+
+
+### Maintenance
+
+* update knowledge graph [skip ci] ([de27df0](https://github.com/Einlanzerous/switchyard/commit/de27df0936f6e7273032a5bc30ff4a350e27e7fa))
+
 ## [4.4.0](https://github.com/Einlanzerous/switchyard/compare/v4.3.0...v4.4.0) (2026-07-23)
 
 
