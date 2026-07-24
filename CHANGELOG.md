@@ -1,5 +1,19 @@
 # Changelog
 
+## [4.4.0](https://github.com/Einlanzerous/switchyard/compare/v4.3.0...v4.4.0) (2026-07-23)
+
+
+### Features
+
+* SWY-163 — add `user` project role; split `delete` out of `write` ([#147](https://github.com/Einlanzerous/switchyard/issues/147)) ([bd2b07d](https://github.com/Einlanzerous/switchyard/commit/bd2b07dd60c6ba0f759e1e5602d01146b88d97b2))
+* SWY-165 — Signet connector (config, owner gating, /v1/signet proxy) ([#148](https://github.com/Einlanzerous/switchyard/issues/148)) ([ff7dfb6](https://github.com/Einlanzerous/switchyard/commit/ff7dfb6785c73cee6620efc2b8919cb91b091f61))
+
+
+### Maintenance
+
+* update knowledge graph [skip ci] ([ed163f6](https://github.com/Einlanzerous/switchyard/commit/ed163f668e27213696523306ef9743ca15dca17f))
+* update knowledge graph [skip ci] ([3a8d869](https://github.com/Einlanzerous/switchyard/commit/3a8d8698876b0208b52553ab869fc8f733b6e865))
+
 ## [4.3.0](https://github.com/Einlanzerous/switchyard/compare/v4.2.0...v4.3.0) (2026-07-12)
 
 
