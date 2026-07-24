@@ -11,10 +11,12 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import TicketBody from "./TicketBody.vue";
+import TicketTitleEditor from "./TicketTitleEditor.vue";
 import TypeIcon from "./TypeIcon.vue";
 import MoveTicketDialog from "./MoveTicketDialog.vue";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
+import { useProjectPermissions } from "@/composables/useProjectPermissions";
 
 const route = useRoute();
 const router = useRouter();
@@ -67,6 +69,11 @@ const headTicket = useQuery({
 });
 const titleTicket = computed(() => headTicket.data.value);
 
+// The drawer header renders its own title, OUTSIDE TicketBody's
+// provideTicketCanWrite provider, so resolve write capability here from the
+// focused ticket's project for the inline title editor.
+const { canWrite } = useProjectPermissions(() => titleTicket.value?.project.key ?? null);
+
 const moveDialogOpen = ref(false);
 function openMoveDialog() { moveDialogOpen.value = true; }
 </script>
@@ -85,8 +92,14 @@ function openMoveDialog() { moveDialogOpen.value = true; }
           <span class="font-mono text-[13px] font-medium text-ink-3 shrink-0">
             {{ titleTicket.key }}
           </span>
-          <SheetTitle class="text-[14.5px] font-bold tracking-tight truncate flex-1">
-            {{ titleTicket.title }}
+          <SheetTitle class="flex-1 min-w-0">
+            <TicketTitleEditor
+              :ticket-key="titleTicket.key"
+              :ticket-id="titleTicket.id"
+              :title="titleTicket.title"
+              :can-write="canWrite"
+              text-class="text-[14.5px] font-bold tracking-tight truncate block"
+            />
           </SheetTitle>
         </template>
         <SheetTitle v-else class="font-mono text-base text-muted-foreground flex-1">

@@ -3,14 +3,18 @@ import { computed } from "vue";
 
 const props = defineProps<{ parent: { id: string; key: string; title: string } }>();
 
-// Drop noisy leading markers like "Phase 6 — " or "New Login: " so the chip shows
-// the meaningful epic name. Splits on a colon or a space-padded dash (—/–/--/-),
-// so hyphenated names like "auto-login" stay intact. Greedy match strips to the
-// last separator; falls back to the raw title if stripping leaves nothing.
+// Show the epic's leading name — the segment before the FIRST separator: a
+// space-padded dash (—/–/--/-) or a colon followed by space. Intra-word hyphens
+// and apostrophes ("Auto-run", "won't") are preserved because they aren't
+// spaced, so only true separators split. So "Scale Hardening — fixes for the…"
+// → "Scale Hardening" and "Phase 6 — Authz" → "Phase 6". The full "KEY — title"
+// stays in the chip tooltip; the chip itself CSS-truncates. A dedicated,
+// author-set epic label (instead of deriving from the title) is tracked in
+// SWY-170.
 const shortLabel = computed(() => {
   const title = props.parent.title.trim();
-  const stripped = title.replace(/^.*(?::\s*|\s+(?:—|–|--|-)\s+)/, "").trim();
-  return (stripped || title).split(/\s+/).slice(0, 3).join(" ");
+  const head = title.split(/\s+(?:—|–|--|-)\s+|:\s+/)[0]!.trim();
+  return head || title;
 });
 </script>
 

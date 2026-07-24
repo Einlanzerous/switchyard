@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import StatusBadge from "./StatusBadge.vue";
 import TypeIcon from "./TypeIcon.vue";
 import DescriptionEditor from "./DescriptionEditor.vue";
+import TicketTitleEditor from "./TicketTitleEditor.vue";
 import CommentItem from "./CommentItem.vue";
 import CommentComposer from "./CommentComposer.vue";
 import TransitionButton from "./TransitionButton.vue";
@@ -278,7 +279,14 @@ function openAddSubTicket() {
       <h1 class="flex items-start gap-2.5 text-[26px] leading-tight tracking-[-0.01em]">
         <TypeIcon :type="ticket.type" class="mt-1 h-[26px] w-[26px]" />
         <span class="mt-1 font-mono text-base text-ink-3">{{ ticket.key }}</span>
-        <span class="font-bold flex-1 min-w-0">{{ ticket.title }}</span>
+        <TicketTitleEditor
+          :ticket-key="ticket.key"
+          :ticket-id="ticket.id"
+          :title="ticket.title"
+          :can-write="canWrite"
+          text-class="text-[26px] font-bold leading-tight tracking-[-0.01em]"
+          class="flex-1 min-w-0"
+        />
         <button
           v-if="ticket.template_id"
           type="button"
